@@ -1,0 +1,8 @@
+node_modules/
+dist/
+dist-electron/
+release/
+native/mac/build/
+native/win/target/
+*.log
+.DS_Store

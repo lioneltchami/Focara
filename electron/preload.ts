@@ -1,0 +1,43 @@
+import { contextBridge, ipcRenderer } from 'electron';
+
+const on = (channel: string, cb: (...a: unknown[]) => void) => {
+  const h = (_e: unknown, ...a: unknown[]) => cb(...a);
+  ipcRenderer.on(channel, h);
+  return () => { ipcRenderer.removeListener(channel, h); };
+};
+
+contextBridge.exposeInMainWorld('odak', {
+  platform: process.platform,
+  isSelftest: process.argv.includes('--selftest'),
+  isUiTest: process.argv.includes('--uitest'),
+  uiTestProject: () => ipcRenderer.invoke('uitest:project'),
+  uiTestCapture: (name: string) => ipcRenderer.invoke('uitest:capture', name),
+  requestScreenPermission: () => ipcRenderer.invoke('capture:requestPermission'),
+  createPackage: (name: string) => ipcRenderer.invoke('project:create', name),
+  loadProject: (pkg: string) => ipcRenderer.invoke('project:load', pkg),
+  saveProject: (pkg: string, project: unknown) => ipcRenderer.invoke('project:save', pkg, project),
+  fileSize: (pkg: string, rel: string) => ipcRenderer.invoke('file:size', pkg, rel),
+  readFile: (pkg: string, rel: string, start: number, end: number) => ipcRenderer.invoke('file:read', pkg, rel, start, end),
+  readCursor: (pkg: string, rel: string) => ipcRenderer.invoke('file:readCursor', pkg, rel),
+  writeFile: (pkg: string, rel: string, data: Uint8Array) => ipcRenderer.invoke('file:write', pkg, rel, data),
+  fileOpen: (path: string) => ipcRenderer.invoke('file:open', path),
+  fileWrite: (handle: number, data: Uint8Array, position: number) => ipcRenderer.invoke('file:writeAt', handle, data, position),
+  fileClose: (handle: number, remove?: boolean) => ipcRenderer.invoke('file:close', handle, !!remove),
+  openProjectDialog: () => ipcRenderer.invoke('dialog:openProject'),
+  saveVideoDialog: (name: string) => ipcRenderer.invoke('dialog:saveVideo', name),
+  reveal: (p: string) => ipcRenderer.invoke('shell:reveal', p),
+  openPath: (p: string) => ipcRenderer.invoke('shell:open', p),
+  recents: () => ipcRenderer.invoke('recents:list'),
+  addRecent: (pkg: string) => ipcRenderer.invoke('recents:add', pkg),
+  displays: () => ipcRenderer.invoke('capture:displays'),
+  screenPermission: () => ipcRenderer.invoke('capture:permission'),
+  openPermissionSettings: () => ipcRenderer.invoke('capture:openSettings'),
+  captureAvailable: () => ipcRenderer.invoke('capture:available'),
+  startRecording: (o: unknown) => ipcRenderer.invoke('capture:start', o),
+  stopRecording: () => ipcRenderer.invoke('capture:stop'),
+  onRecordingFinished: (cb: (r: unknown) => void) => on('recording:finished', cb),
+  onHudFinishing: (cb: () => void) => on('hud:finishing', cb),
+  onMenu: (cb: (cmd: unknown) => void) => on('menu', cb),
+  selftestTempDir: () => ipcRenderer.invoke('selftest:dir'),
+  selftestDone: (result: unknown) => ipcRenderer.send('selftest:done', result),
+});

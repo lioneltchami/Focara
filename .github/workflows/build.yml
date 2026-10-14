@@ -1,0 +1,55 @@
+name: build
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+
+      - name: Capture helper (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          cargo test --manifest-path native/win/Cargo.toml
+          cargo build --release --manifest-path native/win/Cargo.toml
+      - name: Capture helper (macOS)
+        if: runner.os == 'macOS'
+        run: zsh native/mac/build.sh
+
+      - name: End-to-end selftest (synthetic recording → zoom → save/open → export → preview parity, audio sync)
+        run: npm run selftest
+      - name: UI test (real UI driven by DOM events)
+        shell: bash
+        run: |
+          cp -R "examples/Örnek Proje.odak" "$RUNNER_TEMP/ui.odak"
+          npm run uitest -- "$RUNNER_TEMP/ui.odak"
+      - name: Capture helper smoke test (records 3 s of this machine's screen)
+        run: node scripts/helper-smoke.mjs
+
+      - name: Package
+        run: npx electron-builder --publish never
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Odak-${{ runner.os }}
+          path: |
+            release/*.dmg
+            release/*.zip
+            release/*.exe
+          if-no-files-found: error

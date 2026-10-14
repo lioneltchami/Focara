@@ -1,0 +1,82 @@
+{
+  "formatVersion": 1,
+  "id": "621DC987-9BB5-46F7-B6D6-9AB117CA0D44",
+  "name": "\u00d6rnek Proje",
+  "createdAt": 1792014295.829,
+  "updatedAt": 1792014295.829,
+  "media": [
+    {
+      "id": "064D47C9-A1E1-460C-9C14-FEE5924B7FAE",
+      "kind": "screenRecording",
+      "displayName": "Test",
+      "videoFile": "media/064D47C9-A1E1-460C-9C14-FEE5924B7FAE/screen.mp4",
+      "systemAudioFile": "media/064D47C9-A1E1-460C-9C14-FEE5924B7FAE/system.wav",
+      "cursorFile": "media/064D47C9-A1E1-460C-9C14-FEE5924B7FAE/cursor.json",
+      "duration": 10,
+      "pixelWidth": 1920,
+      "pixelHeight": 1200,
+      "pixelsPerPoint": 2
+    }
+  ],
+  "clips": [
+    {
+      "id": "22F27266-1287-44D5-8AD2-C4CE45C864E9",
+      "mediaID": "064D47C9-A1E1-460C-9C14-FEE5924B7FAE",
+      "sourceStart": 0,
+      "sourceEnd": 10,
+      "zooms": [
+        {
+          "id": "A06BF614-C5A7-49FB-B0C4-4894EB428816",
+          "start": 0.55,
+          "end": 4.3,
+          "scale": 2,
+          "focus": {
+            "followCursor": {}
+          },
+          "isGenerated": true
+        },
+        {
+          "id": "E6697310-302E-43D8-9D45-9F84D11FC361",
+          "start": 7.55,
+          "end": 10,
+          "scale": 2,
+          "focus": {
+            "followCursor": {}
+          },
+          "isGenerated": true
+        }
+      ],
+      "videoVolume": 1,
+      "systemAudioVolume": 1,
+      "microphoneVolume": 1
+    }
+  ],
+  "style": {
+    "backgroundTop": {
+      "r": 0.2,
+      "g": 0.24,
+      "b": 0.42,
+      "a": 1
+    },
+    "backgroundBottom": {
+      "r": 0.53,
+      "g": 0.33,
+      "b": 0.55,
+      "a": 1
+    },
+    "padding": 0.07,
+    "cornerRadius": 0.018,
+    "shadow": true,
+    "showCursor": true,
+    "cursorScale": 1.4,
+    "smoothCursor": true,
+    "clickRipple": true,
+    "zoomSpeed": "normal"
+  },
+  "export": {
+    "resolution": "p1080",
+    "fps": 60,
+    "codec": "h264",
+    "aspect": "wide"
+  }
+}

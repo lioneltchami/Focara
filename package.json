@@ -1,0 +1,91 @@
+{
+  "name": "odak",
+  "productName": "Odak",
+  "version": "0.1.0",
+  "description": "Ekran kaydı + otomatik ve düzenlenebilir zoom. macOS ve Windows.",
+  "main": "dist-electron/main.cjs",
+  "private": true,
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "build": "node scripts/build.mjs",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "node --experimental-strip-types --no-warnings --test \"tests/**/*.test.ts\"",
+    "selftest": "node scripts/build.mjs && electron . --selftest",
+    "dist": "node scripts/build.mjs && electron-builder",
+    "build:helper:mac": "zsh native/mac/build.sh",
+    "build:helper:win": "cargo build --release --manifest-path native/win/Cargo.toml",
+    "uitest": "node scripts/build.mjs && electron . --uitest",
+    "dist:mac": "node scripts/build.mjs && electron-builder --mac",
+    "dist:win": "node scripts/build.mjs && electron-builder --win"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.5",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "6.1.2",
+    "electron": "44.7.2",
+    "electron-builder": "26.15.3",
+    "esbuild": "0.28.2",
+    "mediabunny": "1.61.4",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "typescript": "5.9.3",
+    "vite": "8.3.4"
+  },
+  "type": "module",
+  "author": "Odak",
+  "build": {
+    "appId": "com.odak.app",
+    "productName": "Odak",
+    "copyright": "Odak",
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "dist/**",
+      "dist-electron/**",
+      "package.json"
+    ],
+    "asar": true,
+    "npmRebuild": false,
+    "mac": {
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "category": "public.app-category.video",
+      "icon": "build/icon.png",
+      "identity": "-",
+      "hardenedRuntime": false,
+      "extraResources": [
+        {
+          "from": "native/mac/build/odak-capture",
+          "to": "bin/odak-capture"
+        }
+      ],
+      "extendInfo": {
+        "NSMicrophoneUsageDescription": "Odak, kayıtlarına mikrofon sesini ayrı bir iz olarak eklemek için mikrofona erişir.",
+        "NSScreenCaptureUsageDescription": "Odak, seçtiğin ekranı kaydetmek için ekran kaydı iznine ihtiyaç duyar."
+      }
+    },
+    "win": {
+      "target": [
+        "nsis",
+        "zip"
+      ],
+      "icon": "build/icon.png",
+      "extraResources": [
+        {
+          "from": "native/win/target/release/odak-capture.exe",
+          "to": "bin/odak-capture.exe"
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "artifactName": "Odak-Kurulum-${version}.${ext}"
+    }
+  }
+}

@@ -1,0 +1,201 @@
+// Project document model. The JSON layout matches Kadraj's project.json, so the two apps
+// can open each other's projects.
+//
+// Times stored on clips and zooms are *source* times (seconds into the media file), so
+// trimming or reordering clips never moves a zoom relative to the content it frames.
+
+export type Focus = { followCursor: Record<string, never> } | { fixed: { x: number; y: number } };
+
+export interface ZoomSegment {
+  id: string;
+  start: number;
+  end: number;
+  scale: number;
+  focus: Focus;
+  /** True while the segment is untouched output of the auto-zoom generator. */
+  isGenerated: boolean;
+}
+
+export interface Clip {
+  id: string;
+  mediaID: string;
+  sourceStart: number;
+  sourceEnd: number;
+  zooms: ZoomSegment[];
+  videoVolume: number;
+  systemAudioVolume: number;
+  microphoneVolume: number;
+}
+
+export interface MediaAsset {
+  id: string;
+  kind: 'screenRecording' | 'externalVideo';
+  displayName: string;
+  /** Paths are relative to the project package, always with forward slashes. */
+  videoFile: string;
+  systemAudioFile?: string;
+  microphoneFile?: string;
+  cursorFile?: string;
+  duration: number;
+  pixelWidth: number;
+  pixelHeight: number;
+  /** Pixels per point of the recorded display (cursor art is sized in points). */
+  pixelsPerPoint: number;
+  recordedAt?: number;
+}
+
+export interface RGBA { r: number; g: number; b: number; a: number }
+
+export type ZoomSpeed = 'gentle' | 'normal' | 'quick';
+export const zoomSpeeds: { id: ZoomSpeed; title: string; stiffness: number }[] = [
+  { id: 'gentle', title: 'Yumuşak', stiffness: 70 },
+  { id: 'normal', title: 'Normal', stiffness: 140 },
+  { id: 'quick', title: 'Hızlı', stiffness: 260 },
+];
+export const stiffnessOf = (s: ZoomSpeed) => zoomSpeeds.find((z) => z.id === s)?.stiffness ?? 140;
+
+export interface StyleSettings {
+  backgroundTop: RGBA;
+  backgroundBottom: RGBA;
+  /** Fraction of the shorter canvas side left as margin around the screen. */
+  padding: number;
+  /** Corner radius as a fraction of the shorter screen side. */
+  cornerRadius: number;
+  shadow: boolean;
+  showCursor: boolean;
+  cursorScale: number;
+  smoothCursor: boolean;
+  clickRipple: boolean;
+  zoomSpeed: ZoomSpeed;
+}
+
+export type Resolution = 'p1080' | 'p1440' | 'p2160';
+export const resolutions: { id: Resolution; title: string; height: number }[] = [
+  { id: 'p1080', title: '1080p', height: 1080 },
+  { id: 'p1440', title: '1440p', height: 1440 },
+  { id: 'p2160', title: '4K', height: 2160 },
+];
+
+export interface ExportSettings {
+  resolution: Resolution;
+  fps: number;
+  codec: 'h264' | 'hevc';
+  aspect: 'wide' | 'recording';
+}
+
+export interface Project {
+  formatVersion: number;
+  id: string;
+  name: string;
+  createdAt: number;
+  updatedAt: number;
+  media: MediaAsset[];
+  clips: Clip[];
+  style: StyleSettings;
+  export: ExportSettings;
+}
+
+export interface CursorSample { t: number; x: number; y: number }
+export interface ClickEvent { t: number; x: number; y: number; isDown: boolean; button: number }
+export interface CursorTrack { samples: CursorSample[]; clicks: ClickEvent[] }
+
+export const uuid = () => crypto.randomUUID().toUpperCase();
+export const now = () => Date.now() / 1000;
+
+export const defaultStyle = (): StyleSettings => ({
+  backgroundTop: { r: 0.2, g: 0.24, b: 0.42, a: 1 },
+  backgroundBottom: { r: 0.53, g: 0.33, b: 0.55, a: 1 },
+  padding: 0.07,
+  cornerRadius: 0.018,
+  shadow: true,
+  showCursor: true,
+  cursorScale: 1.4,
+  smoothCursor: true,
+  clickRipple: true,
+  zoomSpeed: 'normal',
+});
+
+export const defaultExport = (): ExportSettings => ({ resolution: 'p1080', fps: 60, codec: 'h264', aspect: 'wide' });
+
+export function newProject(name: string): Project {
+  return {
+    formatVersion: 1, id: uuid(), name, createdAt: now(), updatedAt: now(),
+    media: [], clips: [], style: defaultStyle(), export: defaultExport(),
+  };
+}
+
+export function newClip(mediaID: string, sourceStart: number, sourceEnd: number): Clip {
+  return { id: uuid(), mediaID, sourceStart, sourceEnd, zooms: [], videoVolume: 1, systemAudioVolume: 1, microphoneVolume: 1 };
+}
+
+/** Fills fields missing from older or foreign project files with defaults. */
+export function normalizeProject(p: Project): Project {
+  return {
+    ...newProject(p.name ?? 'Proje'),
+    ...p,
+    style: { ...defaultStyle(), ...(p.style ?? {}) },
+    export: { ...defaultExport(), ...(p.export ?? {}) },
+    clips: (p.clips ?? []).map((c) => ({ ...newClip(c.mediaID, c.sourceStart, c.sourceEnd), ...c, zooms: c.zooms ?? [] })),
+    media: p.media ?? [],
+  };
+}
+
+export const isFollow = (f: Focus): f is { followCursor: Record<string, never> } => 'followCursor' in f;
+export const followCursor = (): Focus => ({ followCursor: {} });
+export const fixedFocus = (x: number, y: number): Focus => ({ fixed: { x, y } });
+
+export const clipDuration = (c: Clip) => Math.max(0, c.sourceEnd - c.sourceStart);
+export const projectDuration = (p: Project) => p.clips.reduce((s, c) => s + clipDuration(c), 0);
+export const assetOf = (p: Project, id: string) => p.media.find((m) => m.id === id);
+
+export function clipStarts(p: Project): number[] {
+  let t = 0;
+  return p.clips.map((c) => { const s = t; t += clipDuration(c); return s; });
+}
+
+/** Output-timeline time -> clip index and source time. */
+export function locate(p: Project, time: number): { index: number; sourceTime: number } | null {
+  let t = 0;
+  for (let i = 0; i < p.clips.length; i++) {
+    const c = p.clips[i];
+    const d = clipDuration(c);
+    if (time < t + d || i === p.clips.length - 1) {
+      return { index: i, sourceTime: c.sourceStart + Math.min(Math.max(time - t, 0), d) };
+    }
+    t += d;
+  }
+  return null;
+}
+
+export interface Size { width: number; height: number }
+export interface Rect { x: number; y: number; width: number; height: number }
+
+export function canvasSize(p: Project, s: ExportSettings = p.export): Size {
+  const h = resolutions.find((r) => r.id === s.resolution)?.height ?? 1080;
+  let aspect = 16 / 9;
+  const first = p.clips[0] && assetOf(p, p.clips[0].mediaID);
+  if (s.aspect === 'recording' && first) aspect = first.pixelWidth / Math.max(first.pixelHeight, 1);
+  return { width: Math.round((h * aspect) / 2) * 2, height: h };
+}
+
+/** Where the unzoomed screen sits on the canvas (top-left origin). */
+export function screenRect(canvas: Size, source: Size, padding: number): Rect {
+  const margin = padding * Math.min(canvas.width, canvas.height);
+  const aw = canvas.width - 2 * margin, ah = canvas.height - 2 * margin;
+  const k = Math.min(aw / source.width, ah / source.height);
+  const w = source.width * k, h = source.height * k;
+  return { x: (canvas.width - w) / 2, y: (canvas.height - h) / 2, width: w, height: h };
+}
+
+export function cursorPosition(track: CursorTrack, t: number): { x: number; y: number } | null {
+  const s = track.samples;
+  if (!s.length) return null;
+  if (t <= s[0].t) return { x: s[0].x, y: s[0].y };
+  const last = s[s.length - 1];
+  if (t >= last.t) return { x: last.x, y: last.y };
+  let lo = 0, hi = s.length - 1;
+  while (hi - lo > 1) { const mid = (lo + hi) >> 1; if (s[mid].t <= t) lo = mid; else hi = mid; }
+  const a = s[lo], b = s[hi];
+  const f = b.t > a.t ? (t - a.t) / (b.t - a.t) : 0;
+  return { x: a.x + (b.x - a.x) * f, y: a.y + (b.y - a.y) * f };
+}

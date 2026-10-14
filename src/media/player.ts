@@ -1,0 +1,207 @@
+import type { VideoSample } from 'mediabunny';
+import { type ExportSettings, type Project, type Size, assetOf, canvasSize, clipDuration, clipStarts, locate, projectDuration } from '../core/model.ts';
+import { type ClipRenderData, drawFrame } from '../render/renderer.ts';
+import type { MediaLibrary } from './media.ts';
+
+/** Geometry is resolution independent; the preview renders at up to 1080p. */
+export function previewSettings(p: Project): ExportSettings {
+  return { ...p.export, resolution: 'p1080' };
+}
+
+/** Draws one sample (or nothing) for a clip at a source time. Shared with the exporter. */
+export function renderSample(ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D, canvas: Size,
+                             sample: VideoSample | null, data: ClipRenderData, sourceTime: number) {
+  drawFrame(ctx, canvas, sample ? (c, x, y, w, h) => sample.draw(c, x, y, w, h) : null,
+    sample ? { width: sample.displayWidth, height: sample.displayHeight } : { width: 1, height: 1 }, data, sourceTime);
+}
+
+/**
+ * Preview playback. The Web Audio clock is the master clock: audio buffers of every source are
+ * scheduled on it, and video frames are drawn for the time it reports.
+ */
+export class Player {
+  currentTime = 0;
+  playing = false;
+  private project: Project | null = null;
+  private data: ClipRenderData[] = [];
+  private size: Size = { width: 1920, height: 1080 };
+  private ctx: CanvasRenderingContext2D;
+  private audio: AudioContext | null = null;
+  private gen = 0;
+  private drawToken = 0;
+  private nodes: AudioScheduledSourceNode[] = [];
+  private clockStart = 0;
+  private timeStart = 0;
+
+  constructor(private canvas: HTMLCanvasElement, private lib: MediaLibrary,
+              private onTime: (t: number) => void, private onPlaying: (p: boolean) => void) {
+    this.ctx = canvas.getContext('2d', { alpha: false })!;
+  }
+
+  get duration() { return this.project ? projectDuration(this.project) : 0; }
+  get canvasSize() { return this.size; }
+
+  /** Installs a new edit state and redraws the current frame (playback continues). */
+  async setProject(p: Project) {
+    const data = await this.lib.allRenderData(p);
+    const structureChanged = !this.project || JSON.stringify(this.project.clips.map(c => [c.id, c.mediaID, c.sourceStart, c.sourceEnd, c.videoVolume, c.systemAudioVolume, c.microphoneVolume]))
+      !== JSON.stringify(p.clips.map(c => [c.id, c.mediaID, c.sourceStart, c.sourceEnd, c.videoVolume, c.systemAudioVolume, c.microphoneVolume]));
+    this.project = p;
+    this.data = data;
+    const size = canvasSize(p, previewSettings(p));
+    this.size = size;
+    if (this.canvas.width !== size.width || this.canvas.height !== size.height) {
+      this.canvas.width = size.width; this.canvas.height = size.height;
+    }
+    this.currentTime = Math.min(this.currentTime, this.duration);
+    if (this.playing && structureChanged) { this.pause(); this.play(); }
+    else if (!this.playing) await this.drawAt(this.currentTime);
+  }
+
+  /** Draws the exact frame for timeline time t (the frame the exporter would produce). */
+  async drawAt(t: number) {
+    const p = this.project;
+    if (!p) return;
+    const token = ++this.drawToken;
+    const loc = locate(p, t);
+    if (!loc) { this.ctx.fillStyle = '#000'; this.ctx.fillRect(0, 0, this.size.width, this.size.height); return; }
+    const clip = p.clips[loc.index];
+    const media = await this.lib.open(assetOf(p, clip.mediaID)!.videoFile);
+    const sample = media.videoSink ? await media.videoSink.getSample(loc.sourceTime) : null;
+    if (token !== this.drawToken) { sample?.close(); return; }
+    renderSample(this.ctx, this.size, sample, this.data[loc.index], loc.sourceTime);
+    sample?.close();
+  }
+
+  async seek(t: number) {
+    const wasPlaying = this.playing;
+    if (wasPlaying) this.stopPlayback();
+    this.currentTime = Math.min(Math.max(0, t), this.duration);
+    this.onTime(this.currentTime);
+    if (wasPlaying) this.play(); else await this.drawAt(this.currentTime);
+  }
+
+  private clock() {
+    return this.timeStart + (this.audio!.currentTime - this.clockStart);
+  }
+
+  play() {
+    const p = this.project;
+    if (!p || this.playing || !p.clips.length) return;
+    if (this.currentTime >= this.duration - 0.05) this.currentTime = 0;
+    this.audio ??= new AudioContext({ sampleRate: 48000, latencyHint: 'interactive' });
+    void this.audio.resume();
+    const gen = ++this.gen;
+    this.playing = true; this.onPlaying(true);
+    this.timeStart = this.currentTime;
+    this.clockStart = this.audio.currentTime + 0.12;
+    void this.scheduleAudio(gen, p);
+    void this.videoLoop(gen, p);
+  }
+
+  pause() {
+    if (!this.playing) return;
+    this.currentTime = Math.min(this.clock(), this.duration);
+    this.stopPlayback();
+    this.onTime(this.currentTime);
+    void this.drawAt(this.currentTime);
+  }
+
+  toggle() { if (this.playing) this.pause(); else this.play(); }
+
+  private stopPlayback() {
+    this.gen++;
+    this.playing = false; this.onPlaying(false);
+    for (const n of this.nodes) { try { n.stop(); } catch { /* already stopped */ } }
+    this.nodes = [];
+  }
+
+  private async scheduleAudio(gen: number, p: Project) {
+    const ac = this.audio!;
+    const starts = clipStarts(p);
+    const from = this.timeStart;
+    for (let i = 0; i < p.clips.length; i++) {
+      const clip = p.clips[i], clipStart = starts[i], clipEnd = clipStart + clipDuration(clip);
+      if (clipEnd <= from) continue;
+      const srcFrom = clip.sourceStart + Math.max(0, from - clipStart);
+      const sources = await this.lib.audioOf(p, clip);
+      await Promise.all(sources.map(async ({ sink, volume }) => {
+        const gain = ac.createGain();
+        gain.gain.value = volume;
+        gain.connect(ac.destination);
+        for await (const b of sink.buffers(Math.max(0, srcFrom - 0.2), clip.sourceEnd)) {
+          if (gen !== this.gen) return;
+          const timelineAt = clipStart + (b.timestamp - clip.sourceStart);
+          const ctxAt = this.clockStart + (timelineAt - from);
+          const offset = Math.max(0, srcFrom - b.timestamp);
+          if (offset >= b.duration) continue;
+          const node = ac.createBufferSource();
+          node.buffer = b.buffer;
+          node.connect(gain);
+          node.start(Math.max(ctxAt + offset, ac.currentTime), offset);
+          node.stop(this.clockStart + (clipEnd - from));
+          this.nodes.push(node);
+          node.onended = () => { this.nodes = this.nodes.filter((n) => n !== node); };
+          // Stay a few seconds ahead of the clock, no more.
+          while (gen === this.gen && ctxAt - ac.currentTime > 3) await new Promise((r) => setTimeout(r, 150));
+        }
+      }));
+      if (gen !== this.gen) return;
+    }
+  }
+
+  private async videoLoop(gen: number, p: Project) {
+    let clipIndex = -1;
+    let it: AsyncGenerator<VideoSample, void, unknown> | null = null;
+    let current: VideoSample | null = null;
+    let next: VideoSample | null = null;
+    const release = async () => {
+      current?.close(); next?.close(); current = next = null;
+      if (it) await it.return(undefined);
+      it = null;
+    };
+    try {
+      while (gen === this.gen) {
+        const t = Math.max(this.timeStart, this.clock());
+        if (t >= this.duration) {
+          this.stopPlayback();
+          this.currentTime = this.duration;
+          this.onTime(this.currentTime);
+          break;
+        }
+        this.currentTime = t;
+        this.onTime(t);
+        const loc = locate(p, t)!;
+        if (loc.index !== clipIndex) {
+          await release();
+          clipIndex = loc.index;
+          const media = await this.lib.open(assetOf(p, p.clips[clipIndex].mediaID)!.videoFile);
+          if (media.videoSink) {
+            it = media.videoSink.samples(Math.max(0, loc.sourceTime - 0.1), p.clips[clipIndex].sourceEnd + 0.1);
+            const first = await it.next();
+            current = first.done ? null : first.value;
+            const second = first.done ? null : await it.next();
+            next = second && !second.done ? second.value : null;
+          }
+        }
+        // Advance to the last frame starting at or before the source time.
+        while (it && next && next.timestamp <= loc.sourceTime && gen === this.gen) {
+          current?.close();
+          current = next;
+          const r = await it.next();
+          next = r.done ? null : r.value;
+        }
+        if (gen !== this.gen) break;
+        renderSample(this.ctx, this.size, current, this.data[loc.index], loc.sourceTime);
+        await new Promise((r) => requestAnimationFrame(r));
+      }
+    } finally {
+      await release();
+    }
+  }
+
+  destroy() {
+    this.stopPlayback();
+    void this.audio?.close();
+  }
+}
