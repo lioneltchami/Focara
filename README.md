@@ -54,13 +54,23 @@ Geliştirme modunda (`npm run dev`) macOS izinleri "Electron" uygulamasına veri
 
 ### Kesme, birleştirme, düzenleme
 
+Zaman çizelgesinin üstündeki çubukta üç araç var. Hangisinin seçili olduğu ve ne yaptığı çubuğun sağında yazar.
+
+| Araç | Ne yapar |
+|---|---|
+| **↖ Seç** (V) | Klibe tıkla: seçer. Sürükle: sırasını değiştirir. Kenarını sürükle: kırpar. Shift+sürükle: aralık seçer. |
+| **↔ Aralık** (R) | Kliplerin üstünde sürükleyerek bir kısmı seçersin. Uçlarından tutup daraltıp genişletebilirsin. Altında **Sil / Ayır / ×2 / ×4** çıkar. |
+| **✂ Makas** (C) | Klibe tıkladığın yerden böler. Kesilecek yer kesik çizgiyle gösterilir; oynatma çizgisine yaklaşınca ona yapışır. |
+
+**Oynatma çizgisi** (kırmızı): başındaki kırmızı tutamağı ya da cetveli (en üstteki zaman şeridi) tutup sürükle; önizleme kare kare takip eder. Seç aracındayken çizginin kendisi de tutulabilir.
+
 | İşlem | Nasıl |
 |---|---|
-| Böl | Oynatma çizgisini getir, **✂ Böl** ya da **S**. Zoom'lar da iki parçaya bölünür. |
+| Böl | Oynatma çizgisini getir, **┆ Böl** ya da **S**. Zoom'lar da iki parçaya bölünür. Aralık seçiliyse iki ucundan böler. |
 | Kırp | Klibin sol/sağ kenarını sürükle. Sağ kenar oynatma çizgisine yapışır. Kırpılan kısım silinmez, kenarı geri çekince geri gelir. |
 | Sırala | Klibi tutup sürükle; bırakacağın yer çizgiyle gösterilir. |
 | Sil | Klibi seç, **Sil**. Arkadaki klipler boşluğu kapatır. |
-| Aralık sil | Cetvelde (zaman çizelgesinin üst şeridi) sürükleyerek aralık seç, **⌫ Aralığı sil** ya da **Sil**. Birden çok klibi kesse bile tek adımda çıkarır. |
+| Bir kısmı sil / hızlandır | **↔ Aralık** ile seç, sonra **Sil**, **×2** ya da **×4**. Birden çok klibi kesse bile tek adımda uygulanır. **Ayır** o kısmı ayrı bir klip yapar; sonra taşıyabilir, hızını ya da sesini ayrıca ayarlayabilirsin. |
 | Çoğalt / hız | Klibi seç; sağ panelden **Çoğalt**, hız ×0.5–×8, kaynak başı/sonu ve klibin ses düzeyleri. |
 | Video ekle | **＋ Video**: bilgisayardaki bir MP4/MOV/M4V/WebM/MKV videosu seçili klibin arkasına (seçim yoksa sona) eklenir ve projeye kopyalanır. |
 | Kayıt ekle | **● Kayıt**: açık projeye yeni bir ekran kaydı (kamera/mikrofonla birlikte) eklenir, kendi otomatik zoom'larıyla gelir. |
@@ -69,7 +79,7 @@ Geliştirme modunda (`npm run dev`) macOS izinleri "Electron" uygulamasına veri
 
 Her işlem **geri alınabilir** (⌘/Ctrl+Z). Ham kayıtlar hiç değişmez; düzenlemeler yalnızca `project.json`'a yazılır.
 
-Kısayollar: boşluk (oynat/duraklat), ←/→ (kare kare, Shift ile 10 kare), S (böl), Sil (seçili klip, zoom ya da aralık), Esc (seçimi bırak), ⌘/Ctrl+Z ve ⇧⌘/Ctrl+Shift+Z (geri al/yinele), ⌘/Ctrl+E (dışa aktar).
+Kısayollar: boşluk (oynat/duraklat), ←/→ (kare kare, Shift ile 10 kare), V / R / C (Seç / Aralık / Makas), S (böl), Sil (seçili klip, zoom ya da aralık), Esc (seçimi bırak, Seç aracına dön), ⌘/Ctrl+Z ve ⇧⌘/Ctrl+Shift+Z (geri al/yinele), ⌘/Ctrl+E (dışa aktar).
 
 ## Mimari
 
@@ -119,8 +129,8 @@ npm test               # çekirdek: zoom/kamera Kadraj (Swift) ile aynı mı; b�
 npm run selftest       # uygulama içinde: sentetik kayıt → zoom → kaydet/aç → MP4 → önizleme=dışa aktarma, ses senkronu,
                        #   kamera balonu, görsel/tema arka planlar, imleç stilleri, sahte kamera+mikrofonla kayıt,
                        #   düzenlenmiş çok klipli dışa aktarma (kesik + ×2 + içe aktarılan video + kopya) ve ses senkronu
-npm run uitest -- "examples/Örnek Proje.odak"   # gerçek arayüz: zoom'lar, böl/kırp/sürükle/sil, aralık sil,
-                                               #   video ekle, durgun anlar, geri al, oynat, otomatik kayıt
+npm run uitest -- "examples/Örnek Proje.odak"   # gerçek arayüz: zoom'lar, böl/kırp/sürükle/sil, oynatma çizgisini sürükleme,
+                                               #   makas, aralık ×2/ayır/sil, video ekle, durgun anlar, geri al, oynat, otomatik kayıt
 node scripts/helper-smoke.mjs                  # kayıt yardımcısıyla 3 sn gerçek kayıt (izin gerekir)
 cargo test --manifest-path native/win/Cargo.toml   # Windows yardımcısının WAV hizalaması
 ```

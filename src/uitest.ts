@@ -1,8 +1,9 @@
 // Drives the real UI with DOM events (no OS-level input): home screen, open project, add/drag/
 // edit zooms, fixed focus, undo/redo, style toggle, playback, export dialog, autosave.
 import { odak } from './bridge.ts';
-import { type Project, clipDuration, normalizeProject, projectDuration } from './core/model.ts';
+import { type Project, clipDuration, clipStarts, normalizeProject, projectDuration } from './core/model.ts';
 import type { EditorStore } from './ui/store.ts';
+import { speedRange } from './core/edit.ts';
 
 const log: string[] = [];
 let failures = 0;
@@ -58,7 +59,7 @@ export async function runUiTest() {
     const target = (firstEnd + nextStart) / 2 - 0.3;
     pointer(tl, 'pointerdown', r.left + 18 + target * pps, r.top + 10); pointer(tl, 'pointerup', r.left + 18 + target * pps, r.top + 10);
     await sleep(200);
-    click(byText('.transport button', '＋ Zoom'));
+    click(byText('.timeline-bar button', '＋ Zoom'));
     await until('zoom added', () => project().clips[0].zooms.length === initialZooms + 1);
     const added = selectedZoom()!;
     check(!!added && !added.isGenerated && Math.abs(added.start - target) < 0.1, `“＋ Zoom” adds a selected zoom at the playhead (${added?.start.toFixed(2)}s)`);
@@ -172,13 +173,70 @@ export async function runUiTest() {
     await sleep(80);
     check(project().clips[0].id === lastId, 'dragging a clip reorders it to the front');
 
-    const before = projectDuration(project());
+    // Playhead: grab the red head and drag it; the ruler scrubs too.
+    const knob = $('.playhead-knob')!, kr = knob.getBoundingClientRect();
+    pointer(knob, 'pointerdown', kr.left + 8, kr.top + 8); pointer(knob, 'pointermove', xAt(3), kr.top + 8);
+    await sleep(60);
+    const dragging = !!$('.playhead.dragging') && !!$('.playhead-time');
+    pointer(knob, 'pointerup', xAt(3), kr.top + 8);
+    await sleep(120);
+    check(dragging && Math.abs(ed.player.currentTime - 3) < 0.08, `dragging the playhead head moves it (→ ${ed.player.currentTime.toFixed(2)} s)`);
     const ruler = $('.ruler')!;
-    pointer(ruler, 'pointerdown', xAt(1), y(ruler)); pointer(ruler, 'pointermove', xAt(2.5), y(ruler)); pointer(ruler, 'pointerup', xAt(2.5), y(ruler));
-    await until('range', () => !!$('.range'));
+    pointer(ruler, 'pointerdown', xAt(1), y(ruler)); pointer(ruler, 'pointermove', xAt(2), y(ruler)); pointer(ruler, 'pointerup', xAt(2), y(ruler));
+    await sleep(120);
+    check(Math.abs(ed.player.currentTime - 2) < 0.08 && !$('.range'), `dragging on the ruler scrubs (→ ${ed.player.currentTime.toFixed(2)} s)`);
+    log.push(`shot: ${await odak().uiTestCapture('5a-playhead')}`);
+
+    // Scissors (C): click on a clip to cut exactly there.
+    key('c');
+    await until('scissors tool', () => !!$('.timeline.tool-blade'));
+    const nB = project().clips.length;
+    const cutX = xAt(1.5), cutClip = clipEls()[0];
+    pointer(cutClip, 'pointermove', cutX, y(cutClip));
+    await sleep(30);
+    const preview = !!$('.blade-line');
+    pointer(cutClip, 'pointerdown', cutX, y(cutClip)); pointer(inner(), 'pointerup', cutX, y(cutClip));
+    await sleep(80);
+    check(preview && project().clips.length === nB + 1 && clipStarts(project()).some((t) => Math.abs(t - 1.5) < 0.05),
+      'scissors tool shows the cut line and splits where clicked');
+
+    // Range (R): drag over the clips to select a part, then speed it up / make it a clip / delete it.
+    click(byText('.timeline-bar button', 'Aralık'));
+    await until('range tool', () => !!$('.timeline.tool-range'));
+    const dragRange = async (a: number, b: number) => {
+      const c0 = clipEls()[0];
+      pointer(c0, 'pointerdown', xAt(a), y(c0)); pointer(inner(), 'pointermove', xAt(b), y(c0)); pointer(inner(), 'pointerup', xAt(b), y(c0));
+      await until('range', () => !!$('.range-bar'));
+    };
+    const curRange = () => (window as unknown as { __odakEditor: { range: { a: number; b: number } | null } }).__odakEditor.range!;
+    let before = projectDuration(project());
+    await dragRange(2, 3.5);
+    log.push(`shot: ${await odak().uiTestCapture('5b-range')}`);
+    const r1 = curRange(), prev = project();
+    click(byText('.range-bar button', '×2'));
+    await sleep(80);
+    const expected = projectDuration(speedRange(prev, r1.a, r1.b, 2).project);
+    check(Math.abs(r1.a - 2) < 0.05 && Math.abs(r1.b - 3.5) < 0.05 && Math.abs(projectDuration(project()) - expected) < 1e-6 && expected < before - 0.3 && !$('.range'),
+      `range ${r1.a.toFixed(2)}–${r1.b.toFixed(2)} s at ×2 (${before.toFixed(2)} → ${projectDuration(project()).toFixed(2)} s)`);
+    store().undo();
+    await sleep(50);
+    await dragRange(2, 3.5);
+    const r2 = curRange();
+    click(byText('.range-bar button', 'Ayır'));
+    await sleep(80);
+    const sel = project().clips.findIndex((c) => c.id === (store().selection as { clipID: string } | null)?.clipID);
+    const st = clipStarts(project()), ends = st.map((t, i) => t + clipDuration(project().clips[i]));
+    check(sel >= 0 && Math.abs(st[sel] - r2.a) < 0.11 && ends.some((t) => Math.abs(t - r2.b) < 0.11) && !!$('.timeline.tool-select'),
+      'Ayır cuts at both ends of the range, selects it and returns to Seç');
+
+    before = projectDuration(project());
+    key('r');
+    await until('range tool', () => !!$('.timeline.tool-range'));
+    await dragRange(1, 2.5);
     key('Delete');
     await sleep(80);
     check(Math.abs(projectDuration(project()) - (before - 1.5)) < 0.05, `range select + Delete removes 1.5 s (${before.toFixed(2)} → ${projectDuration(project()).toFixed(2)} s)`);
+    key('Escape');
 
     const cam = project().media.find((m) => m.cameraFile)?.cameraFile;
     const newId = await ed.importFile(`${pkg}/${cam}`);
@@ -187,7 +245,7 @@ export async function runUiTest() {
     check(!!imported && project().media.some((m) => m.id === imported.mediaID && m.kind === 'externalVideo') && clipDuration(imported) > 9,
       'importing a video adds it as a clip');
 
-    click(byText('.transport button', 'Durgun'));
+    click(byText('.timeline-bar button', 'Durgun'));
     await until('quiet dialog', () => !!byText('.modal h2', 'Durgun anlar') && !byText('.modal p', 'inceleniyor'), 15000);
     check(!!byText('.modal button', 'Hızlandır'), 'quiet moments dialog analyses the recording');
     log.push(`shot: ${await odak().uiTestCapture('5-quiet')}`);

@@ -2,8 +2,8 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { odak } from '../bridge.ts';
 import { type Clip, type MediaAsset, type ZoomSegment, assetOf, clipDuration, clipStarts, isFollow, newClip, projectDuration, toLocal } from '../core/model.ts';
 import {
-  addZoomAt, deleteClip, deleteZoom, duplicateClip, insertClip, moveClip, regenerateAutoZooms, removeRange, splitAt,
-  trimClip, updateZoom,
+  addZoomAt, deleteClip, deleteZoom, duplicateClip, insertClip, isolateRange, moveClip, regenerateAutoZooms, removeRange,
+  speedRange, splitAt, trimClip, updateZoom,
 } from '../core/edit.ts';
 import { MediaLibrary } from '../media/media.ts';
 import { Player } from '../media/player.ts';
@@ -19,6 +19,15 @@ export function timecode(t: number, cs = true) {
   const m = Math.floor(t / 60), s = Math.floor(t % 60), c = Math.floor((t - Math.floor(t)) * 100);
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}${cs ? '.' + String(c).padStart(2, '0') : ''}`;
 }
+
+/** Timeline tools: select/move/trim, select a time range, cut where you click. */
+export type Tool = 'select' | 'range' | 'blade';
+
+const toolHints: Record<Tool, string> = {
+  select: 'Seç: tıkla → seç · sürükle → sırala · kenarı sürükle → kırp · Shift+sürükle → aralık',
+  range: 'Aralık: kliplerin üstünde sürükle → bir kısmı seç; sonra Sil, Ayır ya da hızlandır',
+  blade: 'Makas: klibe tıkla → tam oradan böler (oynatma çizgisine yapışır)',
+};
 
 export interface EditActions {
   split: () => void;
@@ -42,6 +51,14 @@ export function Editor({ store, onClose, busy, onRecordInto }: {
   const [aspect, setAspect] = useState(16 / 9);
   const [range, setRange] = useState<{ a: number; b: number } | null>(null);
   const [importing, setImporting] = useState(false);
+  const [tool, setTool] = useState<Tool>('select');
+  const [flash, setFlashState] = useState<string | null>(null);
+  const flashTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const setFlash = (text: string) => {
+    clearTimeout(flashTimer.current);
+    setFlashState(text);
+    flashTimer.current = setTimeout(() => setFlashState(null), 2500);
+  };
 
   useEffect(() => {
     const pl = new Player(canvasRef.current!, lib, setTime, setPlaying);
@@ -79,7 +96,35 @@ export function Editor({ store, onClose, busy, onRecordInto }: {
     store.update(() => r.project);
     store.select({ kind: 'zoom', clipID: r.clipID, zoomID: r.zoomID });
   };
+  /** The selected range becomes its own clip(s), ready to move, speed up or delete. */
+  const isolate = () => {
+    if (!range) return;
+    const r = isolateRange(store.project, range.a, range.b);
+    if (!r.clipIDs.length) return;
+    store.update(() => r.project);
+    store.select({ kind: 'clip', clipID: r.clipIDs[0] });
+    setRange(null);
+    setTool('select');
+  };
+  const speedUp = (speed: number) => {
+    if (!range) return;
+    const r = speedRange(store.project, range.a, range.b, speed);
+    if (!r.clipIDs.length) return;
+    store.update(() => r.project);
+    store.select({ kind: 'clip', clipID: r.clipIDs[0] });
+    setRange(null);
+    seek(range.a);
+  };
+  /** Scissors tool: split exactly where the user clicked. */
+  const cutAt = (t: number) => {
+    const r = splitAt(store.project, t);
+    if ('error' in r) { setFlash(r.error); return; }
+    store.update(() => r.project);
+    store.select({ kind: 'clip', clipID: r.rightID });
+    seek(t);
+  };
   const split = () => {
+    if (range) { isolate(); return; }
     const r = splitAt(store.project, now());
     if ('error' in r) { store.setError(r.error); return; }
     store.update(() => r.project);
@@ -145,7 +190,7 @@ export function Editor({ store, onClose, busy, onRecordInto }: {
     setImporting(false);
   };
 
-  if (odak().isUiTest) Object.assign(window, { __odakEditor: { importFile, setRange, player } });
+  if (odak().isUiTest) Object.assign(window, { __odakEditor: { importFile, setRange, player, range } });
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -155,8 +200,12 @@ export function Editor({ store, onClose, busy, onRecordInto }: {
       else if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); deleteSelected(); }
       else if (e.key === 'ArrowLeft') { e.preventDefault(); step(e.shiftKey ? -10 : -1); }
       else if (e.key === 'ArrowRight') { e.preventDefault(); step(e.shiftKey ? 10 : 1); }
-      else if ((e.key === 's' || e.key === 'S') && !e.metaKey && !e.ctrlKey) { e.preventDefault(); split(); }
-      else if (e.key === 'Escape') { setRange(null); store.select(null); }
+      else if (e.metaKey || e.ctrlKey || e.altKey) return;
+      else if (e.key === 's' || e.key === 'S') { e.preventDefault(); split(); }
+      else if (e.key === 'v' || e.key === 'V') setTool('select');
+      else if (e.key === 'r' || e.key === 'R') setTool('range');
+      else if (e.key === 'c' || e.key === 'C') setTool('blade');
+      else if (e.key === 'Escape') { setRange(null); store.select(null); setTool('select'); }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -186,25 +235,33 @@ export function Editor({ store, onClose, busy, onRecordInto }: {
             <button className="ghost play" onClick={() => player?.toggle()} title="Oynat / Duraklat (boşluk)">{playing ? '❚❚' : '▶'}</button>
             <button className="ghost" onClick={() => step(1)} title="Bir kare ileri (→)">⏭</button>
             <span className="mono muted">{timecode(time)} / {timecode(duration)}</span>
-            <span className="spacer" />
-            <div className="tool-group">
-              <button onClick={split} title="Oynatma çizgisinden böl (S)">✂ Böl</button>
-              <button onClick={deleteSelected} disabled={!range && !sel} title="Seçili klibi, zoom'u ya da aralığı sil (Sil)">⌫ Sil</button>
-            </div>
-            <div className="tool-group">
-              <button onClick={() => void importVideos()} disabled={importing} title="Bilgisayardan video ekle">{importing ? 'Ekleniyor…' : '＋ Video'}</button>
-              <button onClick={() => setDialog('record')} disabled={busy} title="Bu projeye yeni bir ekran kaydı ekle">● Kayıt</button>
-              <button onClick={() => setDialog('quiet')} title="Ekranın değişmediği, imlecin durduğu ve sesin olmadığı anları bul">⏩ Durgun anlar</button>
-            </div>
-            <div className="tool-group">
-              <button onClick={addZoom} title="Oynatma çizgisinde yeni zoom">＋ Zoom</button>
-              <button onClick={() => void regenerate()} title="Dokunulmamış otomatik zoom'ları tıklamalardan yeniden üret; elle düzenlenenler korunur">✦ Oto zoom</button>
-            </div>
           </div>
         </div>
         <Inspector store={store} lib={lib} seek={seek} onDelete={deleteSelected} actions={actions} />
       </div>
-      <Timeline store={store} lib={lib} time={time} playing={playing} seek={seek} range={range} setRange={setRange} onDeleteRange={deleteSelected} />
+      <Timeline store={store} lib={lib} time={time} playing={playing} seek={seek} range={range} setRange={setRange} tool={tool}
+                hint={flash ?? (range ? `${(range.b - range.a).toFixed(2)} sn seçili · Sil, Ayır ya da ×2 / ×4` : toolHints[tool])} warn={!!flash}
+                onDeleteRange={deleteSelected} onIsolate={isolate} onSpeed={speedUp} onCut={cutAt}
+                bar={<>
+                  <div className="tool-group modes">
+                    <button className={tool === 'select' ? 'on' : ''} onClick={() => setTool('select')} title="Seç (V): tıkla seç, sürükle sırala, kenardan kırp">↖ Seç</button>
+                    <button className={tool === 'range' ? 'on' : ''} onClick={() => setTool('range')} title="Aralık (R): kliplerin üstünde sürükleyerek bir kısmı seç">↔ Aralık</button>
+                    <button className={tool === 'blade' ? 'on' : ''} onClick={() => setTool('blade')} title="Makas (C): klibe tıkladığın yerden böl">✂ Makas</button>
+                  </div>
+                  <div className="tool-group">
+                    <button onClick={split} title="Oynatma çizgisinden böl (S); aralık seçiliyse iki ucundan böler">┆ Böl</button>
+                    <button onClick={deleteSelected} disabled={!range && !sel} title="Seçili klibi, zoom'u ya da aralığı sil (Sil)">⌫ Sil</button>
+                  </div>
+                  <div className="tool-group">
+                    <button onClick={() => void importVideos()} disabled={importing} title="Bilgisayardan video ekle">{importing ? 'Ekleniyor…' : '＋ Video'}</button>
+                    <button onClick={() => setDialog('record')} disabled={busy} title="Bu projeye yeni bir ekran kaydı ekle">● Kayıt</button>
+                    <button onClick={() => setDialog('quiet')} title="Ekranın değişmediği, imlecin durduğu ve sesin olmadığı anları bul">⏩ Durgun anlar</button>
+                  </div>
+                  <div className="tool-group">
+                    <button onClick={addZoom} title="Oynatma çizgisinde yeni zoom">＋ Zoom</button>
+                    <button onClick={() => void regenerate()} title="Dokunulmamış otomatik zoom'ları tıklamalardan yeniden üret; elle düzenlenenler korunur">✦ Oto zoom</button>
+                  </div>
+                </>} />
       {dialog === 'export' && <ExportDialog store={store} lib={lib} onClose={() => setDialog(null)} />}
       {dialog === 'quiet' && <QuietDialog store={store} lib={lib} onClose={() => setDialog(null)} />}
       {dialog === 'record' && (
@@ -238,9 +295,11 @@ export function Editor({ store, onClose, busy, onRecordInto }: {
 const INSET = 18;
 const SNAP_PX = 7;
 
-function Timeline({ store, lib, time, playing, seek, range, setRange, onDeleteRange }: {
+function Timeline({ store, lib, time, playing, seek, range, setRange, tool, bar, hint, warn, onDeleteRange, onIsolate, onSpeed, onCut }: {
   store: EditorStore; lib: MediaLibrary; time: number; playing: boolean; seek: (t: number) => void;
-  range: { a: number; b: number } | null; setRange: (r: { a: number; b: number } | null) => void; onDeleteRange: () => void;
+  range: { a: number; b: number } | null; setRange: (r: { a: number; b: number } | null) => void;
+  tool: Tool; bar: React.ReactNode; hint: string; warn: boolean;
+  onDeleteRange: () => void; onIsolate: () => void; onSpeed: (s: number) => void; onCut: (t: number) => void;
 }) {
   const p = store.project;
   const scroller = useRef<HTMLDivElement>(null);
@@ -248,11 +307,14 @@ function Timeline({ store, lib, time, playing, seek, range, setRange, onDeleteRa
   const [zoom, setZoom] = useState(1);
   const [drop, setDrop] = useState<{ clipID: string; index: number; x: number } | null>(null);
   const [envelopes, setEnvelopes] = useState<Map<string, Float32Array | null>>(new Map());
+  const [scrubbing, setScrubbing] = useState(false);
+  const [bladeAt, setBladeAt] = useState<number | null>(null);
   useLayoutEffect(() => {
     const ro = new ResizeObserver(([e]) => setWidth(e.contentRect.width));
     ro.observe(scroller.current!);
     return () => ro.disconnect();
   }, []);
+  useEffect(() => { if (tool !== 'blade') setBladeAt(null); }, [tool]);
   // Waveforms (decoded once per media, in the background).
   const mediaKey = p.media.map((m) => m.id).join(',');
   useEffect(() => {
@@ -263,7 +325,8 @@ function Timeline({ store, lib, time, playing, seek, range, setRange, onDeleteRa
     return () => { alive = false; };
   }, [lib, mediaKey, store]);
 
-  const duration = Math.max(projectDuration(p), 0.5);
+  const total = projectDuration(p);
+  const duration = Math.max(total, 0.5);
   const pps = ((width - INSET * 2) / duration) * zoom;
   const inner = Math.max(width, INSET * 2 + duration * pps);
   const starts = clipStarts(p);
@@ -272,6 +335,7 @@ function Timeline({ store, lib, time, playing, seek, range, setRange, onDeleteRa
     const el = scroller.current!;
     return (clientX - el.getBoundingClientRect().left + el.scrollLeft - INSET) / pps;
   };
+  const clampT = (t: number) => Math.max(0, Math.min(total, t));
 
   // Keep the playhead in view while playing.
   useEffect(() => {
@@ -299,28 +363,67 @@ function Timeline({ store, lib, time, playing, seek, range, setRange, onDeleteRa
     const x0 = e.clientX;
     let moved = false;
     const move = (ev: PointerEvent) => { if (Math.abs(ev.clientX - x0) > 3) moved = true; onMove(ev, ev.clientX - x0); };
-    const up = (ev: PointerEvent) => { el.removeEventListener('pointermove', move); el.removeEventListener('pointerup', up); onUp?.(ev, moved); };
+    const up = (ev: PointerEvent) => {
+      el.removeEventListener('pointermove', move); el.removeEventListener('pointerup', up); el.removeEventListener('pointercancel', up);
+      onUp?.(ev, moved);
+    };
     el.addEventListener('pointermove', move);
     el.addEventListener('pointerup', up);
+    el.addEventListener('pointercancel', up);
+  };
+  // While dragging near an edge of the visible area, scroll along.
+  const follow = (clientX: number) => {
+    const el = scroller.current!, r = el.getBoundingClientRect();
+    if (clientX < r.left + 30) el.scrollLeft -= 24;
+    else if (clientX > r.right - 30) el.scrollLeft += 24;
   };
 
-  // Empty lanes: scrub.
+  /** Moves the playhead with the pointer (the preview follows frame by frame). */
   const scrub = (e: React.PointerEvent) => {
+    e.stopPropagation();
     if (e.button !== 0) return;
-    store.select(null); setRange(null);
-    seek(tOf(e.clientX));
-    drag(e, (ev) => seek(tOf(ev.clientX)));
+    setScrubbing(true);
+    seek(clampT(tOf(e.clientX)));
+    drag(e, (ev) => { follow(ev.clientX); seek(clampT(tOf(ev.clientX))); }, () => setScrubbing(false));
   };
 
-  // Ruler: click to seek, drag to select a range.
-  const ruler = (e: React.PointerEvent) => {
-    e.stopPropagation();
-    const t0 = Math.max(0, Math.min(duration, tOf(e.clientX)));
+  /** Drags out a time range (Aralık tool, or Shift+drag with any tool). */
+  const selectRange = (e: React.PointerEvent) => {
+    const t0 = clampT(tOf(e.clientX));
+    store.select(null);
     drag(e, (ev, dx) => {
       if (Math.abs(dx) < 4) return;
-      const t1 = Math.max(0, Math.min(duration, tOf(ev.clientX)));
+      follow(ev.clientX);
+      const t1 = clampT(tOf(ev.clientX));
       setRange({ a: Math.min(t0, t1), b: Math.max(t0, t1) });
     }, (_ev, moved) => { if (!moved) { setRange(null); seek(t0); } });
+  };
+  const rangeEdge = (which: 'a' | 'b') => (e: React.PointerEvent) => {
+    e.stopPropagation();
+    if (!range) return;
+    const r0 = range;
+    drag(e, (ev) => {
+      follow(ev.clientX);
+      const t = clampT(tOf(ev.clientX));
+      const a = which === 'a' ? t : r0.a, b = which === 'b' ? t : r0.b;
+      setRange({ a: Math.min(a, b), b: Math.max(a, b) });
+    });
+  };
+
+  /** Where the scissors would cut: under the pointer, snapping to the playhead. */
+  const cutTime = (clientX: number) => {
+    let t = tOf(clientX);
+    if (Math.abs(t - time) * pps < SNAP_PX) t = time;
+    return t > 0 && t < total ? t : null;
+  };
+
+  // Lanes (clips and zooms pass the event on when the tool isn't "select").
+  const down = (e: React.PointerEvent) => {
+    if (e.button !== 0) return;
+    if (tool === 'blade') { const t = cutTime(e.clientX); if (t !== null) onCut(t); return; }
+    if (tool === 'range' || e.shiftKey) { selectRange(e); return; }
+    store.select(null); setRange(null);
+    scrub(e);
   };
 
   const steps = [0.1, 0.25, 0.5, 1, 2, 5, 10, 15, 30, 60, 120, 300];
@@ -330,22 +433,36 @@ function Timeline({ store, lib, time, playing, seek, range, setRange, onDeleteRa
 
   return (
     <div className="timeline-wrap">
-      <div className="timeline-tools">
-        <button className="ghost tiny" onClick={() => zoomBy(1 / 1.6)} title="Uzaklaştır">−</button>
-        <button className="ghost tiny" onClick={() => zoomBy(1.6)} title="Yakınlaştır (Ctrl/⌘ + tekerlek)">＋</button>
-        <button className="ghost tiny" onClick={() => setZoom(1)} title="Tümünü sığdır">⤢</button>
+      <div className="timeline-bar">
+        <div className="bar-tools">{bar}</div>
+        <span className={`bar-hint ${warn ? 'warn' : ''}`} title={hint}>{hint}</span>
+        <div className="bar-zoom">
+          <button className="ghost tiny" onClick={() => zoomBy(1 / 1.6)} title="Uzaklaştır">−</button>
+          <button className="ghost tiny" onClick={() => zoomBy(1.6)} title="Yakınlaştır (Ctrl/⌘ + tekerlek)">＋</button>
+          <button className="ghost tiny" onClick={() => setZoom(1)} title="Tümünü sığdır">⤢</button>
+        </div>
       </div>
-      <div className="timeline" ref={scroller}
+      <div className={`timeline tool-${tool}`} ref={scroller}
            onWheel={(e) => { if (e.ctrlKey || e.metaKey) { e.preventDefault(); zoomBy(e.deltaY < 0 ? 1.15 : 1 / 1.15, e.clientX); } }}>
-        <div className="timeline-inner" style={{ width: inner }} onPointerDown={scrub}>
-          <div className="ruler" onPointerDown={ruler} title="Tıkla: git · Sürükle: aralık seç">
+        <div className="timeline-inner" style={{ width: inner }} onPointerDown={down}
+             onPointerMove={(e) => { if (tool === 'blade') setBladeAt(cutTime(e.clientX)); }}
+             onPointerLeave={() => setBladeAt(null)}>
+          <div className="ruler" onPointerDown={scrub} title="Tıkla ya da sürükle: oynatma çizgisini taşı">
             {ticks.map((t) => (
               <div key={t} className="tick" style={{ left: xOf(t) }}><span>{timecode(t, tick < 1)}</span></div>
             ))}
           </div>
           {range && (
             <div className="range" style={{ left: xOf(range.a), width: Math.max(2, (range.b - range.a) * pps) }}>
-              <button className="range-del" onPointerDown={(e) => e.stopPropagation()} onClick={onDeleteRange}>⌫ Aralığı sil ({(range.b - range.a).toFixed(1)} sn)</button>
+              <div className="range-handle l" onPointerDown={rangeEdge('a')} title="Aralığın başı" />
+              <div className="range-handle r" onPointerDown={rangeEdge('b')} title="Aralığın sonu" />
+              <div className="range-bar" onPointerDown={(e) => e.stopPropagation()}>
+                <span className="mono">{(range.b - range.a).toFixed(2)} sn</span>
+                <button onClick={onDeleteRange} title="Bu kısmı sil (Sil)">⌫ Sil</button>
+                <button onClick={onIsolate} title="Bu kısmı ayrı bir klip yap (S)">┆ Ayır</button>
+                <button onClick={() => onSpeed(2)} title="Bu kısmı 2 kat hızlı oynat">⏩ ×2</button>
+                <button onClick={() => onSpeed(4)} title="Bu kısmı 4 kat hızlı oynat">⏩ ×4</button>
+              </div>
             </div>
           )}
           <div className="lane-label">ZOOM</div>
@@ -355,13 +472,13 @@ function Timeline({ store, lib, time, playing, seek, range, setRange, onDeleteRa
             const selected = store.selection?.kind === 'clip' && store.selection.clipID === clip.id;
             return (
               <div key={clip.id}>
-                <ClipBlock store={store} clip={clip} media={media} index={i} left={x} width={w} pps={pps} selected={selected}
+                <ClipBlock store={store} clip={clip} media={media} index={i} left={x} width={w} pps={pps} selected={selected} tool={tool}
                            envelope={envelopes.get(clip.mediaID) ?? null} drag={drag} time={time} clipStart={starts[i]}
                            seek={seek} tOf={tOf} starts={starts} setDrop={setDrop} xOf={xOf} />
                 {clip.zooms.map((z) => {
                   const s = Math.max(z.start, clip.sourceStart), e = Math.min(z.end, clip.sourceEnd);
                   if (e <= s) return null;
-                  return <ZoomBlock key={z.id} store={store} clip={clip} zoom={z} pps={pps} seek={seek}
+                  return <ZoomBlock key={z.id} store={store} clip={clip} zoom={z} pps={pps} seek={seek} tool={tool}
                                     left={x + toLocal(clip, s) * pps} width={Math.max(toLocal(clip, e) * pps - toLocal(clip, s) * pps, 6)}
                                     toTimeline={(src) => starts[i] + toLocal(clip, src)} drag={drag} />;
                 })}
@@ -369,16 +486,23 @@ function Timeline({ store, lib, time, playing, seek, range, setRange, onDeleteRa
             );
           })}
           {drop && <div className="drop-marker" style={{ left: drop.x }} />}
-          <div className="playhead" style={{ left: xOf(time) }} />
+          {tool === 'blade' && bladeAt !== null && (
+            <div className={`blade-line ${bladeAt === time ? 'snapped' : ''}`} style={{ left: xOf(bladeAt) }}><span>✂ {timecode(bladeAt)}</span></div>
+          )}
+          <div className={`playhead ${scrubbing ? 'dragging' : ''}`} style={{ left: xOf(time) }}>
+            <div className="playhead-knob" onPointerDown={scrub} title="Tut ve sürükle: videoda ileri-geri git" />
+            {tool === 'select' && <div className="playhead-grip" onPointerDown={scrub} />}
+            {scrubbing && <span className="playhead-time">{timecode(time)}</span>}
+          </div>
         </div>
       </div>
     </div>
   );
 }
 
-function ClipBlock({ store, clip, media, index, left, width, pps, selected, envelope, drag, time, clipStart, seek, tOf, starts, setDrop, xOf }: {
+function ClipBlock({ store, clip, media, index, left, width, pps, selected, tool, envelope, drag, time, clipStart, seek, tOf, starts, setDrop, xOf }: {
   store: EditorStore; clip: Clip; media: MediaAsset | undefined; index: number; left: number; width: number; pps: number;
-  selected: boolean; envelope: Float32Array | null; time: number; clipStart: number; starts: number[];
+  selected: boolean; tool: Tool; envelope: Float32Array | null; time: number; clipStart: number; starts: number[];
   drag: (e: React.PointerEvent, m: (ev: PointerEvent, dx: number) => void, u?: (ev: PointerEvent, moved: boolean) => void) => void;
   seek: (t: number) => void; tOf: (x: number) => number; xOf: (t: number) => number;
   setDrop: (d: { clipID: string; index: number; x: number } | null) => void;
@@ -386,6 +510,7 @@ function ClipBlock({ store, clip, media, index, left, width, pps, selected, enve
   const speed = clip.speed || 1;
   // Body: click selects and seeks; drag reorders.
   const body = (e: React.PointerEvent) => {
+    if (tool !== 'select' || e.shiftKey || e.button !== 0) return; // the timeline handles range / scissors
     e.stopPropagation();
     store.select({ kind: 'clip', clipID: clip.id });
     const clips = store.project.clips;
@@ -404,6 +529,7 @@ function ClipBlock({ store, clip, media, index, left, width, pps, selected, enve
   };
   // Edges: trim (the end edge snaps to the playhead).
   const edge = (which: 'start' | 'end') => (e: React.PointerEvent) => {
+    if (tool !== 'select' || e.button !== 0) return;
     e.stopPropagation();
     store.select({ kind: 'clip', clipID: clip.id });
     const s0 = clip.sourceStart, e0 = clip.sourceEnd;
@@ -455,14 +581,15 @@ function Waveform({ envelope, clip, width }: { envelope: Float32Array | null; cl
   return <canvas ref={ref} className="wave" style={{ width: Math.min(width, 4096) }} />;
 }
 
-function ZoomBlock({ store, clip, zoom, pps, left, width, seek, toTimeline, drag }: {
-  store: EditorStore; clip: Clip; zoom: ZoomSegment; pps: number; left: number; width: number;
+function ZoomBlock({ store, clip, zoom, pps, left, width, seek, toTimeline, drag, tool }: {
+  store: EditorStore; clip: Clip; zoom: ZoomSegment; pps: number; left: number; width: number; tool: Tool;
   seek: (t: number) => void; toTimeline: (src: number) => number;
   drag: (e: React.PointerEvent, m: (ev: PointerEvent, dx: number) => void, u?: (ev: PointerEvent, moved: boolean) => void) => void;
 }) {
   const selected = store.selection?.kind === 'zoom' && store.selection.zoomID === zoom.id;
   const speed = clip.speed || 1;
   const start = (part: 'body' | 'left' | 'right') => (e: React.PointerEvent) => {
+    if (tool !== 'select' || e.shiftKey || e.button !== 0) return;
     e.stopPropagation();
     const snap = { ...zoom };
     store.select({ kind: 'zoom', clipID: clip.id, zoomID: zoom.id });

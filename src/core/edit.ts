@@ -151,17 +151,36 @@ export function setClipSpeed(p: Project, clipID: string, speed: number): Project
   return { ...p, clips: p.clips.map((c) => (c.id === clipID ? { ...c, speed: Math.min(16, Math.max(0.25, speed)) } : c)) };
 }
 
-/** Removes the timeline range [a, b] (seconds), across clips. */
-export function removeRange(p: Project, a: number, b: number): Project {
-  if (b - a < 0.01) return p;
+/**
+ * Splits at both ends of the timeline range [a, b] and returns the clips that now lie inside it.
+ * A split refused because it is too close to a clip edge means that edge already is the boundary,
+ * so membership allows that much slack.
+ */
+export function isolateRange(p: Project, a: number, b: number): { project: Project; clipIDs: string[] } {
+  if (b - a < 0.01) return { project: p, clipIDs: [] };
   let q = p;
   for (const t of [b, a]) {
     const r = splitAt(q, t);
     if ('project' in r) q = r.project;
   }
   const starts = clipStarts(q);
-  const eps = 1e-6;
-  return { ...q, clips: q.clips.filter((c, i) => !(starts[i] >= a - eps && starts[i] + clipDuration(c) <= b + eps)) };
+  const clipIDs = q.clips.filter((c, i) => {
+    const slack = MIN_CLIP / (c.speed || 1) + 1e-6;
+    return starts[i] >= a - slack && starts[i] + clipDuration(c) <= b + slack;
+  }).map((c) => c.id);
+  return { project: q, clipIDs };
+}
+
+/** Removes the timeline range [a, b] (seconds), across clips. */
+export function removeRange(p: Project, a: number, b: number): Project {
+  const { project: q, clipIDs } = isolateRange(p, a, b);
+  return { ...q, clips: q.clips.filter((c) => !clipIDs.includes(c.id)) };
+}
+
+/** Plays the timeline range [a, b] at another speed (its clips become separate clips). */
+export function speedRange(p: Project, a: number, b: number, speed: number): { project: Project; clipIDs: string[] } {
+  const r = isolateRange(p, a, b);
+  return { project: r.clipIDs.reduce((q, id) => setClipSpeed(q, id, speed), r.project), clipIDs: r.clipIDs };
 }
 
 /** Inserts a clip after the given index (or at the end). */

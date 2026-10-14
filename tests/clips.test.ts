@@ -2,8 +2,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { type Project, clipDuration, clipStarts, followCursor, locate, newClip, newProject, projectDuration } from '../src/core/model.ts';
 import {
-  applyQuietRanges, deleteClip, duplicateClip, findQuietRanges, insertClip, moveClip, removeRange,
-  setClipSpeed, splitAt, trimClip,
+  applyQuietRanges, deleteClip, duplicateClip, findQuietRanges, insertClip, isolateRange, moveClip, removeRange,
+  setClipSpeed, speedRange, splitAt, trimClip,
 } from '../src/core/edit.ts';
 
 function project(): Project {
@@ -63,6 +63,27 @@ test('remove a range across clips', () => {
   const starts = clipStarts(p);
   assert.equal(p.clips.length, 2);
   assert.ok(near(p.clips[0].sourceEnd, 8) && near(p.clips[1].sourceStart, 13) && near(starts[1], 8));
+});
+
+test('a range can become its own clips, or be sped up', () => {
+  let p = project();
+  const r = splitAt(p, 10); if (!('project' in r)) return assert.fail();
+  p = r.project;
+  const iso = isolateRange(p, 8, 13);
+  assert.equal(iso.project.clips.length, 4);
+  assert.equal(iso.clipIDs.length, 2, 'the range spans two clips');
+  const starts = clipStarts(iso.project);
+  const inside = iso.project.clips.filter((c) => iso.clipIDs.includes(c.id));
+  assert.ok(near(inside[0].sourceStart, 8) && near(inside[1].sourceEnd, 13) && near(starts[1], 8));
+  assert.ok(near(projectDuration(iso.project), 20), 'isolating changes nothing in time');
+
+  const sp = speedRange(p, 8, 13, 4);
+  assert.ok(near(projectDuration(sp.project), 15 + 5 / 4));
+  assert.ok(sp.project.clips.filter((c) => sp.clipIDs.includes(c.id)).every((c) => c.speed === 4));
+
+  // A range edge just inside a clip boundary (closer than a split allows) still takes that clip whole.
+  const edge = removeRange(p, 10.05, 13);
+  assert.ok(near(projectDuration(edge), 20 - 3.05, 0.06), `${projectDuration(edge)}`);
 });
 
 test('insert a clip of another media after the current one', () => {
