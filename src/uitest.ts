@@ -102,10 +102,31 @@ export async function runUiTest() {
 
     // Deselect by clicking the timeline, then change the look.
     pointer(tl, 'pointerdown', r.left + 30, r.top + 10); pointer(tl, 'pointerup', r.left + 30, r.top + 10);
-    await until('style inspector', () => !!byText('.inspector h3', 'Görünüm'));
+    await until('style inspector', () => !!byText('.inspector h3', 'Arka plan'));
     click(byText('.inspector label', 'Gölge')?.querySelector('input') ?? null);
     await sleep(50);
     check(project().style.shadow === false, 'shadow checkbox updates the project style');
+
+    click(byText('.inspector .segmented button', 'Tema'));
+    await until('themes', () => $$('.theme').length >= 8);
+    click(byText('.theme', 'Kutlama'));
+    await sleep(400);
+    check(project().style.backgroundKind === 'theme' && project().style.backgroundTheme === 'kutlama' && project().style.padding >= 0.1,
+      'choosing the “Kutlama” theme sets the background (and enough padding to show it)');
+    click($$('.cursor-opt').find((b) => b.title === 'Nokta') ?? null);
+    await sleep(50);
+    check(project().style.cursorStyle === 'dot', 'cursor style “Nokta” is applied');
+    click(byText('.inspector label', 'Vurgu halkası')?.querySelector('input') ?? null);
+    await sleep(50);
+    check(project().style.cursorHighlight === true, 'highlight toggle is applied');
+    if (project().media.some((m) => m.cameraFile)) {
+      click($$('.corners button').find((b) => b.textContent === '↖') ?? null);
+      click(byText('.inspector .segmented button', 'Yuvarlak köşe'));
+      await sleep(50);
+      check(project().style.camera.position === 'top-left' && project().style.camera.shape === 'rounded', 'camera position and shape controls work');
+    } else check(false, 'test project has a camera recording');
+    await sleep(600);
+    log.push(`shot: ${await odak().uiTestCapture('4-looks')}`);
 
     click($('.transport .play'));
     await sleep(1500);
@@ -119,14 +140,14 @@ export async function runUiTest() {
     click(byText('.toolbar button', 'Dışa Aktar'));
     await until('export dialog', () => !!byText('.modal h2', 'Video Dışa Aktar'));
     check(!!byText('.modal button', 'Dışa Aktar…'), 'export dialog opens with its options');
-    log.push(`shot: ${await odak().uiTestCapture('4-export-dialog')}`);
+    log.push(`shot: ${await odak().uiTestCapture('5-export-dialog')}`);
     click(byText('.modal button', 'Kapat'));
     await until('dialog closed', () => !byText('.modal h2', 'Video Dışa Aktar'));
 
     await sleep(800);
     const saved = await odak().loadProject(pkg);
     check(!!saved.project && JSON.stringify(normalizeProject(saved.project)) === JSON.stringify(project()), 'autosave wrote the edits to project.json');
-    log.push(`shot: ${await odak().uiTestCapture('5-editor-final')}`);
+    log.push(`shot: ${await odak().uiTestCapture('6-editor-final')}`);
   } catch (e) {
     check(false, `exception: ${(e as Error).stack ?? e}`);
   }

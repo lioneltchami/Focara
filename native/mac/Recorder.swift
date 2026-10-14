@@ -121,6 +121,11 @@ final class Recorder: NSObject, SCStreamOutput, SCStreamDelegate, @unchecked Sen
 
     var hasFirstFrame: Bool { videoQueue.sync { firstPTS != nil } }
 
+    /// Unix time (ms) of the first video frame — the zero point the app aligns camera and mic to.
+    var firstFrameEpochMs: Double? {
+        videoQueue.sync { firstPTS.map { Date().timeIntervalSince1970 * 1000 - (CACurrentMediaTime() - $0.seconds) * 1000 } }
+    }
+
     func stream(_ stream: SCStream, didOutputSampleBuffer sb: CMSampleBuffer, of type: SCStreamOutputType) {
         guard sb.isValid, !stopped else { return }
         if type == .screen {
@@ -192,7 +197,7 @@ final class WavWriter {
             channels = Int(asbd.mChannelsPerFrame)
             FileManager.default.createFile(atPath: url.path, contents: header(dataBytes: 0))
             handle = try? FileHandle(forWritingTo: url)
-            try? handle?.seekToEnd()
+            _ = try? handle?.seekToEnd()
         }
         guard let handle, asbd.mFormatID == kAudioFormatLinearPCM else { return }
         var blockBuffer: CMBlockBuffer?

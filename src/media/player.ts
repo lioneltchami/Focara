@@ -1,4 +1,4 @@
-import type { VideoSample } from 'mediabunny';
+import type { VideoSample, VideoSampleSink } from 'mediabunny';
 import { type ExportSettings, type Project, type Size, assetOf, canvasSize, clipDuration, clipStarts, locate, projectDuration } from '../core/model.ts';
 import { type ClipRenderData, drawFrame } from '../render/renderer.ts';
 import type { MediaLibrary } from './media.ts';
@@ -10,9 +10,33 @@ export function previewSettings(p: Project): ExportSettings {
 
 /** Draws one sample (or nothing) for a clip at a source time. Shared with the exporter. */
 export function renderSample(ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D, canvas: Size,
-                             sample: VideoSample | null, data: ClipRenderData, sourceTime: number) {
+                             sample: VideoSample | null, data: ClipRenderData, sourceTime: number,
+                             camera: VideoSample | null = null) {
   drawFrame(ctx, canvas, sample ? (c, x, y, w, h) => sample.draw(c, x, y, w, h) : null,
-    sample ? { width: sample.displayWidth, height: sample.displayHeight } : { width: 1, height: 1 }, data, sourceTime);
+    sample ? { width: sample.displayWidth, height: sample.displayHeight } : { width: 1, height: 1 }, data, sourceTime,
+    camera ? { draw: (c, x, y, w, h) => camera.draw(c, x, y, w, h), size: { width: camera.displayWidth, height: camera.displayHeight } } : null);
+}
+
+/** Sequential decoding for playback: keeps the last frame starting at or before t. */
+class FrameCursor {
+  private it: AsyncGenerator<VideoSample, void, unknown>;
+  private current: VideoSample | null = null;
+  private next: VideoSample | null = null;
+  private primed = false;
+  constructor(sink: VideoSampleSink, start: number, end: number) { this.it = sink.samples(Math.max(0, start - 0.1), end + 0.1); }
+  async at(t: number): Promise<VideoSample | null> {
+    if (!this.primed) {
+      this.primed = true;
+      const a = await this.it.next(); this.current = a.done ? null : a.value;
+      const b = a.done ? null : await this.it.next(); this.next = b && !b.done ? b.value : null;
+    }
+    while (this.next && this.next.timestamp <= t) {
+      this.current?.close(); this.current = this.next;
+      const r = await this.it.next(); this.next = r.done ? null : r.value;
+    }
+    return this.current;
+  }
+  async close() { this.current?.close(); this.next?.close(); this.current = this.next = null; await this.it.return(undefined); }
 }
 
 /**
@@ -33,7 +57,7 @@ export class Player {
   private clockStart = 0;
   private timeStart = 0;
 
-  constructor(private canvas: HTMLCanvasElement, private lib: MediaLibrary,
+  constructor(readonly canvas: HTMLCanvasElement, private lib: MediaLibrary,
               private onTime: (t: number) => void, private onPlaying: (p: boolean) => void) {
     this.ctx = canvas.getContext('2d', { alpha: false })!;
   }
@@ -68,9 +92,11 @@ export class Player {
     const clip = p.clips[loc.index];
     const media = await this.lib.open(assetOf(p, clip.mediaID)!.videoFile);
     const sample = media.videoSink ? await media.videoSink.getSample(loc.sourceTime) : null;
-    if (token !== this.drawToken) { sample?.close(); return; }
-    renderSample(this.ctx, this.size, sample, this.data[loc.index], loc.sourceTime);
-    sample?.close();
+    const cam = await this.lib.camera(p, clip);
+    const camSample = cam ? await cam.videoSink!.getSample(loc.sourceTime) : null;
+    if (token !== this.drawToken) { sample?.close(); camSample?.close(); return; }
+    renderSample(this.ctx, this.size, sample, this.data[loc.index], loc.sourceTime, camSample);
+    sample?.close(); camSample?.close();
   }
 
   async seek(t: number) {
@@ -152,14 +178,8 @@ export class Player {
 
   private async videoLoop(gen: number, p: Project) {
     let clipIndex = -1;
-    let it: AsyncGenerator<VideoSample, void, unknown> | null = null;
-    let current: VideoSample | null = null;
-    let next: VideoSample | null = null;
-    const release = async () => {
-      current?.close(); next?.close(); current = next = null;
-      if (it) await it.return(undefined);
-      it = null;
-    };
+    let screen: FrameCursor | null = null, camera: FrameCursor | null = null;
+    const release = async () => { await screen?.close(); await camera?.close(); screen = camera = null; };
     try {
       while (gen === this.gen) {
         const t = Math.max(this.timeStart, this.clock());
@@ -175,24 +195,15 @@ export class Player {
         if (loc.index !== clipIndex) {
           await release();
           clipIndex = loc.index;
-          const media = await this.lib.open(assetOf(p, p.clips[clipIndex].mediaID)!.videoFile);
-          if (media.videoSink) {
-            it = media.videoSink.samples(Math.max(0, loc.sourceTime - 0.1), p.clips[clipIndex].sourceEnd + 0.1);
-            const first = await it.next();
-            current = first.done ? null : first.value;
-            const second = first.done ? null : await it.next();
-            next = second && !second.done ? second.value : null;
-          }
+          const clip = p.clips[clipIndex];
+          const media = await this.lib.open(assetOf(p, clip.mediaID)!.videoFile);
+          if (media.videoSink) screen = new FrameCursor(media.videoSink, loc.sourceTime, clip.sourceEnd);
+          const cam = await this.lib.camera(p, clip);
+          if (cam) camera = new FrameCursor(cam.videoSink!, loc.sourceTime, clip.sourceEnd);
         }
-        // Advance to the last frame starting at or before the source time.
-        while (it && next && next.timestamp <= loc.sourceTime && gen === this.gen) {
-          current?.close();
-          current = next;
-          const r = await it.next();
-          next = r.done ? null : r.value;
-        }
+        const [frame, camFrame] = await Promise.all([screen?.at(loc.sourceTime) ?? null, camera?.at(loc.sourceTime) ?? null]);
         if (gen !== this.gen) break;
-        renderSample(this.ctx, this.size, current, this.data[loc.index], loc.sourceTime);
+        renderSample(this.ctx, this.size, frame, this.data[loc.index], loc.sourceTime, camFrame);
         await new Promise((r) => requestAnimationFrame(r));
       }
     } finally {

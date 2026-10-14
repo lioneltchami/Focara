@@ -1,5 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
-import { type Clip, type RGBA, type StyleSettings, type ZoomSegment, assetOf, fixedFocus, followCursor, isFollow, zoomSpeeds } from '../core/model.ts';
+import {
+  type CameraSettings, type Clip, type CursorStyle, type RGBA, type StyleSettings, type ZoomSegment,
+  assetOf, fixedFocus, followCursor, isFollow, zoomSpeeds,
+} from '../core/model.ts';
+import { odak } from '../bridge.ts';
+import { drawCursor } from '../render/renderer.ts';
+import { gradientPresets, themeCanvas, themes } from '../render/themes.ts';
 import { updateZoom } from '../core/edit.ts';
 import type { MediaLibrary } from '../media/media.ts';
 import { timecode } from './Editor.tsx';
@@ -13,7 +19,7 @@ export function Inspector({ store, lib, seek, onDelete }: { store: EditorStore; 
     <aside className="inspector">
       {clip && zoom
         ? <ZoomInspector key={zoom.id} store={store} lib={lib} clip={clip} zoom={zoom} seek={seek} onDelete={onDelete} />
-        : <StyleInspector store={store} />}
+        : <StyleInspector store={store} lib={lib} />}
     </aside>
   );
 }
@@ -140,23 +146,72 @@ function FocusPicker({ lib, store, clip, zoom, onChange }: {
   );
 }
 
-const toHex = (c: RGBA) => '#' + [c.r, c.g, c.b].map((v) => Math.round(v * 255).toString(16).padStart(2, '0')).join('');
-const fromHex = (h: string): RGBA => ({ r: parseInt(h.slice(1, 3), 16) / 255, g: parseInt(h.slice(3, 5), 16) / 255, b: parseInt(h.slice(5, 7), 16) / 255, a: 1 });
-
-function StyleInspector({ store }: { store: EditorStore }) {
-  const st = store.project.style;
+function StyleInspector({ store, lib }: { store: EditorStore; lib: MediaLibrary }) {
+  const p = store.project, st = p.style;
   const set = <K extends keyof StyleSettings>(key: K, value: StyleSettings[K]) =>
-    store.update((p) => ({ ...p, style: { ...p.style, [key]: value } }), `style-${key}`);
+    store.update((q) => ({ ...q, style: { ...q.style, [key]: value } }), `style-${key}`);
+  const setMany = (patch: Partial<StyleSettings>, key: string) =>
+    store.update((q) => ({ ...q, style: { ...q.style, ...patch } }), `style-${key}`);
+  const setCam = <K extends keyof CameraSettings>(key: K, value: CameraSettings[K]) =>
+    store.update((q) => ({ ...q, style: { ...q.style, camera: { ...q.style.camera, [key]: value } } }), `camera-${key}`);
+  const hasCamera = p.media.some((m) => m.cameraFile);
+  const hasAudio = p.media.some((m) => m.systemAudioFile || m.microphoneFile);
+  const [imageError, setImageError] = useState<string | null>(null);
+
+  const pickImage = async () => {
+    const src = await odak().pickImage();
+    if (!src) return;
+    try {
+      const rel = await odak().importAsset(store.pkg, src);
+      if (!(await lib.image(rel))) { setImageError('Bu görsel açılamadı. PNG, JPG ya da WEBP dene.'); return; }
+      setImageError(null);
+      setMany({ backgroundKind: 'image', backgroundImage: rel, padding: Math.max(st.padding, 0.08) }, 'image');
+    } catch (e) { setImageError((e as Error).message); }
+  };
+
   return (
     <>
       <section>
-        <h3>Görünüm</h3>
-        <div className="field row between">Arka plan
-          <span className="row">
-            <input type="color" value={toHex(st.backgroundTop)} onChange={(e) => set('backgroundTop', fromHex(e.target.value))} />
-            <input type="color" value={toHex(st.backgroundBottom)} onChange={(e) => set('backgroundBottom', fromHex(e.target.value))} />
-          </span>
+        <h3>Arka plan</h3>
+        <div className="segmented">
+          {([['gradient', 'Renk'], ['theme', 'Tema'], ['image', 'Görsel']] as const).map(([k, t]) => (
+            <button key={k} className={st.backgroundKind === k ? 'on' : ''} onClick={() => set('backgroundKind', k)}>{t}</button>
+          ))}
         </div>
+        {st.backgroundKind === 'gradient' && <>
+          <div className="swatches">
+            {gradientPresets.map((g) => (
+              <button key={g.title} title={g.title} className="swatch" style={{ background: `linear-gradient(135deg, ${g.top}, ${g.bottom})` }}
+                      onClick={() => setMany({ backgroundTop: fromHex(g.top), backgroundBottom: fromHex(g.bottom) }, 'preset')} />
+            ))}
+          </div>
+          <div className="field row between">Özel renkler
+            <span className="row">
+              <input type="color" value={toHex(st.backgroundTop)} onChange={(e) => set('backgroundTop', fromHex(e.target.value))} />
+              <input type="color" value={toHex(st.backgroundBottom)} onChange={(e) => set('backgroundBottom', fromHex(e.target.value))} />
+            </span>
+          </div>
+        </>}
+        {st.backgroundKind === 'theme' && (
+          <div className="themes">
+            {themes.map((t) => (
+              <button key={t.id} className={`theme ${st.backgroundTheme === t.id ? 'on' : ''}`} title={t.title}
+                      onClick={() => setMany({ backgroundTheme: t.id, padding: Math.max(st.padding, 0.1) }, 'theme')}>
+                <ThemeThumb id={t.id} />
+                <span>{t.emoji} {t.title}</span>
+              </button>
+            ))}
+          </div>
+        )}
+        {st.backgroundKind === 'image' && <>
+          <div className="row">
+            <button className="primary" onClick={() => void pickImage()}>Görsel Seç…</button>
+            {st.backgroundImage && <span className="muted small">Projeye kopyalandı</span>}
+          </div>
+          {imageError && <p className="err small">{imageError}</p>}
+          {!st.backgroundImage && <p className="muted small">Bilgisayarından bir görsel seç; projeye kopyalanır, ekranın arkasını kaplar.</p>}
+          {st.backgroundImage && <label className="field">Bulanıklık<input type="range" min={0} max={1} step={0.01} value={st.backgroundBlur} onChange={(e) => set('backgroundBlur', Number(e.target.value))} /></label>}
+        </>}
         <label className="field">Kenar boşluğu<input type="range" min={0} max={0.2} step={0.001} value={st.padding} onChange={(e) => set('padding', Number(e.target.value))} /></label>
         <label className="field">Köşe<input type="range" min={0} max={0.06} step={0.001} value={st.cornerRadius} onChange={(e) => set('cornerRadius', Number(e.target.value))} /></label>
         <label className="check"><input type="checkbox" checked={st.shadow} onChange={(e) => set('shadow', e.target.checked)} /> Gölge</label>
@@ -164,10 +219,62 @@ function StyleInspector({ store }: { store: EditorStore }) {
       <section>
         <h3>İmleç</h3>
         <label className="check"><input type="checkbox" checked={st.showCursor} onChange={(e) => set('showCursor', e.target.checked)} /> İmleci göster</label>
+        <div className="cursors">
+          {([['arrow', 'Beyaz ok'], ['arrow-dark', 'Siyah ok'], ['arrow-color', 'Renkli ok'], ['dot', 'Nokta']] as const).map(([k, t]) => (
+            <button key={k} className={`cursor-opt ${st.cursorStyle === k ? 'on' : ''}`} title={t} onClick={() => set('cursorStyle', k)}>
+              <CursorThumb style={k} color={st.cursorColor} /><span>{t}</span>
+            </button>
+          ))}
+        </div>
+        <div className="field row between">Renk (nokta, renkli ok, vurgu, tıklama)
+          <input type="color" value={toHex(st.cursorColor)} onChange={(e) => set('cursorColor', fromHex(e.target.value))} />
+        </div>
         <label className="field">Boyut<input type="range" min={0.6} max={3} step={0.01} value={st.cursorScale} onChange={(e) => set('cursorScale', Number(e.target.value))} /></label>
+        <label className="check"><input type="checkbox" checked={st.cursorHighlight} onChange={(e) => set('cursorHighlight', e.target.checked)} /> Vurgu halkası</label>
         <label className="check"><input type="checkbox" checked={st.smoothCursor} onChange={(e) => set('smoothCursor', e.target.checked)} /> Hareketi yumuşat</label>
-        <label className="check"><input type="checkbox" checked={st.clickRipple} onChange={(e) => set('clickRipple', e.target.checked)} /> Tıklama halkası</label>
+        <label className="check"><input type="checkbox" checked={st.hideIdleCursor} onChange={(e) => set('hideIdleCursor', e.target.checked)} /> Hareketsizken gizle</label>
+        <label className="check"><input type="checkbox" checked={st.clickRipple} onChange={(e) => set('clickRipple', e.target.checked)} /> Tıklama efekti</label>
+        {st.clickRipple && (
+          <div className="segmented">
+            <button className={st.clickStyle === 'ring' ? 'on' : ''} onClick={() => set('clickStyle', 'ring')}>Halka</button>
+            <button className={st.clickStyle === 'pulse' ? 'on' : ''} onClick={() => set('clickStyle', 'pulse')}>Dolgu</button>
+          </div>
+        )}
       </section>
+      {hasCamera && (
+        <section>
+          <h3>Kamera</h3>
+          <label className="check"><input type="checkbox" checked={st.camera.show} onChange={(e) => setCam('show', e.target.checked)} /> Kamerayı göster</label>
+          {st.camera.show && <>
+            <div className="corners">
+              {([['top-left', '↖'], ['top-right', '↗'], ['bottom-left', '↙'], ['bottom-right', '↘']] as const).map(([k, t]) => (
+                <button key={k} className={st.camera.position === k ? 'on' : ''} title="Konum" onClick={() => setCam('position', k)}>{t}</button>
+              ))}
+            </div>
+            <label className="field">Boyut<input type="range" min={0.12} max={0.5} step={0.005} value={st.camera.size} onChange={(e) => setCam('size', Number(e.target.value))} /></label>
+            <div className="segmented">
+              {([['circle', 'Daire'], ['rounded', 'Yuvarlak köşe'], ['square', 'Kare']] as const).map(([k, t]) => (
+                <button key={k} className={st.camera.shape === k ? 'on' : ''} onClick={() => setCam('shape', k)}>{t}</button>
+              ))}
+            </div>
+            <label className="check"><input type="checkbox" checked={st.camera.mirror} onChange={(e) => setCam('mirror', e.target.checked)} /> Ayna görüntüsü</label>
+            <label className="check"><input type="checkbox" checked={st.camera.border} onChange={(e) => setCam('border', e.target.checked)} /> Beyaz çerçeve</label>
+          </>}
+        </section>
+      )}
+      {hasAudio && (
+        <section>
+          <h3>Ses</h3>
+          {p.media.some((m) => m.systemAudioFile) && (
+            <label className="field">Sistem sesi<input type="range" min={0} max={2} step={0.01} value={p.clips[0]?.systemAudioVolume ?? 1}
+              onChange={(e) => store.update((q) => ({ ...q, clips: q.clips.map((c) => ({ ...c, systemAudioVolume: Number(e.target.value) })) }), 'vol-system')} /></label>
+          )}
+          {p.media.some((m) => m.microphoneFile) && (
+            <label className="field">Mikrofon<input type="range" min={0} max={2} step={0.01} value={p.clips[0]?.microphoneVolume ?? 1}
+              onChange={(e) => store.update((q) => ({ ...q, clips: q.clips.map((c) => ({ ...c, microphoneVolume: Number(e.target.value) })) }), 'vol-mic')} /></label>
+          )}
+        </section>
+      )}
       <section>
         <h3>Zoom geçişi</h3>
         <div className="segmented">
@@ -177,16 +284,39 @@ function StyleInspector({ store }: { store: EditorStore }) {
       </section>
       <section>
         <h3>Kayıt</h3>
-        {store.project.media.map((m) => (
+        {p.media.map((m) => (
           <div key={m.id} className="media-info">
             <b>{m.displayName}</b>
             <span className="muted small">{m.pixelWidth}×{m.pixelHeight} · {timecode(m.duration, false)}</span>
-            {(m.systemAudioFile || m.microphoneFile) && (
-              <span className="muted small">Ses: {[m.systemAudioFile && 'sistem sesi', m.microphoneFile && 'mikrofon'].filter(Boolean).join(', ')}</span>
-            )}
+            <span className="muted small">{[m.systemAudioFile && 'sistem sesi', m.microphoneFile && 'mikrofon', m.cameraFile && 'kamera'].filter(Boolean).join(' · ') || 'yalnızca ekran'}</span>
           </div>
         ))}
       </section>
     </>
   );
 }
+
+function ThemeThumb({ id }: { id: string }) {
+  const ref = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    const c = ref.current!;
+    c.width = 160; c.height = 90;
+    c.getContext('2d')!.drawImage(themeCanvas(id, 160, 90), 0, 0);
+  }, [id]);
+  return <canvas ref={ref} />;
+}
+
+function CursorThumb({ style, color }: { style: CursorStyle; color: RGBA }) {
+  const ref = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    const c = ref.current!, dpr = 2;
+    c.width = 36 * dpr; c.height = 36 * dpr;
+    const ctx = c.getContext('2d')!;
+    ctx.clearRect(0, 0, c.width, c.height);
+    drawCursor(ctx, style === 'dot' ? { x: 18 * dpr, y: 18 * dpr } : { x: 10 * dpr, y: 6 * dpr }, 1.2 * dpr, style, color);
+  }, [style, color]);
+  return <canvas ref={ref} style={{ width: 36, height: 36 }} />;
+}
+
+const toHex = (c: RGBA) => '#' + [c.r, c.g, c.b].map((v) => Math.round(v * 255).toString(16).padStart(2, '0')).join('');
+const fromHex = (h: string): RGBA => ({ r: parseInt(h.slice(1, 3), 16) / 255, g: parseInt(h.slice(3, 5), 16) / 255, b: parseInt(h.slice(5, 7), 16) / 255, a: 1 });

@@ -56,6 +56,7 @@ export async function exportProject(p: Project, lib: MediaLibrary, path: string,
     // Per-clip sequential frame readers (decode each packet at most once).
     let readerClip = -1;
     let reader: AsyncGenerator<VideoSample | null, void, unknown> | null = null;
+    let camReader: AsyncGenerator<VideoSample | null, void, unknown> | null = null;
 
     for (let chunkStart = 0; chunkStart < duration - 1e-9; chunkStart += CHUNK) {
       if (signal?.aborted) throw new DOMException('İptal edildi', 'AbortError');
@@ -72,22 +73,28 @@ export async function exportProject(p: Project, lib: MediaLibrary, path: string,
         const loc = locate(p, t)!;
         if (loc.index !== readerClip) {
           if (reader) await reader.return(undefined);
+          if (camReader) await camReader.return(undefined);
           readerClip = loc.index;
           const clip = p.clips[readerClip];
           const media = await lib.open(assetOf(p, clip.mediaID)!.videoFile);
           const times: number[] = [];
           for (let k = frame; k < frames && (locate(p, k / fps)!.index === readerClip); k++) times.push(locate(p, k / fps)!.sourceTime);
           reader = media.videoSink ? media.videoSink.samplesAtTimestamps(times) : null;
+          const cam = await lib.camera(p, clip);
+          camReader = cam ? cam.videoSink!.samplesAtTimestamps(times) : null;
         }
         const r = reader ? await reader.next() : null;
         const sample = r && !r.done ? r.value : null;
-        renderSample(ctx, size, sample, data[loc.index], loc.sourceTime);
-        sample?.close();
+        const c = camReader ? await camReader.next() : null;
+        const camSample = c && !c.done ? c.value : null;
+        renderSample(ctx, size, sample, data[loc.index], loc.sourceTime, camSample);
+        sample?.close(); camSample?.close();
         await video.add(t, 1 / fps);
         if (frame % 15 === 0) onProgress(frame / frames);
       }
     }
     if (reader) await reader.return(undefined);
+    if (camReader) await camReader.return(undefined);
     await output.finalize();
     failed = false;
     onProgress(1);

@@ -19,6 +19,11 @@ let mainWindow: BrowserWindow | null = null;
 let hudWindow: BrowserWindow | null = null;
 
 app.setName('Odak');
+if (isTest) {
+  // Tests use Chromium's built-in fake camera and microphone (no real devices or permissions).
+  app.commandLine.appendSwitch('use-fake-device-for-media-stream');
+  app.commandLine.appendSwitch('use-fake-ui-for-media-stream');
+}
 
 // ---------------------------------------------------------------- paths & files
 
@@ -125,10 +130,11 @@ ipcMain.handle('file:writeAt', async (_e, id: number, data: Uint8Array, position
   await h.fh.write(data, 0, data.length, position);
 });
 
-ipcMain.handle('file:close', async (_e, id: number, remove: boolean) => {
+ipcMain.handle('file:close', async (_e, id: number, remove: boolean, truncateTo?: number) => {
   const h = writeHandles.get(id);
   if (!h) return;
   writeHandles.delete(id);
+  if (typeof truncateTo === 'number' && !remove) await h.fh.truncate(truncateTo);
   await h.fh.close();
   for (const [file, ph] of readHandles) if (file === h.path) { (await ph).close().catch(() => {}); readHandles.delete(file); }
   if (remove) await fsp.rm(h.path, { force: true });
@@ -152,6 +158,23 @@ ipcMain.handle('dialog:saveVideo', async (_e, name: string) => {
     filters: [{ name: 'MP4 Video', extensions: ['mp4'] }],
   });
   return r.canceled ? null : r.filePath ?? null;
+});
+
+ipcMain.handle('dialog:pickImage', async () => {
+  const r = await dialog.showOpenDialog(mainWindow!, {
+    title: 'Arka Plan Görseli Seç', properties: ['openFile'],
+    filters: [{ name: 'Görseller', extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp'] }],
+  });
+  return r.canceled ? null : r.filePaths[0] ?? null;
+});
+
+/** Copies a file into the project so the project stays self-contained. */
+ipcMain.handle('project:importAsset', async (_e, pkg: string, src: string) => {
+  const ext = path.extname(src).toLowerCase() || '.bin';
+  const rel = `assets/${randomUUID().toUpperCase()}${ext}`;
+  await fsp.mkdir(path.join(pkg, 'assets'), { recursive: true });
+  await fsp.copyFile(src, inPackage(pkg, rel));
+  return rel;
 });
 
 ipcMain.handle('shell:reveal', (_e, p: string) => shell.showItemInFolder(p));
@@ -229,7 +252,13 @@ function nextEvent(r: Recording, names: string[], timeoutMs: number): Promise<{ 
   });
 }
 
-ipcMain.handle('capture:start', async (_e, o: { displayId: number; systemAudio: boolean; microphone: boolean }) => {
+ipcMain.handle('media:ask', async (_e, kind: 'camera' | 'microphone') => {
+  if (!isMac) return true;
+  if (systemPreferences.getMediaAccessStatus(kind) === 'granted') return true;
+  return systemPreferences.askForMediaAccess(kind);
+});
+
+ipcMain.handle('capture:start', async (_e, o: { displayId: number; systemAudio: boolean }) => {
   if (recording) return { ok: false, error: 'Zaten kayıt yapılıyor.' };
   const display = screen.getAllDisplays().find((d) => d.id === o.displayId) ?? screen.getPrimaryDisplay();
   const stamp = new Date().toISOString().slice(0, 19).replace('T', ' ').replace(/:/g, '.');
@@ -244,8 +273,8 @@ ipcMain.handle('capture:start', async (_e, o: { displayId: number; systemAudio: 
     const b = screen.dipToScreenRect(null, display.bounds);
     args.push('--bounds', `${b.x},${b.y},${b.width},${b.height}`, '--scale', String(display.scaleFactor));
   }
+  // The microphone (and camera) are recorded by the app itself, so the user can pick devices.
   if (o.systemAudio) args.push('--system-audio');
-  if (o.microphone) args.push('--mic');
 
   const proc = spawn(helperPath(), args, { stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true });
   const r: Recording = { proc, pkg, mediaID, startedAt: Date.now() / 1000, events: [], waiters: [], stopping: false, stderr: '' };
@@ -281,7 +310,7 @@ ipcMain.handle('capture:start', async (_e, o: { displayId: number; systemAudio: 
   mainWindow?.hide();
   showHud(display);
   globalShortcut.register('CommandOrControl+Shift+2', () => void stopRecording());
-  return { ok: true };
+  return { ok: true, pkg, mediaID, t0: typeof first.t0 === 'number' ? first.t0 : Date.now() };
 });
 
 async function stopRecording(failure?: string) {
@@ -407,7 +436,8 @@ function createWindow() {
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'), contextIsolation: true, sandbox: true,
       additionalArguments: isSelftest ? ['--selftest'] : uiTestProject ? ['--uitest'] : [],
-      backgroundThrottling: !isTest,
+      // Keep timers and capture running while the window is hidden during a recording.
+      backgroundThrottling: false,
       offscreen: !!uiTestProject,
     },
   });

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { type DisplayInfo, type RecordingFinished, odak } from '../bridge.ts';
 import { type MediaAsset, type Project, newClip, newProject, normalizeProject } from '../core/model.ts';
 import { generateAutoZooms } from '../core/zoom.ts';
+import { type SideDevices, type SideResult, SideRecorder } from '../media/sideRecorder.ts';
 import { Editor } from './Editor.tsx';
 import { EditorStore } from './store.ts';
 import './styles.css';
@@ -15,6 +16,29 @@ export function App() {
   const [busy, setBusy] = useState(false);
   const storeRef = useRef(store);
   storeRef.current = store;
+  // Camera + microphone recorder; lives here so it survives while the window is hidden.
+  const side = useRef<SideRecorder | null>(null);
+
+  const startRecording = useCallback(async (displayId: number, systemAudio: boolean, devices: SideDevices) => {
+    setBusy(true);
+    try {
+      if (devices.micId) await odak().askMediaAccess('microphone');
+      if (devices.cameraId) await odak().askMediaAccess('camera');
+      side.current = await SideRecorder.open(devices);
+    } catch (e) {
+      setBusy(false);
+      setAlert(`Kamera/mikrofon açılamadı: ${(e as Error).message}\nSistem ayarlarında Odak'a kamera ve mikrofon izni verildiğinden emin ol.`);
+      return false;
+    }
+    const r = await odak().startRecording({ displayId, systemAudio });
+    if (!r.ok) {
+      await side.current?.cancel(); side.current = null;
+      setBusy(false); setAlert(r.error);
+      return false;
+    }
+    await side.current?.setTarget(r.pkg, r.mediaID, r.t0);
+    return true;
+  }, []);
 
   const openProject = useCallback(async (pkg: string, project?: Project) => {
     const r = project ? { project } : await odak().loadProject(pkg);
@@ -39,14 +63,17 @@ export function App() {
 
   // A finished recording becomes a project with automatic zooms, then opens in the editor.
   useEffect(() => odak().onRecordingFinished(async (r: RecordingFinished) => {
-    setBusy(false);
-    if (!r.ok) { setAlert(r.error); return; }
+    const rec = side.current;
+    side.current = null;
+    if (!r.ok) { await rec?.cancel(); setBusy(false); setAlert(r.error); return; }
     const { info } = r;
+    const extra: SideResult = rec ? await rec.stop(info.duration).catch((e): SideResult => { setAlert(`Kamera/mikrofon kaydı tamamlanamadı: ${(e as Error).message}`); return {}; }) : {};
+    setBusy(false);
     const track = await odak().readCursor(r.pkg, info.cursor);
     const asset: MediaAsset = {
       id: r.mediaID, kind: 'screenRecording', displayName: 'Ekran kaydı', videoFile: info.video,
-      systemAudioFile: info.systemAudio ?? undefined, microphoneFile: info.microphone ?? undefined,
-      cursorFile: info.cursor, duration: info.duration, pixelWidth: info.width, pixelHeight: info.height,
+      systemAudioFile: info.systemAudio ?? undefined, microphoneFile: extra.micFile ?? info.microphone ?? undefined,
+      cameraFile: extra.cameraFile, cursorFile: info.cursor, duration: info.duration, pixelWidth: info.width, pixelHeight: info.height,
       pixelsPerPoint: info.pixelsPerPoint, recordedAt: r.startedAt,
     };
     const project = newProject(baseName(r.pkg));
@@ -72,7 +99,7 @@ export function App() {
     <>
       {store
         ? <Editor key={store.pkg} store={store} onClose={closeProject} />
-        : <Home onOpen={openProject} onShowOpen={showOpen} busy={busy} setBusy={setBusy} setAlert={setAlert} />}
+        : <Home onOpen={openProject} onShowOpen={showOpen} busy={busy} onStart={startRecording} />}
       {alert && (
         <div className="modal-backdrop" onClick={() => setAlert(null)}>
           <div className="modal small" onClick={(e) => e.stopPropagation()}>
@@ -86,17 +113,28 @@ export function App() {
   );
 }
 
-function Home({ onOpen, onShowOpen, busy, setBusy, setAlert }: {
+function Home({ onOpen, onShowOpen, busy, onStart }: {
   onOpen: (pkg: string) => void; onShowOpen: () => void; busy: boolean;
-  setBusy: (b: boolean) => void; setAlert: (s: string) => void;
+  onStart: (displayId: number, systemAudio: boolean, devices: SideDevices) => Promise<boolean>;
 }) {
   const [displays, setDisplays] = useState<DisplayInfo[]>([]);
   const [display, setDisplay] = useState<number | null>(null);
   const [systemAudio, setSystemAudio] = useState(true);
-  const [microphone, setMicrophone] = useState(false);
+  const [mics, setMics] = useState<MediaDeviceInfo[]>([]);
+  const [cams, setCams] = useState<MediaDeviceInfo[]>([]);
+  const [micId, setMicId] = useState<string>(() => localStorage.getItem('odak.mic') ?? '');
+  const [camId, setCamId] = useState<string>(() => localStorage.getItem('odak.camera') ?? '');
+  const [noiseSuppression, setNoiseSuppression] = useState(() => localStorage.getItem('odak.ns') !== '0');
   const [permission, setPermission] = useState<string>('granted');
   const [available, setAvailable] = useState<{ ok: boolean; reason?: string }>({ ok: true });
   const [recents, setRecents] = useState<string[]>([]);
+  const preview = useRef<HTMLVideoElement>(null);
+
+  const loadDevices = useCallback(async () => {
+    const all = await navigator.mediaDevices.enumerateDevices().catch(() => [] as MediaDeviceInfo[]);
+    setMics(all.filter((d) => d.kind === 'audioinput' && d.deviceId));
+    setCams(all.filter((d) => d.kind === 'videoinput' && d.deviceId));
+  }, []);
 
   const refresh = useCallback(async () => {
     const d = await odak().displays();
@@ -105,22 +143,51 @@ function Home({ onOpen, onShowOpen, busy, setBusy, setAlert }: {
     setPermission(await odak().screenPermission());
     setAvailable(await odak().captureAvailable());
     setRecents(await odak().recents());
-  }, []);
+    await loadDevices();
+  }, [loadDevices]);
 
   useEffect(() => {
     void refresh();
     window.addEventListener('focus', refresh);
-    return () => window.removeEventListener('focus', refresh);
-  }, [refresh]);
+    navigator.mediaDevices.addEventListener?.('devicechange', loadDevices);
+    return () => { window.removeEventListener('focus', refresh); navigator.mediaDevices.removeEventListener?.('devicechange', loadDevices); };
+  }, [refresh, loadDevices]);
+
+  useEffect(() => { localStorage.setItem('odak.mic', micId); localStorage.setItem('odak.camera', camId); localStorage.setItem('odak.ns', noiseSuppression ? '1' : '0'); }, [micId, camId, noiseSuppression]);
+
+  // Live camera preview so the framing can be checked before recording.
+  useEffect(() => {
+    if (!camId) return;
+    let stream: MediaStream | null = null, cancelled = false;
+    void (async () => {
+      await odak().askMediaAccess('camera');
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ video: { deviceId: { exact: camId }, width: { ideal: 640 } } });
+        if (cancelled) { stream.getTracks().forEach((t) => t.stop()); return; }
+        if (preview.current) preview.current.srcObject = stream;
+        void loadDevices(); // labels become available after permission
+      } catch { setCamId(''); }
+    })();
+    return () => { cancelled = true; stream?.getTracks().forEach((t) => t.stop()); };
+  }, [camId, loadDevices]);
+
+  // Device labels are only exposed after access was granted once.
+  const askFor = async (kind: 'microphone' | 'camera') => {
+    await odak().askMediaAccess(kind);
+    try { const s = await navigator.mediaDevices.getUserMedia(kind === 'camera' ? { video: true } : { audio: true }); s.getTracks().forEach((t) => t.stop()); } catch { /* denied */ }
+    await loadDevices();
+  };
 
   const start = async () => {
     if (display === null) return;
-    setBusy(true);
-    const r = await odak().startRecording({ displayId: display, systemAudio, microphone });
-    if (!r.ok) { setBusy(false); setAlert(r.error); void refresh(); }
+    // Release the preview so the recorder can open the camera.
+    (preview.current?.srcObject as MediaStream | null)?.getTracks().forEach((t) => t.stop());
+    const ok = await onStart(display, systemAudio, { cameraId: camId || null, micId: micId || null, noiseSuppression });
+    if (!ok) void refresh();
   };
 
   const needsPermission = odak().platform === 'darwin' && permission !== 'granted';
+  const label = (d: MediaDeviceInfo, i: number, kind: string) => d.label || `${kind} ${i + 1}`;
 
   return (
     <div className="home">
@@ -150,7 +217,20 @@ function Home({ onOpen, onShowOpen, busy, setBusy, setAlert }: {
             </select>
           </label>
           <label className="check"><input type="checkbox" checked={systemAudio} onChange={(e) => setSystemAudio(e.target.checked)} /> Sistem sesini kaydet</label>
-          <label className="check"><input type="checkbox" checked={microphone} onChange={(e) => setMicrophone(e.target.checked)} /> Mikrofonu kaydet</label>
+          <label>Mikrofon
+            <select value={micId} onChange={(e) => setMicId(e.target.value)} onFocus={() => { if (!mics.some((m) => m.label)) void askFor('microphone'); }}>
+              <option value="">Kapalı</option>
+              {mics.map((d, i) => <option key={d.deviceId} value={d.deviceId}>{label(d, i, 'Mikrofon')}</option>)}
+            </select>
+          </label>
+          {micId && <label className="check"><input type="checkbox" checked={noiseSuppression} onChange={(e) => setNoiseSuppression(e.target.checked)} /> Gürültü azaltma</label>}
+          <label>Kamera
+            <select value={camId} onChange={(e) => setCamId(e.target.value)} onFocus={() => { if (!cams.some((c) => c.label)) void askFor('camera'); }}>
+              <option value="">Kapalı</option>
+              {cams.map((d, i) => <option key={d.deviceId} value={d.deviceId}>{label(d, i, 'Kamera')}</option>)}
+            </select>
+          </label>
+          {camId && <video ref={preview} className="cam-preview" autoPlay muted playsInline />}
         </div>
         <button className="record-btn" disabled={busy || display === null || !available.ok} onClick={() => void start()}>
           {busy ? 'Başlatılıyor…' : '● Kaydı Başlat'}

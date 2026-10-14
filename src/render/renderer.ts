@@ -1,5 +1,6 @@
-import { type Clip, type CursorTrack, type MediaAsset, type RGBA, type Size, type StyleSettings, screenRect } from '../core/model.ts';
+import { type Clip, type CursorStyle, type CursorTrack, type MediaAsset, type RGBA, type Size, type StyleSettings, screenRect } from '../core/model.ts';
 import { CameraTimeline } from '../core/zoom.ts';
+import { imageCanvas, themeCanvas } from './themes.ts';
 
 // The single frame renderer. The live preview and the exporter both call drawFrame with the
 // same inputs, which is what keeps the exported video identical to what the editor shows.
@@ -9,6 +10,8 @@ export interface ClipRenderData {
   asset: MediaAsset;
   timeline: CameraTimeline;
   style: StyleSettings;
+  /** Decoded user background image (when the style uses one). */
+  backgroundImage?: ImageBitmap | null;
 }
 
 export function makeRenderData(clip: Clip, asset: MediaAsset, track: CursorTrack | null, style: StyleSettings): ClipRenderData {
@@ -19,12 +22,22 @@ export function makeRenderData(clip: Clip, asset: MediaAsset, track: CursorTrack
 
 type Ctx = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
 export type DrawSource = (ctx: Ctx, x: number, y: number, w: number, h: number) => void;
+export interface Overlay { draw: DrawSource; size: Size }
 
 export const RIPPLE_DURATION = 0.45;
+const IDLE_AFTER = 1.5, IDLE_FADE = 0.35;
 const css = (c: RGBA, alpha = c.a) =>
   `rgba(${Math.round(c.r * 255)}, ${Math.round(c.g * 255)}, ${Math.round(c.b * 255)}, ${alpha})`;
 
-export function drawBackground(ctx: Ctx, canvas: Size, style: StyleSettings) {
+export function drawBackground(ctx: Ctx, canvas: Size, style: StyleSettings, image?: ImageBitmap | null) {
+  if (style.backgroundKind === 'theme') {
+    ctx.drawImage(themeCanvas(style.backgroundTheme, canvas.width, canvas.height), 0, 0);
+    return;
+  }
+  if (style.backgroundKind === 'image' && image) {
+    ctx.drawImage(imageCanvas(image, canvas.width, canvas.height, style.backgroundBlur), 0, 0);
+    return;
+  }
   const g = ctx.createLinearGradient(0, 0, canvas.width * 0.35, canvas.height);
   g.addColorStop(0, css(style.backgroundTop));
   g.addColorStop(1, css(style.backgroundBottom));
@@ -33,17 +46,19 @@ export function drawBackground(ctx: Ctx, canvas: Size, style: StyleSettings) {
 }
 
 /**
- * @param source  draws the decoded source frame into a rect, or null when no frame is available
- * @param srcSize size of the decoded source frame
+ * @param source  draws the decoded screen frame into a rect, or null when no frame is available
+ * @param srcSize size of the decoded screen frame
  * @param t       seconds into the clip's media
+ * @param camera  the webcam frame at the same time, if the recording has one
  */
-export function drawFrame(ctx: Ctx, canvas: Size, source: DrawSource | null, srcSize: Size, data: ClipRenderData, t: number) {
+export function drawFrame(ctx: Ctx, canvas: Size, source: DrawSource | null, srcSize: Size, data: ClipRenderData, t: number,
+                          camera: Overlay | null = null) {
   const style = data.style;
   ctx.save();
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = 'high';
-  drawBackground(ctx, canvas, style);
+  drawBackground(ctx, canvas, style, data.backgroundImage);
   if (!source) { ctx.restore(); return; }
 
   const base = screenRect(canvas, srcSize, style.padding);
@@ -83,43 +98,125 @@ export function drawFrame(ctx: Ctx, canvas: Size, source: DrawSource | null, src
     if (style.clickRipple) {
       for (const c of data.timeline.downClicks) {
         if (c.t > t || t - c.t >= RIPPLE_DURATION) continue;
-        const age = (t - c.t) / RIPPLE_DURATION;
-        const eased = 1 - Math.pow(1 - age, 3);
-        const size = (10 + 26 * eased) * pointScale;
-        const at = toCanvas(c.x, c.y);
-        const alpha = 0.9 * (1 - age);
-        const rad = size * 0.4297;
-        ctx.beginPath(); ctx.arc(at.x, at.y, rad, 0, Math.PI * 2);
-        ctx.lineWidth = size * (22 / 256); ctx.strokeStyle = `rgba(0, 0, 0, ${0.35 * alpha})`; ctx.stroke();
-        ctx.lineWidth = size * (12 / 256); ctx.strokeStyle = `rgba(255, 255, 255, ${alpha})`; ctx.stroke();
+        drawClick(ctx, toCanvas(c.x, c.y), (t - c.t) / RIPPLE_DURATION, pointScale, style);
       }
     }
-    drawArrow(ctx, toCanvas(p.x, p.y), pointScale);
+    let alpha = 1;
+    if (style.hideIdleCursor) {
+      const idle = data.timeline.idleFor(t);
+      alpha = idle <= IDLE_AFTER ? 1 : Math.max(0, 1 - (idle - IDLE_AFTER) / IDLE_FADE);
+    }
+    if (alpha > 0.001) {
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      const at = toCanvas(p.x, p.y);
+      if (style.cursorHighlight) {
+        const rad = 20 * pointScale;
+        const g = ctx.createRadialGradient(at.x, at.y, 0, at.x, at.y, rad);
+        g.addColorStop(0, css(style.cursorColor, 0.42)); g.addColorStop(0.7, css(style.cursorColor, 0.22)); g.addColorStop(1, css(style.cursorColor, 0));
+        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(at.x, at.y, rad, 0, Math.PI * 2); ctx.fill();
+      }
+      drawCursor(ctx, at, pointScale, style.cursorStyle, style.cursorColor);
+      ctx.restore();
+    }
   }
+
+  if (camera && style.camera.show) drawCamera(ctx, canvas, camera, style);
   ctx.restore();
+}
+
+function drawClick(ctx: Ctx, at: { x: number; y: number }, age: number, pointScale: number, style: StyleSettings) {
+  const eased = 1 - Math.pow(1 - age, 3);
+  const size = (10 + 26 * eased) * pointScale;
+  if (style.clickStyle === 'pulse') {
+    ctx.fillStyle = css(style.cursorColor, 0.45 * (1 - age));
+    ctx.beginPath(); ctx.arc(at.x, at.y, size * 0.5, 0, Math.PI * 2); ctx.fill();
+    return;
+  }
+  const alpha = 0.9 * (1 - age);
+  const rad = size * 0.4297;
+  ctx.beginPath(); ctx.arc(at.x, at.y, rad, 0, Math.PI * 2);
+  ctx.lineWidth = size * (22 / 256); ctx.strokeStyle = `rgba(0, 0, 0, ${0.35 * alpha})`; ctx.stroke();
+  ctx.lineWidth = size * (12 / 256); ctx.strokeStyle = `rgba(255, 255, 255, ${alpha})`; ctx.stroke();
 }
 
 /** Our own cursor artwork, in points with the tip at (3, 3). */
 const ARROW: [number, number][] = [[3, 3], [3, 21], [7.6, 16.9], [10.6, 23.4], [13.4, 22.1], [10.5, 15.8], [16.4, 15.8]];
 
-function drawArrow(ctx: Ctx, tip: { x: number; y: number }, scale: number) {
+export function drawCursor(ctx: Ctx, tip: { x: number; y: number }, scale: number, style: CursorStyle, color: RGBA) {
   ctx.save();
   ctx.translate(tip.x, tip.y);
   ctx.scale(scale, scale);
+  if (style === 'dot') {
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.4)'; ctx.shadowBlur = 3 * scale; ctx.shadowOffsetY = 0.8 * scale;
+    ctx.beginPath(); ctx.arc(0, 0, 6.5, 0, Math.PI * 2);
+    ctx.fillStyle = css(color, 1); ctx.fill();
+    ctx.shadowColor = 'transparent';
+    ctx.lineWidth = 2; ctx.strokeStyle = '#fff'; ctx.stroke();
+    ctx.restore();
+    return;
+  }
   ctx.translate(-3, -3);
   ctx.beginPath();
   ARROW.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
   ctx.closePath();
+  const fill = style === 'arrow-dark' ? 'rgb(20, 20, 20)' : style === 'arrow-color' ? css(color, 1) : '#fff';
+  const stroke = style === 'arrow' ? 'rgb(20, 20, 20)' : '#fff';
   ctx.save();
   ctx.shadowColor = 'rgba(0, 0, 0, 0.45)';
   ctx.shadowBlur = 2.2 * scale;
   ctx.shadowOffsetY = 0.8 * scale;
-  ctx.fillStyle = '#fff';
+  ctx.fillStyle = fill;
   ctx.fill();
   ctx.restore();
   ctx.lineJoin = 'round';
   ctx.lineWidth = 1.3;
-  ctx.strokeStyle = 'rgb(20, 20, 20)';
+  ctx.strokeStyle = stroke;
   ctx.stroke();
   ctx.restore();
+}
+
+/** Where the camera bubble goes on the canvas. */
+export function cameraRect(canvas: Size, style: StyleSettings): { x: number; y: number; width: number; height: number } {
+  const c = style.camera;
+  const h = canvas.height * c.size;
+  const w = c.shape === 'rounded' ? h * (4 / 3) : h;
+  const margin = Math.min(canvas.width, canvas.height) * 0.035;
+  const x = c.position.endsWith('right') ? canvas.width - margin - w : margin;
+  const y = c.position.startsWith('bottom') ? canvas.height - margin - h : margin;
+  return { x, y, width: w, height: h };
+}
+
+function drawCamera(ctx: Ctx, canvas: Size, cam: Overlay, style: StyleSettings) {
+  const c = style.camera;
+  const box = cameraRect(canvas, style);
+  const path = () => {
+    ctx.beginPath();
+    if (c.shape === 'circle') ctx.arc(box.x + box.width / 2, box.y + box.height / 2, box.width / 2, 0, Math.PI * 2);
+    else ctx.roundRect(box.x, box.y, box.width, box.height, c.shape === 'rounded' ? box.height * 0.12 : box.height * 0.02);
+  };
+  const unit = Math.min(canvas.width, canvas.height);
+  ctx.save();
+  ctx.shadowColor = 'rgba(0, 0, 0, 0.45)'; ctx.shadowBlur = unit * 0.03; ctx.shadowOffsetY = unit * 0.006;
+  ctx.fillStyle = '#000'; path(); ctx.fill();
+  ctx.restore();
+
+  ctx.save();
+  path(); ctx.clip();
+  // Cover: scale the frame to fill the box and crop the overflow.
+  const k = Math.max(box.width / cam.size.width, box.height / cam.size.height);
+  const dw = cam.size.width * k, dh = cam.size.height * k;
+  const dx = box.x + (box.width - dw) / 2, dy = box.y + (box.height - dh) / 2;
+  if (c.mirror) {
+    ctx.translate(box.x + box.width / 2, 0); ctx.scale(-1, 1); ctx.translate(-(box.x + box.width / 2), 0);
+  }
+  cam.draw(ctx, dx, dy, dw, dh);
+  ctx.restore();
+
+  if (c.border) {
+    ctx.save();
+    ctx.lineWidth = unit * 0.006; ctx.strokeStyle = 'rgba(255, 255, 255, 0.95)';
+    path(); ctx.stroke();
+    ctx.restore();
+  }
 }

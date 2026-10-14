@@ -66,7 +66,8 @@
       ],
       "extendInfo": {
         "NSMicrophoneUsageDescription": "Odak, kayıtlarına mikrofon sesini ayrı bir iz olarak eklemek için mikrofona erişir.",
-        "NSScreenCaptureUsageDescription": "Odak, seçtiğin ekranı kaydetmek için ekran kaydı iznine ihtiyaç duyar."
+        "NSScreenCaptureUsageDescription": "Odak, seçtiğin ekranı kaydetmek için ekran kaydı iznine ihtiyaç duyar.",
+        "NSCameraUsageDescription": "Odak, ekran kaydıyla birlikte kamera görüntünü kaydetmek için kameraya erişir."
       }
     },
     "win": {

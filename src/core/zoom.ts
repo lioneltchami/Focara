@@ -97,6 +97,8 @@ export class CameraTimeline {
   readonly duration: number;
   readonly hasCursor: boolean;
   readonly downClicks: ClickEvent[];
+  /** Times at which the cursor moved or clicked (for hiding an idle cursor). */
+  private activity: Float64Array;
   private scale: Float64Array;
   private fx: Float64Array;
   private fy: Float64Array;
@@ -166,6 +168,21 @@ export class CameraTimeline {
     }
     this.cx = cx; this.cy = cy;
     this.downClicks = tr.clicks.filter((c) => c.isDown);
+    const act: number[] = [];
+    for (let i = 0; i < tr.samples.length; i++) {
+      const a = tr.samples[i], b = tr.samples[i - 1];
+      if (!b || Math.hypot(a.x - b.x, a.y - b.y) > 1.5) act.push(a.t);
+    }
+    for (const c of tr.clicks) act.push(c.t);
+    this.activity = Float64Array.from(act.sort((x, y) => x - y));
+  }
+
+  /** Seconds since the cursor last moved or clicked (Infinity before any activity). */
+  idleFor(t: number): number {
+    const a = this.activity;
+    let lo = 0, hi = a.length - 1, best = -1;
+    while (lo <= hi) { const mid = (lo + hi) >> 1; if (a[mid] <= t) { best = mid; lo = mid + 1; } else hi = mid - 1; }
+    return best < 0 ? Infinity : t - a[best];
   }
 
   private sample(a: Float64Array, t: number): number {

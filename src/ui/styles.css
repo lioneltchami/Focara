@@ -108,3 +108,17 @@ input[type=checkbox] { accent-color: var(--accent); }
 .progress div { position: absolute; inset: 0 auto 0 0; background: var(--accent); }
 .progress span { position: relative; padding-left: 8px; font-size: 12px; line-height: 22px; }
 .ok { color: #4cd964; margin: 0; } .err { color: #ff6b6b; margin: 0; user-select: text; }
+
+.cam-preview { width: 100%; max-height: 200px; border-radius: 10px; background: #000; transform: scaleX(-1); object-fit: cover; }
+.record { overflow-y: auto; }
+
+.swatches { display: grid; grid-template-columns: repeat(8, 1fr); gap: 6px; }
+.swatch { height: 26px; padding: 0; border-radius: 6px; border: 1px solid var(--line); }
+.themes { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.theme { display: flex; flex-direction: column; gap: 4px; padding: 4px; border-radius: 8px; font-size: 11px; }
+.theme canvas { width: 100%; aspect-ratio: 16 / 9; border-radius: 5px; display: block; }
+.theme.on, .cursor-opt.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.cursors { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.cursor-opt { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 2px; font-size: 10px; background: #3a3a44; }
+.corners { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.corners button.on { background: var(--accent); color: #fff; border-color: var(--accent); }

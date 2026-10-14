@@ -7,7 +7,8 @@ import {
   getFirstEncodableAudioCodec, getFirstEncodableVideoCodec,
 } from 'mediabunny';
 import { odak } from './bridge.ts';
-import { type CursorTrack, type MediaAsset, newClip, newProject, normalizeProject, uuid } from './core/model.ts';
+import { type CursorTrack, type MediaAsset, type Project, newClip, newProject, normalizeProject, uuid } from './core/model.ts';
+import { SideRecorder } from './media/sideRecorder.ts';
 import { generateAutoZooms } from './core/zoom.ts';
 import { exportProject } from './media/exporter.ts';
 import { MediaLibrary } from './media/media.ts';
@@ -93,6 +94,21 @@ export async function runSelftest() {
       for (let i = 0; i < SECONDS * FPS; i++) { drawSynthetic(ctx, i); await src.add(i / FPS, 1 / FPS); }
       await out.finalize();
     });
+    await writeFile(`${dir}/camera.mp4`, async (target) => {
+      const canvas = new OffscreenCanvas(640, 480);
+      const ctx = canvas.getContext('2d')!;
+      const out = new Output({ format: new Mp4OutputFormat(), target });
+      const src = new CanvasSource(canvas, { codec: vcodec, bitrate: 3e6, keyFrameInterval: 1 });
+      out.addVideoTrack(src, { frameRate: 30 });
+      await out.start();
+      for (let i = 0; i < SECONDS * 30; i++) {
+        ctx.fillStyle = `hsl(${(i * 3) % 360}, 60%, 45%)`; ctx.fillRect(0, 0, 640, 480);
+        ctx.fillStyle = '#f2c9a0'; ctx.beginPath(); ctx.arc(320, 250, 120, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#000'; ctx.font = 'bold 48px monospace'; ctx.fillText(`cam ${i}`, 40, 80);
+        await src.add(i / 30, 1 / 30);
+      }
+      await out.finalize();
+    });
     const acodec = await getFirstEncodableAudioCodec(['aac', 'opus'], { numberOfChannels: 2, sampleRate: 48000 });
     log.push(`encoders: audio=${acodec}`);
     await writeFile(`${dir}/system.wav`, async (target) => {
@@ -125,6 +141,7 @@ export async function runSelftest() {
     const asset: MediaAsset = {
       id: mediaID, kind: 'screenRecording', displayName: 'Test', videoFile: `media/${mediaID}/screen.mp4`,
       systemAudioFile: `media/${mediaID}/system.wav`, cursorFile: `media/${mediaID}/cursor.json`,
+      cameraFile: `media/${mediaID}/camera.mp4`,
       duration: SECONDS, pixelWidth: W, pixelHeight: H, pixelsPerPoint: 2,
     };
     const project = newProject('SelfTest');
@@ -195,6 +212,69 @@ export async function runSelftest() {
         check(onset !== null && Math.abs(onset - beep) < 0.01, `audio beep at ${beep}s found at ${onset?.toFixed(4)}s`);
       }
     } else check(false, 'exported file has an audio track');
+    // 6. Other looks: background image, theme, cursor styles, camera placements — same parity.
+    const bg = new OffscreenCanvas(1600, 900);
+    const bctx = bg.getContext('2d')!;
+    const g = bctx.createLinearGradient(0, 0, 1600, 900); g.addColorStop(0, '#0f766e'); g.addColorStop(1, '#f59e0b');
+    bctx.fillStyle = g; bctx.fillRect(0, 0, 1600, 900);
+    for (let i = 0; i < 40; i++) { bctx.fillStyle = `hsla(${i * 37}, 80%, 60%, 0.8)`; bctx.beginPath(); bctx.arc((i * 211) % 1600, (i * 97) % 900, 30 + (i % 5) * 12, 0, Math.PI * 2); bctx.fill(); }
+    await odak().writeFile(pkg, 'assets/bg.png', new Uint8Array(await (await bg.convertToBlob({ type: 'image/png' })).arrayBuffer()));
+    const looks: [string, (p: Project) => Project][] = [
+      ['image+dot+pulse+camera rounded top-left', (p) => ({ ...p, style: { ...p.style, backgroundKind: 'image', backgroundImage: 'assets/bg.png', backgroundBlur: 0.4,
+        cursorStyle: 'dot', cursorHighlight: true, clickStyle: 'pulse', camera: { ...p.style.camera, shape: 'rounded', position: 'top-left', mirror: false } } })],
+      ['theme yilbasi+color arrow+idle hide', (p) => ({ ...p, style: { ...p.style, backgroundKind: 'theme', backgroundTheme: 'yilbasi', padding: 0.1,
+        cursorStyle: 'arrow-color', hideIdleCursor: true, camera: { ...p.style.camera, shape: 'square', position: 'bottom-left', size: 0.2 } } })],
+    ];
+    for (const [name, apply] of looks) {
+      const variant = apply(reopened);
+      const vlib = new MediaLibrary(pkg);
+      const file = `${tmp}/export-${name.split(' ')[0]}.mp4`;
+      await exportProject(variant, vlib, file, { ...variant.export, fps: 30 }, () => {});
+      const vin = openAbsolute(file);
+      const vsink = new VideoSampleSink((await vin.getPrimaryVideoTrack())!);
+      const vp = new Player(document.createElement('canvas'), vlib, () => {}, () => {});
+      await vp.setProject(variant);
+      for (const t of [1.0, 2.5, 8.6]) {
+        await vp.seek(t);
+        const pv = grab((c) => c.drawImage(vp.canvas, 0, 0));
+        const s1 = await vsink.getSample(t + 1e-6);
+        const ev = grab((c) => s1!.draw(c, 0, 0)); s1!.close();
+        const db = psnr(pv, ev);
+        check(db > 35, `${name} t=${t}: preview vs export ${db.toFixed(1)} dB`);
+        if (t === 2.5) {
+          const c = new OffscreenCanvas(1920, 1080); c.getContext('2d')!.putImageData(new ImageData(new Uint8ClampedArray(ev), 1920, 1080), 0, 0);
+          await odak().writeFile(pkg, `look-${name.split(' ')[0]}.png`, new Uint8Array(await (await c.convertToBlob({ type: 'image/png' })).arrayBuffer()));
+        }
+      }
+      vp.destroy(); vlib.dispose();
+    }
+
+    // 7. Camera + microphone recorder with Chromium's fake devices.
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const cam = devices.find((d) => d.kind === 'videoinput'), mic = devices.find((d) => d.kind === 'audioinput');
+    log.push(`fake devices: camera=${cam?.label ?? '-'} mic=${mic?.label ?? '-'}`);
+    const side = await SideRecorder.open({ cameraId: cam?.deviceId ?? null, micId: mic?.deviceId ?? null, noiseSuppression: false });
+    const sideID = uuid();
+    const recT0 = Date.now() + 300;
+    await side!.setTarget(pkg, sideID, recT0);
+    await new Promise((r) => setTimeout(r, 2600));
+    const res = await side!.stop(2.0);
+    check(!!res.cameraFile && !!res.micFile, `camera + mic files written (${res.cameraFile}, ${res.micFile})`);
+    if (res.cameraFile) {
+      const ci = new Input({ formats: ALL_FORMATS, source: new CustomSource({ getSize: () => odak().fileSize(pkg, res.cameraFile!), read: (a, b) => odak().readFile(pkg, res.cameraFile!, a, b) }) });
+      const ct = (await ci.getPrimaryVideoTrack())!;
+      const cp = new EncodedPacketSink(ct);
+      let n = 0, first = Infinity, last = 0;
+      for (let pk = await cp.getFirstPacket(); pk; pk = await cp.getNextPacket(pk)) { n++; first = Math.min(first, pk.timestamp); last = Math.max(last, pk.timestamp); }
+      // Frames after the stop may follow; the clip ends at the screen recording's length anyway.
+      check(n >= 40 && first >= 0 && first < 0.2 && last >= 1.9, `camera: ${n} frames, ${first.toFixed(3)}–${last.toFixed(3)}s on the screen timeline`);
+    }
+    if (res.micFile) {
+      const size = await odak().fileSize(pkg, res.micFile);
+      const head = new DataView((await odak().readFile(pkg, res.micFile, 0, 44)).slice().buffer);
+      const rate = head.getUint32(24, true), ch = head.getUint16(22, true), bytes = head.getUint32(40, true);
+      check(bytes === size - 44 && Math.abs(bytes / (rate * ch * 2) - 2.0) < 0.002, `mic.wav: ${rate} Hz ×${ch}, ${(bytes / (rate * ch * 2)).toFixed(3)}s`);
+    }
     lib.dispose();
   } catch (err) {
     check(false, `exception: ${(err as Error).stack ?? err}`);

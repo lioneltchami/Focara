@@ -178,7 +178,9 @@ mod win {
             }
             thread::sleep(Duration::from_millis(10));
         }
-        emit(json!({"event": "started"}));
+        let t0 = shared.t0.load(Ordering::SeqCst);
+        let unix_ms = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs_f64() * 1000.0).unwrap_or(0.0);
+        emit(json!({"event": "started", "t0": unix_ms - (qpc_100ns() - t0) as f64 / 1e4}));
 
         // Wait for "stop" on stdin (EOF also stops, e.g. when the app quits).
         {

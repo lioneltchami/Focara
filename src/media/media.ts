@@ -17,6 +17,7 @@ export class MediaLibrary {
   private files = new Map<string, Promise<MediaFile>>();
   private cursors = new Map<string, Promise<CursorTrack | null>>();
   private renderCache = new Map<string, ClipRenderData>();
+  private images = new Map<string, Promise<ImageBitmap | null>>();
 
   constructor(readonly pkg: string) {}
 
@@ -54,15 +55,38 @@ export class MediaLibrary {
     return c;
   }
 
+  /** A package image (e.g. the background) decoded once. */
+  image(rel: string): Promise<ImageBitmap | null> {
+    let i = this.images.get(rel);
+    if (!i) {
+      i = (async () => {
+        const size = await odak().fileSize(this.pkg, rel);
+        const bytes = await odak().readFile(this.pkg, rel, 0, size);
+        return createImageBitmap(new Blob([bytes as BlobPart]));
+      })().catch(() => null);
+      this.images.set(rel, i);
+    }
+    return i;
+  }
+
   /** Camera timelines are cached per clip edit state so small edits rebuild quickly. */
   async renderData(clip: Clip, asset: MediaAsset, style: StyleSettings): Promise<ClipRenderData> {
     const key = JSON.stringify([clip.id, clip.zooms, asset.id, style.zoomSpeed, style.smoothCursor]);
+    const backgroundImage = style.backgroundKind === 'image' && style.backgroundImage ? await this.image(style.backgroundImage) : null;
     const hit = this.renderCache.get(key);
-    if (hit) return { ...hit, clip, style };
+    if (hit) return { ...hit, clip, style, backgroundImage };
     const d = makeRenderData(clip, asset, await this.cursor(asset), style);
     if (this.renderCache.size > 64) this.renderCache.clear();
     this.renderCache.set(key, d);
-    return d;
+    return { ...d, backgroundImage };
+  }
+
+  /** The webcam track of a clip's recording, when it has one and the camera is shown. */
+  async camera(p: Project, clip: Clip): Promise<MediaFile | null> {
+    const m = assetOf(p, clip.mediaID);
+    if (!m?.cameraFile || !p.style.camera.show) return null;
+    const f = await this.open(m.cameraFile);
+    return f.videoSink ? f : null;
   }
 
   async allRenderData(p: Project): Promise<ClipRenderData[]> {

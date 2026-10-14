@@ -5,7 +5,10 @@ Ekran kaydı, otomatik zoom ve zoom'ları elle düzenleme. **macOS ve Windows'ta
 - Kayıtta sistem imleci gizlenir. İmleç konumu ve tıklamalar ayrıca saklanır; imleç sonradan yeniden çizilir, yumuşatılır ve boyutlandırılır.
 - Zoom'lar tıklamalardan otomatik oluşur. Her zoom'un zamanı, miktarı ve odağı (imleci takip / sabit nokta) düzenlenebilir.
 - Önizleme ile dışa aktarılan MP4 aynı çizim koduyla üretilir. Görüntü, zamanlama ve ses senkronu aynıdır.
-- Sistem sesi ve mikrofon ayrı dosyalara kaydedilir.
+- **Kamera:** Ekranla aynı anda kaydedilir. Videoda daire, yuvarlak köşe ya da kare balon olarak görünür; konumu, boyutu, ayna görüntüsü ve çerçevesi ayarlanabilir.
+- **Ses:** Sistem sesi ve mikrofon ayrı dosyalara kaydedilir, ses düzeyleri ayrı ayarlanır. Kamera ve mikrofon listeden seçilir (örneğin harici USB mikrofon), gürültü azaltma isteğe bağlıdır.
+- **Arka plan:** Hazır renk geçişleri, temalar ya da bilgisayarından seçtiğin bir görsel (bulanıklaştırılabilir). Temalar: Eğlenceli, Yılbaşı, Sonbahar, Kutlama, Bahar, Uzay, Okyanus, Sade açık, Sade koyu. Hepsi kod ile çizilir, dışarıdan görsel kullanılmaz.
+- **İmleç:** Beyaz ok, siyah ok, renkli ok ya da nokta. Renk, boyut, vurgu halkası, hareketsizken gizleme, hareket yumuşatma ve tıklama efekti (halka ya da dolgu) ayarlanabilir.
 - Projeler `.odak` klasörlerinde saklanır: ham medya, imleç verisi ve düzenlemeler. Uygulamayı kapatıp açınca kaldığın yerden devam edersin.
 
 > Kardeş uygulama **Kadraj** yalnızca macOS içindir ve tamamen Swift ile yazılmıştır. İki uygulama aynı proje formatını ve aynı zoom/kamera algoritmasını kullanır. Odak, Kadraj projelerini de açabilir.
@@ -41,11 +44,12 @@ Geliştirme modunda (`npm run dev`) macOS izinleri "Electron" uygulamasına veri
 
 ## Kullanım
 
-1. **Kaydı Başlat**. Ekranı ve isteğe bağlı olarak sistem sesi/mikrofonu seç.
+1. Ekranı seç. İstersen sistem sesini, mikrofonu ve kamerayı aç; kamera seçilince önizlemesi görünür. Sonra **Kaydı Başlat**'a bas.
 2. Durdurmak için üstteki paneli ya da **⌘⇧2 / Ctrl+Shift+2**'yi kullan. Kayıt otomatik zoom'larla düzenleyicide açılır.
 3. Zaman çizelgesinde bir zoom'u **sürükle** (taşı) ya da **kenarından** uzat. Tıklayınca sağ panelden miktarını ve odağını değiştirebilirsin.
 4. **Zoom Ekle** oynatma çizgisine yeni bir zoom ekler. **Otomatik Zoom** dokunulmamış zoom'ları yeniden üretir; elle düzenlediklerin korunur.
-5. **Dışa Aktar**: 1080p / 1440p / 4K, 30/60 fps, H.264 ya da HEVC.
+5. Sağ paneldeki **Arka plan**, **İmleç**, **Kamera** ve **Ses** bölümlerinden görünümü ayarla. Hiçbir zoom seçili değilken bu bölümler görünür.
+6. **Dışa Aktar**: 1080p / 1440p / 4K, 30/60 fps, H.264 ya da HEVC.
 
 Kısayollar: boşluk (oynat/duraklat), ←/→ (kare kare), Sil (seçili zoom), ⌘/Ctrl+Z ve ⇧⌘/Ctrl+Shift+Z (geri al/yinele), ⌘/Ctrl+E (dışa aktar).
 
@@ -57,6 +61,7 @@ Kısayollar: boşluk (oynat/duraklat), ←/→ (kare kare), Sil (seçili zoom), 
 │  core/   proje modeli · otomatik zoom · imleç grupları · yaylı kamera     │
 │  render/ tek çizici (Canvas 2D) ──┬── önizleme oynatıcısı (Web Audio saati)│
 │                                   └── MP4 dışa aktarma (mediabunny/WebCodecs)│
+│  media/sideRecorder  kamera + mikrofon (WebCodecs, cihaz seçimli)         │
 │  electron/main  dosyalar · proje paketi · menüler · kayıt yönetimi        │
 └───────────────┬───────────────────────────────────────────────────────────┘
                 │ stdin/stdout JSON satırları (aynı protokol)
@@ -65,12 +70,15 @@ Kısayollar: boşluk (oynat/duraklat), ←/→ (kare kare), Sil (seçili zoom), 
      │ ScreenCaptureKit     │                │ Windows Graphics Capture     │
      │ imleç gizli, H.264   │                │ imleç gizli, H.264 (MF)      │
      │ host saati           │                │ QPC saati                    │
-     │ sistem sesi + mik.   │                │ WASAPI loopback + mikrofon   │
+     │ sistem sesi          │                │ WASAPI loopback (sistem sesi)│
      └──────────────────────┘                └─────────────────────────────┘
 ```
 
 - **Neden yerel kayıt yardımcıları?** Electron/Chromium'un ekran yakalayıcısında sistem imlecini gizlemenin güvenilir bir yolu yok. İmleç gizlenmezse imleci yeniden çizmek, yumuşatmak ve boyutlandırmak mümkün olmaz.
-- **Senkron:** Her platformda video kareleri, imleç örnekleri ve ses paketleri aynı saatle (macOS'ta host time, Windows'ta QPC) zaman damgalanır. Ses, ilk video karesine hizalanmış 16 bit WAV olarak yazılır. Boşluklara sessizlik eklenir, çakışan kısımlar atılır.
+- **Senkron:**
+  - Ekran kareleri, imleç örnekleri ve sistem sesi aynı saatle (macOS'ta host time, Windows'ta QPC) zaman damgalanır.
+  - Yardımcı, ilk ekran karesinin zamanını (t0) bildirir. Kamera ve mikrofon tek bir MediaStream'den geldiği için dudak senkronu korunur ve ikisi bu t0'a hizalanır.
+  - Sesler ilk ekran karesine hizalanmış 16 bit WAV olarak yazılır. Boşluklara sessizlik eklenir, çakışan kısımlar atılır.
 - **Önizleme = dışa aktarma:** İkisi de aynı `drawFrame` fonksiyonunu ve aynı kare seçme kuralını kullanır. Kural şu: kaynakta o andan önce ya da o anda başlayan son kare. Dışa aktarmada AAC kodlayıcının eklediği "priming" gecikmesi ölçülüp telafi edilir.
 
 Proje paketi (`~/Movies/Odak` ya da `~/Videos/Odak`):
@@ -82,13 +90,16 @@ Kayıt 2026-10-15 10.12.30.odak/
   media/<id>/cursor.json       imleç örnekleri ve tıklamalar
   media/<id>/system.wav        sistem sesi (ayrı iz)
   media/<id>/mic.wav           mikrofon (ayrı iz)
+  media/<id>/camera.mp4        kamera (ekranla aynı zaman çizelgesinde)
+  assets/                      seçtiğin arka plan görselleri (projeye kopyalanır)
 ```
 
 ## Testler
 
 ```bash
 npm test               # çekirdek: zoom/kamera Kadraj (Swift) ile aynı sonuçları veriyor mu, düzenleme işlemleri
-npm run selftest       # uygulama içinde: sentetik kayıt → zoom → kaydet/aç → MP4 → önizleme=dışa aktarma, ses senkronu
+npm run selftest       # uygulama içinde: sentetik kayıt → zoom → kaydet/aç → MP4 → önizleme=dışa aktarma, ses senkronu,
+                       #   kamera balonu, görsel/tema arka planlar, imleç stilleri, sahte kamera+mikrofonla kayıt
 npm run uitest -- "examples/Örnek Proje.odak"   # gerçek arayüz: zoom ekle/sürükle/düzenle, geri al, oynat, otomatik kayıt
 node scripts/helper-smoke.mjs                  # kayıt yardımcısıyla 3 sn gerçek kayıt (izin gerekir)
 cargo test --manifest-path native/win/Cargo.toml   # Windows yardımcısının WAV hizalaması
@@ -99,7 +110,6 @@ cargo test --manifest-path native/win/Cargo.toml   # Windows yardımcısının W
 ## Bilinen sınırlar
 
 - Uygulamalar Apple/Microsoft sertifikasıyla imzalı değil. İlk açılışta yukarıdaki uyarılar çıkar.
-- Mikrofon kaydı macOS'ta 15 ve sonrasında çalışır; macOS 14'te yalnızca sistem sesi kaydedilir.
 - 4096×2304'ten büyük ekranlar: macOS'ta kayıt bu boyuta sığdırılır. Windows'ta HEVC kullanılır ve bu kayıtlar ancak HEVC çözebilen bilgisayarlarda düzenlenebilir.
 - Linux'ta düzenleme ve dışa aktarma çalışır, kayıt henüz desteklenmiyor.
 - Çoklu klip, video içe aktarma ve ses düzeyi arayüzü sonraki aşamada. Veri modeli ve dışa aktarma bunları zaten destekliyor.

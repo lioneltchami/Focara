@@ -3,7 +3,7 @@ import type { CursorTrack, Project } from './core/model.ts';
 
 export interface DisplayInfo { id: number; name: string; width: number; height: number; scaleFactor: number; primary: boolean }
 
-export interface RecordingOptions { displayId: number; systemAudio: boolean; microphone: boolean }
+export interface RecordingOptions { displayId: number; systemAudio: boolean }
 
 /** Written by the native capture helper (same fields on macOS and Windows). */
 export interface RecordingInfo {
@@ -30,6 +30,9 @@ export interface OdakAPI {
   uiTestProject(): Promise<string | null>;
   uiTestCapture(name: string): Promise<string>;
   requestScreenPermission(): Promise<boolean>;
+  askMediaAccess(kind: 'camera' | 'microphone'): Promise<boolean>;
+  pickImage(): Promise<string | null>;
+  importAsset(pkg: string, src: string): Promise<string>;
   createPackage(name: string): Promise<string>;
   loadProject(pkg: string): Promise<{ project?: Project; error?: string }>;
   saveProject(pkg: string, project: Project): Promise<void>;
@@ -39,7 +42,7 @@ export interface OdakAPI {
   writeFile(pkg: string, rel: string, data: Uint8Array): Promise<void>;
   fileOpen(path: string): Promise<number>;
   fileWrite(handle: number, data: Uint8Array, position: number): Promise<void>;
-  fileClose(handle: number, remove?: boolean): Promise<void>;
+  fileClose(handle: number, remove?: boolean, truncateTo?: number): Promise<void>;
   openProjectDialog(): Promise<string | null>;
   saveVideoDialog(defaultName: string): Promise<string | null>;
   reveal(path: string): Promise<void>;
@@ -50,7 +53,7 @@ export interface OdakAPI {
   screenPermission(): Promise<'granted' | 'denied' | 'not-determined' | 'restricted' | 'unknown'>;
   openPermissionSettings(): Promise<void>;
   captureAvailable(): Promise<{ ok: boolean; reason?: string }>;
-  startRecording(o: RecordingOptions): Promise<{ ok: true } | { ok: false; error: string }>;
+  startRecording(o: RecordingOptions): Promise<{ ok: true; pkg: string; mediaID: string; t0: number } | { ok: false; error: string }>;
   stopRecording(): Promise<void>;
   onRecordingFinished(cb: (r: RecordingFinished) => void): () => void;
   onMenu(cb: (cmd: MenuCommand) => void): () => void;

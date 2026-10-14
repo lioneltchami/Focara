@@ -36,6 +36,8 @@ export interface MediaAsset {
   systemAudioFile?: string;
   microphoneFile?: string;
   cursorFile?: string;
+  /** Webcam video recorded alongside the screen (same timeline as the screen video). */
+  cameraFile?: string;
   duration: number;
   pixelWidth: number;
   pixelHeight: number;
@@ -54,20 +56,54 @@ export const zoomSpeeds: { id: ZoomSpeed; title: string; stiffness: number }[] =
 ];
 export const stiffnessOf = (s: ZoomSpeed) => zoomSpeeds.find((z) => z.id === s)?.stiffness ?? 140;
 
+export type BackgroundKind = 'gradient' | 'theme' | 'image';
+export type CursorStyle = 'arrow' | 'arrow-dark' | 'arrow-color' | 'dot';
+export type ClickStyle = 'ring' | 'pulse';
+export type CameraPosition = 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left';
+export type CameraShape = 'circle' | 'rounded' | 'square';
+
+export interface CameraSettings {
+  show: boolean;
+  position: CameraPosition;
+  /** Height of the camera bubble as a fraction of the canvas height. */
+  size: number;
+  shape: CameraShape;
+  mirror: boolean;
+  border: boolean;
+}
+
 export interface StyleSettings {
+  backgroundKind: BackgroundKind;
   backgroundTop: RGBA;
   backgroundBottom: RGBA;
+  backgroundTheme: string;
+  /** Package-relative path of a user image (copied into the project). */
+  backgroundImage: string | null;
+  /** 0…1 blur of the background image. */
+  backgroundBlur: number;
   /** Fraction of the shorter canvas side left as margin around the screen. */
   padding: number;
   /** Corner radius as a fraction of the shorter screen side. */
   cornerRadius: number;
   shadow: boolean;
   showCursor: boolean;
+  cursorStyle: CursorStyle;
+  cursorColor: RGBA;
   cursorScale: number;
   smoothCursor: boolean;
+  /** Soft halo behind the cursor, handy for tutorials. */
+  cursorHighlight: boolean;
+  /** Fade the cursor out after it has been still for a moment. */
+  hideIdleCursor: boolean;
   clickRipple: boolean;
+  clickStyle: ClickStyle;
   zoomSpeed: ZoomSpeed;
+  camera: CameraSettings;
 }
+
+export const defaultCamera = (): CameraSettings => ({
+  show: true, position: 'bottom-right', size: 0.28, shape: 'circle', mirror: true, border: true,
+});
 
 export type Resolution = 'p1080' | 'p1440' | 'p2160';
 export const resolutions: { id: Resolution; title: string; height: number }[] = [
@@ -103,16 +139,26 @@ export const uuid = () => crypto.randomUUID().toUpperCase();
 export const now = () => Date.now() / 1000;
 
 export const defaultStyle = (): StyleSettings => ({
+  backgroundKind: 'gradient',
   backgroundTop: { r: 0.2, g: 0.24, b: 0.42, a: 1 },
   backgroundBottom: { r: 0.53, g: 0.33, b: 0.55, a: 1 },
+  backgroundTheme: 'eglenceli',
+  backgroundImage: null,
+  backgroundBlur: 0,
   padding: 0.07,
   cornerRadius: 0.018,
   shadow: true,
   showCursor: true,
+  cursorStyle: 'arrow',
+  cursorColor: { r: 0.48, g: 0.42, b: 1, a: 1 },
   cursorScale: 1.4,
   smoothCursor: true,
+  cursorHighlight: false,
+  hideIdleCursor: false,
   clickRipple: true,
+  clickStyle: 'ring',
   zoomSpeed: 'normal',
+  camera: defaultCamera(),
 });
 
 export const defaultExport = (): ExportSettings => ({ resolution: 'p1080', fps: 60, codec: 'h264', aspect: 'wide' });
@@ -133,7 +179,7 @@ export function normalizeProject(p: Project): Project {
   return {
     ...newProject(p.name ?? 'Proje'),
     ...p,
-    style: { ...defaultStyle(), ...(p.style ?? {}) },
+    style: { ...defaultStyle(), ...(p.style ?? {}), camera: { ...defaultCamera(), ...(p.style?.camera ?? {}) } },
     export: { ...defaultExport(), ...(p.export ?? {}) },
     clips: (p.clips ?? []).map((c) => ({ ...newClip(c.mediaID, c.sourceStart, c.sourceEnd), ...c, zooms: c.zooms ?? [] })),
     media: p.media ?? [],

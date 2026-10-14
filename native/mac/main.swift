@@ -62,7 +62,7 @@ case "record":
             // Report "started" once the first frame is in the file.
             for _ in 0..<500 where !recorder.hasFirstFrame { try await Task.sleep(nanoseconds: 10_000_000) }
             guard recorder.hasFirstFrame else { throw HelperError.noFrames }
-            emit(["event": "started"])
+            emit(["event": "started", "t0": recorder.firstFrameEpochMs ?? Date().timeIntervalSince1970 * 1000])
         } catch { fail(error) }
     }
     Thread {
