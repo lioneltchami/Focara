@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { odak } from '../bridge.ts';
-import { type Clip, type MediaAsset, type ZoomSegment, assetOf, clipDuration, clipStarts, isFollow, newClip, projectDuration, toLocal } from '../core/model.ts';
+import { type CameraSegment, type CameraPosition, type Clip, type MediaAsset, type ZoomSegment, assetOf, clipDuration, clipStarts, isFollow, newClip, projectDuration, toLocal } from '../core/model.ts';
+import { cameraPositions } from '../core/cameraLayout.ts';
 import {
-  addZoomAt, deleteClip, deleteZoom, duplicateClip, insertClip, isolateRange, moveClip, regenerateAutoZooms, removeRange,
-  speedRange, splitAt, trimClip, updateZoom,
+  addCameraSegment, addZoomAt, deleteCameraSegment, deleteClip, deleteZoom, duplicateClip, insertClip, isolateRange, moveClip,
+  regenerateAutoZooms, removeRange, speedRange, splitAt, trimClip, updateCameraSegment, updateZoom,
 } from '../core/edit.ts';
 import { MediaLibrary } from '../media/media.ts';
 import { Player } from '../media/player.ts';
@@ -115,6 +116,23 @@ export function Editor({ store, onClose, busy, onRecordInto }: {
     setRange(null);
     seek(range.a);
   };
+  /**
+   * Gives the selected range (or the next 3 s from the playhead) its own camera layout. It starts
+   * mirrored to the other side, so the change is visible at once; the panel on the right edits it.
+   */
+  const hasCamera = p.media.some((m) => m.cameraFile);
+  const addCamera = () => {
+    const a = range ? range.a : now(), b = range ? range.b : Math.min(now() + 3, projectDuration(store.project));
+    const c = store.project.style.camera;
+    const flip: CameraPosition = c.position.endsWith('right') ? c.position.replace('right', 'left') as CameraPosition
+      : c.position.endsWith('left') ? c.position.replace('left', 'right') as CameraPosition : 'bottom-right';
+    const r = addCameraSegment(store.project, a, b, { mode: 'bubble', position: flip, size: c.size });
+    if (!r.ids.length) { setFlash('Kamera bölümü için en az 0.1 sn seç.'); return; }
+    store.update(() => r.project);
+    store.select({ kind: 'camera', clipID: r.ids[0].clipID, segID: r.ids[0].segID });
+    setRange(null);
+    setTool('select');
+  };
   /** Scissors tool: split exactly where the user clicked. */
   const cutAt = (t: number) => {
     const r = splitAt(store.project, t);
@@ -149,6 +167,7 @@ export function Editor({ store, onClose, busy, onRecordInto }: {
       return;
     }
     if (sel?.kind === 'zoom') { store.update((q) => deleteZoom(q, sel.clipID, sel.zoomID)); store.select(null); }
+    else if (sel?.kind === 'camera') { store.update((q) => deleteCameraSegment(q, sel.clipID, sel.segID)); store.select(null); }
     else if (sel?.kind === 'clip') removeClip(sel.clipID);
   };
   const regenerate = async () => {
@@ -241,7 +260,7 @@ export function Editor({ store, onClose, busy, onRecordInto }: {
       </div>
       <Timeline store={store} lib={lib} time={time} playing={playing} seek={seek} range={range} setRange={setRange} tool={tool}
                 hint={flash ?? (range ? `${(range.b - range.a).toFixed(2)} sn seçili · Sil, Ayır ya da ×2 / ×4` : toolHints[tool])} warn={!!flash}
-                onDeleteRange={deleteSelected} onIsolate={isolate} onSpeed={speedUp} onCut={cutAt}
+                onDeleteRange={deleteSelected} onIsolate={isolate} onSpeed={speedUp} onCut={cutAt} onCamera={hasCamera ? addCamera : null}
                 bar={<>
                   <div className="tool-group modes">
                     <button className={tool === 'select' ? 'on' : ''} onClick={() => setTool('select')} title="Seç (V): tıkla seç, sürükle sırala, kenardan kırp">↖ Seç</button>
@@ -260,6 +279,8 @@ export function Editor({ store, onClose, busy, onRecordInto }: {
                   <div className="tool-group">
                     <button onClick={addZoom} title="Oynatma çizgisinde yeni zoom">＋ Zoom</button>
                     <button onClick={() => void regenerate()} title="Dokunulmamış otomatik zoom'ları tıklamalardan yeniden üret; elle düzenlenenler korunur">✦ Oto zoom</button>
+                    <button onClick={addCamera} disabled={!hasCamera}
+                            title={hasCamera ? 'Seçili aralıkta (ya da oynatma çizgisinden 3 sn) kamerayı başka yere taşı, büyüt ya da gizle' : 'Bu projede kamera kaydı yok'}>📷 Kamera</button>
                   </div>
                 </>} />
       {dialog === 'export' && <ExportDialog store={store} lib={lib} onClose={() => setDialog(null)} />}
@@ -295,11 +316,12 @@ export function Editor({ store, onClose, busy, onRecordInto }: {
 const INSET = 18;
 const SNAP_PX = 7;
 
-function Timeline({ store, lib, time, playing, seek, range, setRange, tool, bar, hint, warn, onDeleteRange, onIsolate, onSpeed, onCut }: {
+function Timeline({ store, lib, time, playing, seek, range, setRange, tool, bar, hint, warn, onDeleteRange, onIsolate, onSpeed, onCut, onCamera }: {
   store: EditorStore; lib: MediaLibrary; time: number; playing: boolean; seek: (t: number) => void;
   range: { a: number; b: number } | null; setRange: (r: { a: number; b: number } | null) => void;
   tool: Tool; bar: React.ReactNode; hint: string; warn: boolean;
   onDeleteRange: () => void; onIsolate: () => void; onSpeed: (s: number) => void; onCut: (t: number) => void;
+  onCamera: (() => void) | null;
 }) {
   const p = store.project;
   const scroller = useRef<HTMLDivElement>(null);
@@ -462,10 +484,12 @@ function Timeline({ store, lib, time, playing, seek, range, setRange, tool, bar,
                 <button onClick={onIsolate} title="Bu kısmı ayrı bir klip yap (S)">┆ Ayır</button>
                 <button onClick={() => onSpeed(2)} title="Bu kısmı 2 kat hızlı oynat">⏩ ×2</button>
                 <button onClick={() => onSpeed(4)} title="Bu kısmı 4 kat hızlı oynat">⏩ ×4</button>
+                {onCamera && <button onClick={onCamera} title="Bu kısımda kamerayı başka yere taşı, büyüt ya da gizle">📷 Kamera</button>}
               </div>
             </div>
           )}
           <div className="lane-label">ZOOM</div>
+          {onCamera && <div className="lane-label cam">KAMERA</div>}
           {p.clips.map((clip, i) => {
             const x = xOf(starts[i]), w = clipDuration(clip) * pps;
             const media = assetOf(p, clip.mediaID);
@@ -481,6 +505,13 @@ function Timeline({ store, lib, time, playing, seek, range, setRange, tool, bar,
                   return <ZoomBlock key={z.id} store={store} clip={clip} zoom={z} pps={pps} seek={seek} tool={tool}
                                     left={x + toLocal(clip, s) * pps} width={Math.max(toLocal(clip, e) * pps - toLocal(clip, s) * pps, 6)}
                                     toTimeline={(src) => starts[i] + toLocal(clip, src)} drag={drag} />;
+                })}
+                {onCamera && (clip.cameraSegments ?? []).map((cs) => {
+                  const s = Math.max(cs.start, clip.sourceStart), e = Math.min(cs.end, clip.sourceEnd);
+                  if (e <= s) return null;
+                  return <CameraBlock key={cs.id} store={store} clip={clip} seg={cs} pps={pps} seek={seek} tool={tool} drag={drag}
+                                      left={x + toLocal(clip, s) * pps} width={Math.max(toLocal(clip, e) * pps - toLocal(clip, s) * pps, 6)}
+                                      toTimeline={(src) => starts[i] + toLocal(clip, src)} />;
                 })}
               </div>
             );
@@ -609,6 +640,42 @@ function ZoomBlock({ store, clip, zoom, pps, left, width, seek, toTimeline, drag
          onPointerDown={start('body')} title={`${zoom.isGenerated ? 'Otomatik' : 'Düzenlenmiş'} zoom · sürükle: taşı · kenarlar: süre`}>
       <div className="handle l" onPointerDown={start('left')} />
       <span>{isFollow(zoom.focus) ? '➚' : '⌖'} ×{zoom.scale.toFixed(1)}</span>
+      <div className="handle r" onPointerDown={start('right')} />
+    </div>
+  );
+}
+
+const cameraLabel = (seg: CameraSegment) =>
+  seg.mode === 'full' ? '⛶ Tam ekran' : seg.mode === 'hidden' ? '⊘ Gizli' : `📷 ${cameraPositions.find((p) => p.id === seg.position)?.title ?? ''}`;
+
+function CameraBlock({ store, clip, seg, pps, left, width, seek, toTimeline, drag, tool }: {
+  store: EditorStore; clip: Clip; seg: CameraSegment; pps: number; left: number; width: number; tool: Tool;
+  seek: (t: number) => void; toTimeline: (src: number) => number;
+  drag: (e: React.PointerEvent, m: (ev: PointerEvent, dx: number) => void, u?: (ev: PointerEvent, moved: boolean) => void) => void;
+}) {
+  const selected = store.selection?.kind === 'camera' && store.selection.segID === seg.id;
+  const speed = clip.speed || 1;
+  const start = (part: 'body' | 'left' | 'right') => (e: React.PointerEvent) => {
+    if (tool !== 'select' || e.shiftKey || e.button !== 0) return;
+    e.stopPropagation();
+    const snap = { ...seg };
+    store.select({ kind: 'camera', clipID: clip.id, segID: seg.id });
+    drag(e, (_ev, dx) => {
+      if (Math.abs(dx) < 2) return;
+      const d = (dx / pps) * speed;
+      store.update((q) => updateCameraSegment(q, clip.id, seg.id, (z) => {
+        if (part === 'body') return { ...z, start: snap.start + d, end: snap.end + d };
+        if (part === 'left') return { ...z, start: Math.min(snap.start + d, snap.end - 0.2) };
+        return { ...z, end: Math.max(snap.end + d, snap.start + 0.2) };
+      }), `drag-${seg.id}`);
+      seek(toTimeline(part === 'right' ? snap.end + d : snap.start + d));
+    }, (_ev, moved) => { if (!moved) seek(toTimeline(seg.start)); });
+  };
+  return (
+    <div className={`cam-seg ${seg.mode} ${selected ? 'selected' : ''}`} style={{ left, width }} onPointerDown={start('body')}
+         title="Kamera bölümü · sürükle: taşı · kenarlar: süre · tıkla: ayarları sağda">
+      <div className="handle l" onPointerDown={start('left')} />
+      <span>{cameraLabel(seg)}</span>
       <div className="handle r" onPointerDown={start('right')} />
     </div>
   );

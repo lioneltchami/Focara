@@ -16,12 +16,28 @@ export interface ZoomSegment {
   isGenerated: boolean;
 }
 
+/** How the webcam appears: a bubble somewhere on the canvas, the whole frame, or not at all. */
+export type CameraMode = 'bubble' | 'full' | 'hidden';
+
+/** A part of a clip where the camera has its own layout (source times, like zooms). */
+export interface CameraSegment {
+  id: string;
+  start: number;
+  end: number;
+  mode: CameraMode;
+  position: CameraPosition;
+  /** Bubble height as a fraction of the canvas height. */
+  size: number;
+}
+
 export interface Clip {
   id: string;
   mediaID: string;
   sourceStart: number;
   sourceEnd: number;
   zooms: ZoomSegment[];
+  /** Camera layout changes inside this clip; outside them the project's camera settings apply. */
+  cameraSegments: CameraSegment[];
   /** Playback speed (1 = normal). Audio is muted while a clip plays faster or slower. */
   speed: number;
   videoVolume: number;
@@ -61,7 +77,10 @@ export const stiffnessOf = (s: ZoomSpeed) => zoomSpeeds.find((z) => z.id === s)?
 export type BackgroundKind = 'gradient' | 'theme' | 'image';
 export type CursorStyle = 'arrow' | 'arrow-dark' | 'arrow-color' | 'dot';
 export type ClickStyle = 'ring' | 'pulse';
-export type CameraPosition = 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left';
+export type CameraPosition =
+  | 'top-left' | 'top-center' | 'top-right'
+  | 'middle-left' | 'center' | 'middle-right'
+  | 'bottom-left' | 'bottom-center' | 'bottom-right';
 export type CameraShape = 'circle' | 'rounded' | 'square';
 
 export interface CameraSettings {
@@ -173,7 +192,7 @@ export function newProject(name: string): Project {
 }
 
 export function newClip(mediaID: string, sourceStart: number, sourceEnd: number): Clip {
-  return { id: uuid(), mediaID, sourceStart, sourceEnd, zooms: [], speed: 1, videoVolume: 1, systemAudioVolume: 1, microphoneVolume: 1 };
+  return { id: uuid(), mediaID, sourceStart, sourceEnd, zooms: [], cameraSegments: [], speed: 1, videoVolume: 1, systemAudioVolume: 1, microphoneVolume: 1 };
 }
 
 /** Fills fields missing from older or foreign project files with defaults. */
@@ -183,7 +202,7 @@ export function normalizeProject(p: Project): Project {
     ...p,
     style: { ...defaultStyle(), ...(p.style ?? {}), camera: { ...defaultCamera(), ...(p.style?.camera ?? {}) } },
     export: { ...defaultExport(), ...(p.export ?? {}) },
-    clips: (p.clips ?? []).map((c) => ({ ...newClip(c.mediaID, c.sourceStart, c.sourceEnd), ...c, zooms: c.zooms ?? [] })),
+    clips: (p.clips ?? []).map((c) => ({ ...newClip(c.mediaID, c.sourceStart, c.sourceEnd), ...c, zooms: c.zooms ?? [], cameraSegments: c.cameraSegments ?? [] })),
     media: p.media ?? [],
   };
 }

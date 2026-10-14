@@ -11,7 +11,7 @@ import { type CursorTrack, type MediaAsset, type Project, newClip, newProject, n
 import { SideRecorder } from './media/sideRecorder.ts';
 import { generateAutoZooms } from './core/zoom.ts';
 import { encoderDelay, exportProject } from './media/exporter.ts';
-import { duplicateClip, insertClip, setClipSpeed, splitClipAtSource, trimClip } from './core/edit.ts';
+import { addCameraSegment, duplicateClip, insertClip, setClipSpeed, splitClipAtSource, trimClip } from './core/edit.ts';
 import { projectDuration } from './core/model.ts';
 import { MediaLibrary } from './media/media.ts';
 import { Player } from './media/player.ts';
@@ -221,13 +221,21 @@ export async function runSelftest() {
     bctx.fillStyle = g; bctx.fillRect(0, 0, 1600, 900);
     for (let i = 0; i < 40; i++) { bctx.fillStyle = `hsla(${i * 37}, 80%, 60%, 0.8)`; bctx.beginPath(); bctx.arc((i * 211) % 1600, (i * 97) % 900, 30 + (i % 5) * 12, 0, Math.PI * 2); bctx.fill(); }
     await odak().writeFile(pkg, 'assets/bg.png', new Uint8Array(await (await bg.convertToBlob({ type: 'image/png' })).arrayBuffer()));
-    const looks: [string, (p: Project) => Project][] = [
+    const looks: [string, (p: Project) => Project, number[]?][] = [
       ['image+dot+pulse+camera rounded top-left', (p) => ({ ...p, style: { ...p.style, backgroundKind: 'image', backgroundImage: 'assets/bg.png', backgroundBlur: 0.4,
         cursorStyle: 'dot', cursorHighlight: true, clickStyle: 'pulse', camera: { ...p.style.camera, shape: 'rounded', position: 'top-left', mirror: false } } })],
       ['theme yilbasi+color arrow+idle hide', (p) => ({ ...p, style: { ...p.style, backgroundKind: 'theme', backgroundTheme: 'yilbasi', padding: 0.1,
         cursorStyle: 'arrow-color', hideIdleCursor: true, camera: { ...p.style.camera, shape: 'square', position: 'bottom-left', size: 0.2 } } })],
+      // Camera segments: full frame 2–4 s, top centre 6–9 s (transitions at 2.0–2.5, 6.0–6.5, 8.5–9.0).
+      ['camera segments', (p) => {
+        let q = addCameraSegment(p, 2, 4, { mode: 'full', position: 'center', size: 0.28 }).project;
+        q = addCameraSegment(q, 6, 9, { mode: 'bubble', position: 'top-center', size: 0.28 }).project;
+        return { ...q, style: { ...q.style, camera: { ...q.style.camera, shape: 'circle', position: 'bottom-right', size: 0.28, show: true } } };
+      }, [1.0, 2.2, 3.0, 6.2, 7.5, 8.7]], // on 30 fps frame times: mid-transition frames must match too
     ];
-    for (const [name, apply] of looks) {
+    const px = (rgba: Uint8ClampedArray, x: number, y: number) => { const i = (Math.round(y) * 1920 + Math.round(x)) * 4; return [rgba[i], rgba[i + 1], rgba[i + 2]]; };
+    const skin = (c: number[]) => Math.abs(c[0] - 0xf2) < 30 && Math.abs(c[1] - 0xc9) < 30 && Math.abs(c[2] - 0xa0) < 30;
+    for (const [name, apply, times] of looks) {
       const variant = apply(reopened);
       const vlib = new MediaLibrary(pkg);
       const file = `${tmp}/export-${name.split(' ')[0]}.mp4`;
@@ -236,13 +244,19 @@ export async function runSelftest() {
       const vsink = new VideoSampleSink((await vin.getPrimaryVideoTrack())!);
       const vp = new Player(document.createElement('canvas'), vlib, () => {}, () => {});
       await vp.setProject(variant);
-      for (const t of [1.0, 2.5, 8.6]) {
+      for (const t of times ?? [1.0, 2.5, 8.6]) {
         await vp.seek(t);
         const pv = grab((c) => c.drawImage(vp.canvas, 0, 0));
         const s1 = await vsink.getSample(t + 1e-6);
         const ev = grab((c) => s1!.draw(c, 0, 0)); s1!.close();
         const db = psnr(pv, ev);
         check(db > 35, `${name} t=${t}: preview vs export ${db.toFixed(1)} dB`);
+        if (name === 'camera segments') {
+          // The synthetic camera has a skin-coloured face in the middle of the frame.
+          if (t === 1.0) check(!skin(px(ev, 960, 540)), 'camera segments: before, the screen is in the middle');
+          if (t === 3.0) check(skin(px(ev, 960, 540)), 'camera segments: full frame shows the camera in the middle');
+          if (t === 7.5) { const h = 1080 * 0.28, y = 1080 * 0.035 + h / 2; check(skin(px(ev, 960, y)) && !skin(px(ev, 1920 - 37.8 - h / 2, 1080 - 37.8 - h / 2)), 'camera segments: bubble moved to the top centre'); }
+        }
         if (t === 2.5) {
           const c = new OffscreenCanvas(1920, 1080); c.getContext('2d')!.putImageData(new ImageData(new Uint8ClampedArray(ev), 1920, 1080), 0, 0);
           await odak().writeFile(pkg, `look-${name.split(' ')[0]}.png`, new Uint8Array(await (await c.convertToBlob({ type: 'image/png' })).arrayBuffer()));

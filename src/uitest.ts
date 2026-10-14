@@ -121,7 +121,7 @@ export async function runUiTest() {
     await sleep(50);
     check(project().style.cursorHighlight === true, 'highlight toggle is applied');
     if (project().media.some((m) => m.cameraFile)) {
-      click($$('.corners button').find((b) => b.textContent === '↖') ?? null);
+      click($$('.positions button').find((b) => b.title === 'Sol üst') ?? null);
       click(byText('.inspector .segmented button', 'Yuvarlak köşe'));
       await sleep(50);
       check(project().style.camera.position === 'top-left' && project().style.camera.shape === 'rounded', 'camera position and shape controls work');
@@ -248,6 +248,39 @@ export async function runUiTest() {
     await sleep(80);
     check(Math.abs(projectDuration(project()) - (before - 1.5)) < 0.05, `range select + Delete removes 1.5 s (${before.toFixed(2)} → ${projectDuration(project()).toFixed(2)} s)`);
     key('Escape');
+
+    // Camera segments: select a range, "📷 Kamera", then change it on the right.
+    const camSel = () => { const sl = store().selection; return sl?.kind === 'camera' ? project().clips.find((c) => c.id === sl.clipID)?.cameraSegments.find((x) => x.id === sl.segID) : undefined; };
+    check(!!$('.lane-label.cam'), 'the timeline has a KAMERA lane when the project has a camera');
+    key('r');
+    await until('range tool', () => !!$('.timeline.tool-range'));
+    await dragRange(3, 5);
+    click(byText('.range-bar button', 'Kamera'));
+    await until('camera segment', () => !!camSel() && !!$('.cam-seg') && !!byText('.inspector h3', 'Kamera bölümü'));
+    const cs0 = camSel()!;
+    check(cs0.mode === 'bubble' && cs0.position !== project().style.camera.position, `📷 Kamera adds a segment for the range (${cs0.position}) and opens its settings`);
+    click(byText('.inspector .segmented button', 'Tam ekran'));
+    await sleep(50);
+    check(camSel()?.mode === 'full' && !!$('.cam-seg.full'), 'segment set to full frame');
+    await (ed.player as unknown as { seek: (t: number) => Promise<void> }).seek(4.2);
+    await sleep(300);
+    log.push(`shot: ${await odak().uiTestCapture('5c-camera-full')}`);
+    click(byText('.inspector .segmented button', 'Balon'));
+    await sleep(30);
+    click($$('.positions button').find((b) => b.title === 'Üst orta') ?? null);
+    await sleep(50);
+    check(camSel()?.mode === 'bubble' && camSel()?.position === 'top-center', 'segment moved to the top centre with the position picker');
+    const blk = $('.cam-seg')!, br = blk.getBoundingClientRect(), st0 = camSel()!.start;
+    pointer(blk, 'pointerdown', br.left + br.width / 2, br.top + 10); pointer(blk, 'pointermove', br.left + br.width / 2 + 40, br.top + 10); pointer(blk, 'pointerup', br.left + br.width / 2 + 40, br.top + 10);
+    await sleep(60);
+    check(camSel()!.start > st0 + 0.1, `dragging the camera block moves it (${st0.toFixed(2)} → ${camSel()!.start.toFixed(2)} s)`);
+    key('Delete');
+    await sleep(50);
+    check(!$('.cam-seg') && project().clips.every((c) => !c.cameraSegments.length), 'Delete removes the camera segment');
+    store().undo();
+    await sleep(50);
+    check(!!$('.cam-seg'), 'undo brings it back');
+    store().select(null);
 
     const cam = project().media.find((m) => m.cameraFile)?.cameraFile;
     const newId = await ed.importFile(`${pkg}/${cam}`);

@@ -2,7 +2,11 @@ import { useSyncExternalStore } from 'react';
 import { type Project, now } from '../core/model.ts';
 import { odak } from '../bridge.ts';
 
-export type Selection = { kind: 'zoom'; clipID: string; zoomID: string } | { kind: 'clip'; clipID: string } | null;
+export type Selection =
+  | { kind: 'zoom'; clipID: string; zoomID: string }
+  | { kind: 'camera'; clipID: string; segID: string }
+  | { kind: 'clip'; clipID: string }
+  | null;
 
 /** Editor state with undo/redo and debounced autosave (same behaviour as Kadraj's EditorModel). */
 export class EditorStore {

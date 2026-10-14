@@ -1,4 +1,5 @@
-import { type Clip, type CursorStyle, type CursorTrack, type MediaAsset, type RGBA, type Size, type StyleSettings, screenRect } from '../core/model.ts';
+import { type Clip, type CursorStyle, type CursorTrack, type MediaAsset, type RGBA, type Size, type StyleSettings, screenRect, toLocal } from '../core/model.ts';
+import { type CameraBox, type CameraSpan, baseLayout, cameraBoxAt, layoutBox } from '../core/cameraLayout.ts';
 import { CameraTimeline } from '../core/zoom.ts';
 import { imageCanvas, themeCanvas } from './themes.ts';
 
@@ -12,6 +13,9 @@ export interface ClipRenderData {
   style: StyleSettings;
   /** Decoded user background image (when the style uses one). */
   backgroundImage?: ImageBitmap | null;
+  /** Where this clip starts on the timeline, and the project's camera layout track (timeline seconds). */
+  timelineStart?: number;
+  cameraSpans?: CameraSpan[];
 }
 
 export function makeRenderData(clip: Clip, asset: MediaAsset, track: CursorTrack | null, style: StyleSettings): ClipRenderData {
@@ -121,7 +125,10 @@ export function drawFrame(ctx: Ctx, canvas: Size, source: DrawSource | null, src
     }
   }
 
-  if (camera && style.camera.show) drawCamera(ctx, canvas, camera, style);
+  if (camera) {
+    const box = cameraBoxAt(canvas, style.camera, data.cameraSpans ?? [], (data.timelineStart ?? 0) + toLocal(data.clip, t));
+    if (box.alpha > 0.002) drawCamera(ctx, canvas, camera, style, box);
+  }
   ctx.restore();
 }
 
@@ -176,30 +183,28 @@ export function drawCursor(ctx: Ctx, tip: { x: number; y: number }, scale: numbe
   ctx.restore();
 }
 
-/** Where the camera bubble goes on the canvas. */
+/** Where the camera bubble goes with the project's camera settings. */
 export function cameraRect(canvas: Size, style: StyleSettings): { x: number; y: number; width: number; height: number } {
-  const c = style.camera;
-  const h = canvas.height * c.size;
-  const w = c.shape === 'rounded' ? h * (4 / 3) : h;
-  const margin = Math.min(canvas.width, canvas.height) * 0.035;
-  const x = c.position.endsWith('right') ? canvas.width - margin - w : margin;
-  const y = c.position.startsWith('bottom') ? canvas.height - margin - h : margin;
-  return { x, y, width: w, height: h };
+  const b = layoutBox(canvas, { ...baseLayout(style.camera), mode: 'bubble' }, style.camera.shape);
+  return { x: b.x, y: b.y, width: b.width, height: b.height };
 }
 
-function drawCamera(ctx: Ctx, canvas: Size, cam: Overlay, style: StyleSettings) {
+/** Draws the webcam into its box (a circle is a square box with half-height corners). */
+function drawCamera(ctx: Ctx, canvas: Size, cam: Overlay, style: StyleSettings, box: CameraBox) {
   const c = style.camera;
-  const box = cameraRect(canvas, style);
   const path = () => {
     ctx.beginPath();
-    if (c.shape === 'circle') ctx.arc(box.x + box.width / 2, box.y + box.height / 2, box.width / 2, 0, Math.PI * 2);
-    else ctx.roundRect(box.x, box.y, box.width, box.height, c.shape === 'rounded' ? box.height * 0.12 : box.height * 0.02);
+    ctx.roundRect(box.x, box.y, box.width, box.height, Math.max(0, Math.min(box.radius, box.width / 2, box.height / 2)));
   };
   const unit = Math.min(canvas.width, canvas.height);
   ctx.save();
-  ctx.shadowColor = 'rgba(0, 0, 0, 0.45)'; ctx.shadowBlur = unit * 0.03; ctx.shadowOffsetY = unit * 0.006;
-  ctx.fillStyle = '#000'; path(); ctx.fill();
-  ctx.restore();
+  ctx.globalAlpha = box.alpha;
+  if (box.frame > 0.01) {
+    ctx.save();
+    ctx.shadowColor = `rgba(0, 0, 0, ${0.45 * box.frame})`; ctx.shadowBlur = unit * 0.03; ctx.shadowOffsetY = unit * 0.006;
+    ctx.fillStyle = '#000'; path(); ctx.fill();
+    ctx.restore();
+  }
 
   ctx.save();
   path(); ctx.clip();
@@ -213,10 +218,11 @@ function drawCamera(ctx: Ctx, canvas: Size, cam: Overlay, style: StyleSettings) 
   cam.draw(ctx, dx, dy, dw, dh);
   ctx.restore();
 
-  if (c.border) {
+  if (c.border && box.frame > 0.01) {
     ctx.save();
-    ctx.lineWidth = unit * 0.006; ctx.strokeStyle = 'rgba(255, 255, 255, 0.95)';
+    ctx.lineWidth = unit * 0.006; ctx.strokeStyle = `rgba(255, 255, 255, ${0.95 * box.frame})`;
     path(); ctx.stroke();
     ctx.restore();
   }
+  ctx.restore();
 }

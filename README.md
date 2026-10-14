@@ -6,7 +6,7 @@ Ekran kaydı, otomatik zoom ve zoom'ları elle düzenleme. **macOS ve Windows'ta
 - Zoom'lar tıklamalardan otomatik oluşur. Her zoom'un zamanı, miktarı ve odağı (imleci takip / sabit nokta) düzenlenebilir.
 - **Düzenleme:** Birden çok kayıt ve bilgisayardan video tek zaman çizelgesinde. Böl, kenarından kırp, sürükleyip sırala, çoğalt, aralık seçip sil, klip hızı (×0.5–×8). **Durgun anlar** tek adımda bulunur, hızlandırılır ya da kesilir.
 - Önizleme ile dışa aktarılan MP4 aynı çizim koduyla üretilir. Görüntü, zamanlama ve ses senkronu aynıdır.
-- **Kamera:** Ekranla aynı anda kaydedilir. Videoda daire, yuvarlak köşe ya da kare balon olarak görünür; konumu, boyutu, ayna görüntüsü ve çerçevesi ayarlanabilir.
+- **Kamera:** Ekranla aynı anda kaydedilir. Videoda daire, yuvarlak köşe ya da kare balon olarak görünür; 9 konumdan birine yerleşir, boyutu, ayna görüntüsü ve çerçevesi ayarlanabilir. **Kamera bölümleri** ile videonun istediğin kısmında kamera başka yere kayar, tam ekran olur ya da gizlenir.
 - **Ses:** Sistem sesi ve mikrofon ayrı dosyalara kaydedilir, ses düzeyleri ayrı ayarlanır. Kamera ve mikrofon listeden seçilir (örneğin harici USB mikrofon), gürültü azaltma isteğe bağlıdır.
 - **Arka plan:** Hazır renk geçişleri, temalar ya da bilgisayarından seçtiğin bir görsel (bulanıklaştırılabilir). Temalar: Eğlenceli, Yılbaşı, Sonbahar, Kutlama, Bahar, Uzay, Okyanus, Sade açık, Sade koyu. Hepsi kod ile çizilir, dışarıdan görsel kullanılmaz.
 - **İmleç:** Beyaz ok, siyah ok, renkli ok ya da nokta. Renk, boyut, vurgu halkası, hareketsizken gizleme, hareket yumuşatma ve tıklama efekti (halka ya da dolgu) ayarlanabilir.
@@ -71,6 +71,7 @@ Zaman çizelgesinin üstündeki çubukta üç araç var. Hangisinin seçili oldu
 | Sırala | Klibi tutup sürükle; bırakacağın yer çizgiyle gösterilir. |
 | Sil | Klibi seç, **Sil**. Arkadaki klipler boşluğu kapatır. |
 | Bir kısmı sil / hızlandır | **↔ Aralık** ile seç, sonra **Sil**, **×2** ya da **×4**. Birden çok klibi kesse bile tek adımda uygulanır. **Ayır** o kısmı ayrı bir klip yapar; sonra taşıyabilir, hızını ya da sesini ayrıca ayarlayabilirsin. |
+| Kamera bölümü | **↔ Aralık** ile seç (örneğin 3:00–5:00), sonra **📷 Kamera**. Aralık seçmeden basarsan oynatma çizgisinden itibaren 3 sn'lik bir bölüm oluşur. Bölüm KAMERA şeridinde görünür. Sağ panelden **Balon** (9 konum + boyut), **Tam ekran** ya da **Gizle** seçilir. Kamera bölümün başında 0.5 sn'de yeni yerine kayar, sonunda geri döner; arka arkaya iki bölüm varsa doğrudan birinden ötekine geçer. Bloğu sürükleyerek taşır, kenarından uzatırsın. Klibi kesip taşısan da bölüm içerikle birlikte gider. |
 | Çoğalt / hız | Klibi seç; sağ panelden **Çoğalt**, hız ×0.5–×8, kaynak başı/sonu ve klibin ses düzeyleri. |
 | Video ekle | **＋ Video**: bilgisayardaki bir MP4/MOV/M4V/WebM/MKV videosu seçili klibin arkasına (seçim yoksa sona) eklenir ve projeye kopyalanır. |
 | Kayıt ekle | **● Kayıt**: açık projeye yeni bir ekran kaydı (kamera/mikrofonla birlikte) eklenir, kendi otomatik zoom'larıyla gelir. |
@@ -128,9 +129,11 @@ Kayıt 2026-10-15 10.12.30.odak/
 npm test               # çekirdek: zoom/kamera Kadraj (Swift) ile aynı mı; böl/kırp/sırala/hız/aralık sil/durgun anlar
 npm run selftest       # uygulama içinde: sentetik kayıt → zoom → kaydet/aç → MP4 → önizleme=dışa aktarma, ses senkronu,
                        #   kamera balonu, görsel/tema arka planlar, imleç stilleri, sahte kamera+mikrofonla kayıt,
-                       #   düzenlenmiş çok klipli dışa aktarma (kesik + ×2 + içe aktarılan video + kopya) ve ses senkronu
+                       #   düzenlenmiş çok klipli dışa aktarma (kesik + ×2 + içe aktarılan video + kopya) ve ses senkronu,
+                       #   kamera bölümleri (tam ekran, taşınan balon, geçiş kareleri dahil önizleme = dışa aktarma)
 npm run uitest -- "examples/Örnek Proje.odak"   # gerçek arayüz: zoom'lar, böl/kırp/sürükle/sil, oynatma çizgisini sürükleme,
-                                               #   makas, aralık ×2/ayır/sil, video ekle, durgun anlar, geri al, oynat, otomatik kayıt
+                                               #   makas, aralık ×2/ayır/sil, kamera bölümleri, video ekle, durgun anlar, geri al,
+                                               #   oynat, otomatik kayıt
 node scripts/helper-smoke.mjs                  # kayıt yardımcısıyla 3 sn gerçek kayıt (izin gerekir)
 cargo test --manifest-path native/win/Cargo.toml   # Windows yardımcısının WAV hizalaması
 ```

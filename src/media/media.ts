@@ -1,5 +1,6 @@
 import { ALL_FORMATS, AudioBufferSink, CustomSource, EncodedPacketSink, Input, VideoSampleSink, type InputAudioTrack, type InputVideoTrack } from 'mediabunny';
-import { type Clip, type CursorTrack, type MediaAsset, type Project, type StyleSettings, assetOf } from '../core/model.ts';
+import { type Clip, type CursorTrack, type MediaAsset, type Project, type StyleSettings, assetOf, clipStarts } from '../core/model.ts';
+import { cameraTrack } from '../core/cameraLayout.ts';
 import { type ClipRenderData, makeRenderData } from '../render/renderer.ts';
 import { odak } from '../bridge.ts';
 
@@ -93,7 +94,9 @@ export class MediaLibrary {
   }
 
   async allRenderData(p: Project): Promise<ClipRenderData[]> {
-    return Promise.all(p.clips.map((c) => this.renderData(c, assetOf(p, c.mediaID)!, p.style)));
+    const spans = cameraTrack(p), starts = clipStarts(p);
+    const data = await Promise.all(p.clips.map((c) => this.renderData(c, assetOf(p, c.mediaID)!, p.style)));
+    return data.map((d, i) => ({ ...d, timelineStart: starts[i], cameraSpans: spans }));
   }
 
   /** Audio sources of a clip, each with its volume (kept separate until mixing). */

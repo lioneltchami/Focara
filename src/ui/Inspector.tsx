@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import {
-  type CameraSettings, type Clip, type CursorStyle, type RGBA, type StyleSettings, type ZoomSegment,
+  type CameraPosition, type CameraSegment, type CameraSettings, type Clip, type CursorStyle, type RGBA, type StyleSettings, type ZoomSegment,
   assetOf, clipDuration, clipStarts, fixedFocus, followCursor, isFollow, toLocal, zoomSpeeds,
 } from '../core/model.ts';
 import { odak } from '../bridge.ts';
 import { drawCursor } from '../render/renderer.ts';
 import { gradientPresets, themeCanvas, themes } from '../render/themes.ts';
-import { setClipSpeed, trimClip, updateZoom } from '../core/edit.ts';
+import { setClipSpeed, trimClip, updateCameraSegment, updateZoom } from '../core/edit.ts';
+import { cameraPositions } from '../core/cameraLayout.ts';
 import type { MediaLibrary } from '../media/media.ts';
 import { type EditActions, timecode } from './Editor.tsx';
 import type { EditorStore } from './store.ts';
@@ -17,6 +18,11 @@ export function Inspector({ store, lib, seek, onDelete, actions }: {
   const s = store.selection;
   const selClip = s?.kind === 'clip' ? store.project.clips.find((c) => c.id === s.clipID) : undefined;
   if (selClip) return <aside className="inspector"><ClipInspector store={store} clip={selClip} actions={actions} seek={seek} /></aside>;
+  if (s?.kind === 'camera') {
+    const c = store.project.clips.find((x) => x.id === s.clipID);
+    const seg = c?.cameraSegments.find((x) => x.id === s.segID);
+    if (c && seg) return <aside className="inspector"><CameraSegmentInspector key={seg.id} store={store} clip={c} seg={seg} seek={seek} onDelete={onDelete} /></aside>;
+  }
   const clip = s?.kind === 'zoom' ? store.project.clips.find((c) => c.id === s.clipID) : undefined;
   const zoom = s?.kind === 'zoom' ? clip?.zooms.find((z) => z.id === s.zoomID) : undefined;
   return (
@@ -76,6 +82,60 @@ function ZoomInspector({ store, lib, clip, zoom, seek, onDelete }: {
         <div className="field row between"><span>Süre</span><span className="mono">{(zoom.end - zoom.start).toFixed(2)} sn</span></div>
         <div className="row between">
           <button onClick={() => seek(clipStart + Math.max(0, toLocal(clip, zoom.start) - 0.5))}>Başına Git</button>
+          <button className="danger" onClick={onDelete}>Sil</button>
+        </div>
+      </section>
+    </>
+  );
+}
+
+/** Nine places for the camera bubble. */
+function PositionPicker({ value, onChange }: { value: CameraPosition; onChange: (p: CameraPosition) => void }) {
+  return (
+    <div className="positions">
+      {cameraPositions.map((p) => (
+        <button key={p.id} className={value === p.id ? 'on' : ''} title={p.title} onClick={() => onChange(p.id)}>{p.icon}</button>
+      ))}
+    </div>
+  );
+}
+
+function CameraSegmentInspector({ store, clip, seg, seek, onDelete }: {
+  store: EditorStore; clip: Clip; seg: CameraSegment; seek: (t: number) => void; onDelete: () => void;
+}) {
+  const set = (key: string, change: (s: CameraSegment) => CameraSegment) =>
+    store.update((p) => updateCameraSegment(p, clip.id, seg.id, change), `${key}-${seg.id}`);
+  const clipStart = clipStarts(store.project)[store.project.clips.findIndex((c) => c.id === clip.id)] ?? 0;
+  return (
+    <>
+      <section>
+        <h3>Kamera bölümü</h3>
+        <p className="muted small">Bu aralıkta kamera burada durur. Başında yerine yumuşakça kayar, sonunda genel ayara geri döner.</p>
+        <div className="segmented">
+          {([['bubble', 'Balon'], ['full', 'Tam ekran'], ['hidden', 'Gizle']] as const).map(([k, t]) => (
+            <button key={k} className={seg.mode === k ? 'on' : ''} onClick={() => set('mode', (x) => ({ ...x, mode: k }))}>{t}</button>
+          ))}
+        </div>
+        {seg.mode === 'bubble' && <>
+          <div className="field">Konum</div>
+          <PositionPicker value={seg.position} onChange={(v) => set('position', (x) => ({ ...x, position: v }))} />
+          <label className="field">Boyut
+            <div className="row">
+              <input type="range" min={0.12} max={0.6} step={0.005} value={seg.size} onChange={(e) => set('size', (x) => ({ ...x, size: Number(e.target.value) }))} />
+              <span className="mono value">{Math.round(seg.size * 100)}%</span>
+            </div>
+          </label>
+        </>}
+        {seg.mode === 'full' && <p className="muted small">Kamera tüm görüntüyü kaplar; örneğin girişte ya da konuşurken.</p>}
+        {seg.mode === 'hidden' && <p className="muted small">Kamera bu aralıkta görünmez (yavaşça kaybolur ve geri gelir).</p>}
+      </section>
+      <section>
+        <h3>Zamanlama</h3>
+        <TimeField label="Başlangıç" value={seg.start - clip.sourceStart} onCommit={(v) => set('start', (x) => ({ ...x, start: clip.sourceStart + v }))} />
+        <TimeField label="Bitiş" value={seg.end - clip.sourceStart} onCommit={(v) => set('end', (x) => ({ ...x, end: clip.sourceStart + v }))} />
+        <div className="field row between"><span>Süre</span><span className="mono">{(toLocal(clip, seg.end) - toLocal(clip, seg.start)).toFixed(2)} sn</span></div>
+        <div className="row between">
+          <button onClick={() => seek(clipStart + Math.max(0, toLocal(clip, seg.start) - 0.7))}>Başına Git</button>
           <button className="danger" onClick={onDelete}>Sil</button>
         </div>
       </section>
@@ -249,11 +309,7 @@ function StyleInspector({ store, lib }: { store: EditorStore; lib: MediaLibrary 
           <h3>Kamera</h3>
           <label className="check"><input type="checkbox" checked={st.camera.show} onChange={(e) => setCam('show', e.target.checked)} /> Kamerayı göster</label>
           {st.camera.show && <>
-            <div className="corners">
-              {([['top-left', '↖'], ['top-right', '↗'], ['bottom-left', '↙'], ['bottom-right', '↘']] as const).map(([k, t]) => (
-                <button key={k} className={st.camera.position === k ? 'on' : ''} title="Konum" onClick={() => setCam('position', k)}>{t}</button>
-              ))}
-            </div>
+            <PositionPicker value={st.camera.position} onChange={(v) => setCam('position', v)} />
             <label className="field">Boyut<input type="range" min={0.12} max={0.5} step={0.005} value={st.camera.size} onChange={(e) => setCam('size', Number(e.target.value))} /></label>
             <div className="segmented">
               {([['circle', 'Daire'], ['rounded', 'Yuvarlak köşe'], ['square', 'Kare']] as const).map(([k, t]) => (
@@ -263,6 +319,7 @@ function StyleInspector({ store, lib }: { store: EditorStore; lib: MediaLibrary 
             <label className="check"><input type="checkbox" checked={st.camera.mirror} onChange={(e) => setCam('mirror', e.target.checked)} /> Ayna görüntüsü</label>
             <label className="check"><input type="checkbox" checked={st.camera.border} onChange={(e) => setCam('border', e.target.checked)} /> Beyaz çerçeve</label>
           </>}
+          <p className="muted small">Belli bir aralıkta kamerayı başka yere taşımak, tam ekran yapmak ya da gizlemek için: aralığı seç, <b>📷 Kamera</b>.</p>
         </section>
       )}
       {hasAudio && (
