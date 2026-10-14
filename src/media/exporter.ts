@@ -148,6 +148,7 @@ async function mixAudio(p: Project, sources: { sink: import('mediabunny').AudioB
   for (let i = 0; i < p.clips.length; i++) {
     const clip = p.clips[i], cs = starts[i], ce = cs + clipDuration(clip);
     if (ce <= from || cs >= to) continue;
+    if ((clip.speed || 1) !== 1) continue; // sped-up / slowed clips are silent (same as the preview)
     const srcA = clip.sourceStart + Math.max(0, from - cs);
     const srcB = clip.sourceStart + Math.min(ce, to) - cs;
     const segStart = Math.max(cs, from) - from;    // where this clip's audio begins in the chunk

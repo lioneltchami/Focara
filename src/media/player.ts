@@ -2,6 +2,7 @@ import type { VideoSample, VideoSampleSink } from 'mediabunny';
 import { type ExportSettings, type Project, type Size, assetOf, canvasSize, clipDuration, clipStarts, locate, projectDuration } from '../core/model.ts';
 import { type ClipRenderData, drawFrame } from '../render/renderer.ts';
 import type { MediaLibrary } from './media.ts';
+import { odak } from '../bridge.ts';
 
 /** Geometry is resolution independent; the preview renders at up to 1080p. */
 export function previewSettings(p: Project): ExportSettings {
@@ -52,7 +53,9 @@ export class Player {
   private ctx: CanvasRenderingContext2D;
   private audio: AudioContext | null = null;
   private gen = 0;
-  private drawToken = 0;
+  private pendingDraw: number | null = null;
+  private drawing: Promise<void> | null = null;
+  private lastError = 0;
   private nodes: AudioScheduledSourceNode[] = [];
   private clockStart = 0;
   private timeStart = 0;
@@ -82,11 +85,26 @@ export class Player {
     else if (!this.playing) await this.drawAt(this.currentTime);
   }
 
-  /** Draws the exact frame for timeline time t (the frame the exporter would produce). */
-  async drawAt(t: number) {
+  /**
+   * Draws the exact frame for timeline time t (the frame the exporter would produce).
+   * Requests are coalesced: while one frame decodes, only the newest requested time is kept,
+   * so dragging the playhead never runs a pile of full-resolution decoders at once.
+   */
+  drawAt(t: number): Promise<void> {
+    this.pendingDraw = t;
+    this.drawing ??= (async () => {
+      while (this.pendingDraw !== null) {
+        const next = this.pendingDraw;
+        this.pendingDraw = null;
+        try { await this.drawOnce(next); } catch (e) { this.decodeFailed(e, next); }
+      }
+    })().finally(() => { this.drawing = null; });
+    return this.drawing;
+  }
+
+  private async drawOnce(t: number) {
     const p = this.project;
     if (!p) return;
-    const token = ++this.drawToken;
     const loc = locate(p, t);
     if (!loc) { this.ctx.fillStyle = '#000'; this.ctx.fillRect(0, 0, this.size.width, this.size.height); return; }
     const clip = p.clips[loc.index];
@@ -94,7 +112,7 @@ export class Player {
     const sample = media.videoSink ? await media.videoSink.getSample(loc.sourceTime) : null;
     const cam = await this.lib.camera(p, clip);
     const camSample = cam ? await cam.videoSink!.getSample(loc.sourceTime) : null;
-    if (token !== this.drawToken) { sample?.close(); camSample?.close(); return; }
+    if (this.playing) { sample?.close(); camSample?.close(); return; }
     renderSample(this.ctx, this.size, sample, this.data[loc.index], loc.sourceTime, camSample);
     sample?.close(); camSample?.close();
   }
@@ -149,6 +167,7 @@ export class Player {
     for (let i = 0; i < p.clips.length; i++) {
       const clip = p.clips[i], clipStart = starts[i], clipEnd = clipStart + clipDuration(clip);
       if (clipEnd <= from) continue;
+      if ((clip.speed || 1) !== 1) continue; // sped-up / slowed clips play silently
       const srcFrom = clip.sourceStart + Math.max(0, from - clipStart);
       const sources = await this.lib.audioOf(p, clip);
       await Promise.all(sources.map(async ({ sink, volume }) => {
@@ -176,10 +195,19 @@ export class Player {
     }
   }
 
+  /** A frame that fails to decode is skipped instead of stopping the preview; it is logged (rate limited). */
+  private decodeFailed(e: unknown, t: number) {
+    if (performance.now() - this.lastError < 2000) return;
+    this.lastError = performance.now();
+    const loc = this.project && locate(this.project, t);
+    const file = loc ? assetOf(this.project!, this.project!.clips[loc.index].mediaID)?.videoFile : undefined;
+    odak().log('preview decode failed', { t: Number(t.toFixed(3)), file, error: String((e as Error)?.message ?? e) });
+  }
+
   private async videoLoop(gen: number, p: Project) {
     let clipIndex = -1;
     let screen: FrameCursor | null = null, camera: FrameCursor | null = null;
-    const release = async () => { await screen?.close(); await camera?.close(); screen = camera = null; };
+    const release = async () => { const s = screen, c = camera; screen = camera = null; await Promise.allSettled([s?.close(), c?.close()]); };
     try {
       while (gen === this.gen) {
         const t = Math.max(this.timeStart, this.clock());
@@ -201,7 +229,17 @@ export class Player {
           const cam = await this.lib.camera(p, clip);
           if (cam) camera = new FrameCursor(cam.videoSink!, loc.sourceTime, clip.sourceEnd);
         }
-        const [frame, camFrame] = await Promise.all([screen?.at(loc.sourceTime) ?? null, camera?.at(loc.sourceTime) ?? null]);
+        let frame: VideoSample | null, camFrame: VideoSample | null;
+        try {
+          [frame, camFrame] = await Promise.all([screen?.at(loc.sourceTime) ?? null, camera?.at(loc.sourceTime) ?? null]);
+        } catch (e) {
+          // Reopen the decoders at the current time on the next pass; the clock keeps running.
+          this.decodeFailed(e, t);
+          await release().catch(() => {});
+          clipIndex = -1;
+          await new Promise((r) => setTimeout(r, 100));
+          continue;
+        }
         if (gen !== this.gen) break;
         renderSample(this.ctx, this.size, frame, this.data[loc.index], loc.sourceTime, camFrame);
         await new Promise((r) => requestAnimationFrame(r));

@@ -10,7 +10,9 @@ import { odak } from './bridge.ts';
 import { type CursorTrack, type MediaAsset, type Project, newClip, newProject, normalizeProject, uuid } from './core/model.ts';
 import { SideRecorder } from './media/sideRecorder.ts';
 import { generateAutoZooms } from './core/zoom.ts';
-import { exportProject } from './media/exporter.ts';
+import { encoderDelay, exportProject } from './media/exporter.ts';
+import { duplicateClip, insertClip, setClipSpeed, splitClipAtSource, trimClip } from './core/edit.ts';
+import { projectDuration } from './core/model.ts';
 import { MediaLibrary } from './media/media.ts';
 import { Player } from './media/player.ts';
 
@@ -249,7 +251,74 @@ export async function runSelftest() {
       vp.destroy(); vlib.dispose();
     }
 
-    // 7. Camera + microphone recorder with Chromium's fake devices.
+    // 7. Editing: cut, speed, an imported video and a duplicate — durations, parity, audio placement.
+    const extPath = `${tmp}/dis-video.mp4`;
+    const delay = await encoderDelay(acodec!);
+    await writeFile(extPath, async (target) => {
+      const canvas = new OffscreenCanvas(640, 360);
+      const ctx = canvas.getContext('2d')!;
+      const out = new Output({ format: new Mp4OutputFormat(), target });
+      const vs = new CanvasSource(canvas, { codec: vcodec, bitrate: 2e6, keyFrameInterval: 1 });
+      out.addVideoTrack(vs, { frameRate: 30 });
+      const as = new AudioBufferSource({ codec: acodec!, bitrate: QUALITY_HIGH });
+      out.addAudioTrack(as);
+      await out.start();
+      // Beep at 1.0 s (fed early by the encoder's priming delay, like the exporter does).
+      const ac = new OfflineAudioContext(2, 4 * 48000, 48000), ab = ac.createBuffer(2, 4 * 48000, 48000);
+      for (let ch = 0; ch < 2; ch++) { const d = ab.getChannelData(ch); const at = Math.round((1.0 - delay) * 48000); for (let i = 0; i < 2400; i++) d[at + i] = 0.8 * Math.sin((2 * Math.PI * 1000 * i) / 48000); }
+      await as.add(ab);
+      for (let i = 0; i < 120; i++) { ctx.fillStyle = `hsl(${i * 3}, 70%, 50%)`; ctx.fillRect(0, 0, 640, 360); ctx.fillStyle = '#fff'; ctx.font = 'bold 40px monospace'; ctx.fillText(`dis ${i}`, 30, 60); await vs.add(i / 30, 1 / 30); }
+      await out.finalize();
+    });
+    const imported = await odak().importMedia(pkg, extPath);
+    const extAsset: MediaAsset = { id: imported.id, kind: 'externalVideo', displayName: imported.name, videoFile: imported.rel, duration: 4, pixelWidth: 640, pixelHeight: 360, pixelsPerPoint: 1 };
+    let ed: Project = { ...reopened, media: [...reopened.media, extAsset] };
+    const c0 = ed.clips[0].id;
+    let sp = splitClipAtSource(ed, c0, 3); if (!('project' in sp)) throw new Error(sp.error); ed = sp.project; const bId = sp.rightID;   // A 0–3 | B 3–10
+    sp = splitClipAtSource(ed, bId, 8); if (!('project' in sp)) throw new Error(sp.error); ed = sp.project; const dId = sp.rightID;      // B 3–8 | D 8–10
+    ed = trimClip(ed, bId, 'start', 5);              // B 5–8
+    ed = setClipSpeed(ed, bId, 2);                   // B lasts 1.5 s
+    ed = insertClip(ed, newClip(extAsset.id, 0, 4), 1); // A | B | ext | D
+    const dup = duplicateClip(ed, dId)!; ed = dup.project; // … | D | D′
+    const expected = 3 + 1.5 + 4 + 2 + 2;
+    check(Math.abs(projectDuration(ed) - expected) < 1e-9, `edited timeline is ${projectDuration(ed)} s (A 3 + B 3@×2 + video 4 + D 2 + copy 2)`);
+    const elib = new MediaLibrary(pkg);
+    const efile = `${tmp}/export-edited.mp4`;
+    await exportProject(ed, elib, efile, { ...ed.export, fps: 30 }, () => {});
+    const ein = openAbsolute(efile);
+    const evt = (await ein.getPrimaryVideoTrack())!;
+    const edur = await evt.computeDuration();
+    check(Math.abs(edur - expected) < 0.04, `edited export is ${edur.toFixed(3)} s`);
+    const esink = new VideoSampleSink(evt);
+    const ep = new Player(document.createElement('canvas'), elib, () => {}, () => {});
+    await ep.setProject(ed);
+    for (const [t, what] of [[1.0, 'cut clip'], [3.6, '×2 clip'], [6.0, 'imported video'], [9.5, 'clip after video'], [11.8, 'duplicate']] as const) {
+      await ep.seek(t);
+      const pv = grab((c) => c.drawImage(ep.canvas, 0, 0));
+      const s1 = await esink.getSample(t + 1e-6);
+      const ev = grab((c) => s1!.draw(c, 0, 0)); s1!.close();
+      check(psnr(pv, ev) > 35, `${what} t=${t}: preview vs export ${psnr(pv, ev).toFixed(1)} dB`);
+    }
+    ep.destroy();
+    const eat = await ein.getPrimaryAudioTrack();
+    const onsets: number[] = [];
+    if (eat) {
+      const asink = new AudioBufferSink(eat);
+      let last = -1;
+      for await (const b of asink.buffers()) {
+        const d = b.buffer.getChannelData(0);
+        for (let i = 0; i < d.length; i++) {
+          const tt = b.timestamp + i / b.buffer.sampleRate;
+          if (Math.abs(d[i]) > 0.3 && tt - last > 0.5) { onsets.push(tt); last = tt; }
+        }
+      }
+    }
+    // A keeps its beep at 2.0; B (×2) is silent; the video's beep (1.0 s in) lands at 3 + 1.5 + 1.0 = 5.5.
+    check(onsets.length === 2 && Math.abs(onsets[0] - 2.0) < 0.01 && Math.abs(onsets[1] - 5.5) < 0.01,
+      `edited audio beeps at ${onsets.map((x) => x.toFixed(4)).join(', ')} s (expected 2.0000, 5.5000)`);
+    elib.dispose();
+
+    // 8. Camera + microphone recorder with Chromium's fake devices.
     const devices = await navigator.mediaDevices.enumerateDevices();
     const cam = devices.find((d) => d.kind === 'videoinput'), mic = devices.find((d) => d.kind === 'audioinput');
     log.push(`fake devices: camera=${cam?.label ?? '-'} mic=${mic?.label ?? '-'}`);

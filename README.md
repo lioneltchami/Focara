@@ -4,6 +4,7 @@ Ekran kaydı, otomatik zoom ve zoom'ları elle düzenleme. **macOS ve Windows'ta
 
 - Kayıtta sistem imleci gizlenir. İmleç konumu ve tıklamalar ayrıca saklanır; imleç sonradan yeniden çizilir, yumuşatılır ve boyutlandırılır.
 - Zoom'lar tıklamalardan otomatik oluşur. Her zoom'un zamanı, miktarı ve odağı (imleci takip / sabit nokta) düzenlenebilir.
+- **Düzenleme:** Birden çok kayıt ve bilgisayardan video tek zaman çizelgesinde. Böl, kenarından kırp, sürükleyip sırala, çoğalt, aralık seçip sil, klip hızı (×0.5–×8). **Durgun anlar** tek adımda bulunur, hızlandırılır ya da kesilir.
 - Önizleme ile dışa aktarılan MP4 aynı çizim koduyla üretilir. Görüntü, zamanlama ve ses senkronu aynıdır.
 - **Kamera:** Ekranla aynı anda kaydedilir. Videoda daire, yuvarlak köşe ya da kare balon olarak görünür; konumu, boyutu, ayna görüntüsü ve çerçevesi ayarlanabilir.
 - **Ses:** Sistem sesi ve mikrofon ayrı dosyalara kaydedilir, ses düzeyleri ayrı ayarlanır. Kamera ve mikrofon listeden seçilir (örneğin harici USB mikrofon), gürültü azaltma isteğe bağlıdır.
@@ -47,11 +48,28 @@ Geliştirme modunda (`npm run dev`) macOS izinleri "Electron" uygulamasına veri
 1. Ekranı seç. İstersen sistem sesini, mikrofonu ve kamerayı aç; kamera seçilince önizlemesi görünür. Sonra **Kaydı Başlat**'a bas.
 2. Durdurmak için üstteki paneli ya da **⌘⇧2 / Ctrl+Shift+2**'yi kullan. Kayıt otomatik zoom'larla düzenleyicide açılır.
 3. Zaman çizelgesinde bir zoom'u **sürükle** (taşı) ya da **kenarından** uzat. Tıklayınca sağ panelden miktarını ve odağını değiştirebilirsin.
-4. **Zoom Ekle** oynatma çizgisine yeni bir zoom ekler. **Otomatik Zoom** dokunulmamış zoom'ları yeniden üretir; elle düzenlediklerin korunur.
-5. Sağ paneldeki **Arka plan**, **İmleç**, **Kamera** ve **Ses** bölümlerinden görünümü ayarla. Hiçbir zoom seçili değilken bu bölümler görünür.
+4. **＋ Zoom** oynatma çizgisine yeni bir zoom ekler. **✦ Oto zoom** dokunulmamış zoom'ları yeniden üretir; elle düzenlediklerin korunur.
+5. Sağ paneldeki **Arka plan**, **İmleç**, **Kamera** ve **Ses** bölümlerinden görünümü ayarla. Hiçbir şey seçili değilken bu bölümler görünür.
 6. **Dışa Aktar**: 1080p / 1440p / 4K, 30/60 fps, H.264 ya da HEVC.
 
-Kısayollar: boşluk (oynat/duraklat), ←/→ (kare kare), Sil (seçili zoom), ⌘/Ctrl+Z ve ⇧⌘/Ctrl+Shift+Z (geri al/yinele), ⌘/Ctrl+E (dışa aktar).
+### Kesme, birleştirme, düzenleme
+
+| İşlem | Nasıl |
+|---|---|
+| Böl | Oynatma çizgisini getir, **✂ Böl** ya da **S**. Zoom'lar da iki parçaya bölünür. |
+| Kırp | Klibin sol/sağ kenarını sürükle. Sağ kenar oynatma çizgisine yapışır. Kırpılan kısım silinmez, kenarı geri çekince geri gelir. |
+| Sırala | Klibi tutup sürükle; bırakacağın yer çizgiyle gösterilir. |
+| Sil | Klibi seç, **Sil**. Arkadaki klipler boşluğu kapatır. |
+| Aralık sil | Cetvelde (zaman çizelgesinin üst şeridi) sürükleyerek aralık seç, **⌫ Aralığı sil** ya da **Sil**. Birden çok klibi kesse bile tek adımda çıkarır. |
+| Çoğalt / hız | Klibi seç; sağ panelden **Çoğalt**, hız ×0.5–×8, kaynak başı/sonu ve klibin ses düzeyleri. |
+| Video ekle | **＋ Video**: bilgisayardaki bir MP4/MOV/M4V/WebM/MKV videosu seçili klibin arkasına (seçim yoksa sona) eklenir ve projeye kopyalanır. |
+| Kayıt ekle | **● Kayıt**: açık projeye yeni bir ekran kaydı (kamera/mikrofonla birlikte) eklenir, kendi otomatik zoom'larıyla gelir. |
+| Durgun anlar | **⏩ Durgun anlar**: ekranın değişmediği, imlecin durduğu ve ses olmayan anları bulur. Yeni süreyi önceden gösterir; ×2/×4/×8 hızlandırır ya da keser. Her anın başında ve sonunda pay bırakılır. |
+| Zaman çizelgesi | **−/＋/⤢** ya da **⌘/Ctrl + tekerlek** ile yakınlaştır. Kliplerin altında ses dalgası görünür. |
+
+Her işlem **geri alınabilir** (⌘/Ctrl+Z). Ham kayıtlar hiç değişmez; düzenlemeler yalnızca `project.json`'a yazılır.
+
+Kısayollar: boşluk (oynat/duraklat), ←/→ (kare kare, Shift ile 10 kare), S (böl), Sil (seçili klip, zoom ya da aralık), Esc (seçimi bırak), ⌘/Ctrl+Z ve ⇧⌘/Ctrl+Shift+Z (geri al/yinele), ⌘/Ctrl+E (dışa aktar).
 
 ## Mimari
 
@@ -97,10 +115,12 @@ Kayıt 2026-10-15 10.12.30.odak/
 ## Testler
 
 ```bash
-npm test               # çekirdek: zoom/kamera Kadraj (Swift) ile aynı sonuçları veriyor mu, düzenleme işlemleri
+npm test               # çekirdek: zoom/kamera Kadraj (Swift) ile aynı mı; böl/kırp/sırala/hız/aralık sil/durgun anlar
 npm run selftest       # uygulama içinde: sentetik kayıt → zoom → kaydet/aç → MP4 → önizleme=dışa aktarma, ses senkronu,
-                       #   kamera balonu, görsel/tema arka planlar, imleç stilleri, sahte kamera+mikrofonla kayıt
-npm run uitest -- "examples/Örnek Proje.odak"   # gerçek arayüz: zoom ekle/sürükle/düzenle, geri al, oynat, otomatik kayıt
+                       #   kamera balonu, görsel/tema arka planlar, imleç stilleri, sahte kamera+mikrofonla kayıt,
+                       #   düzenlenmiş çok klipli dışa aktarma (kesik + ×2 + içe aktarılan video + kopya) ve ses senkronu
+npm run uitest -- "examples/Örnek Proje.odak"   # gerçek arayüz: zoom'lar, böl/kırp/sürükle/sil, aralık sil,
+                                               #   video ekle, durgun anlar, geri al, oynat, otomatik kayıt
 node scripts/helper-smoke.mjs                  # kayıt yardımcısıyla 3 sn gerçek kayıt (izin gerekir)
 cargo test --manifest-path native/win/Cargo.toml   # Windows yardımcısının WAV hizalaması
 ```
@@ -112,4 +132,5 @@ cargo test --manifest-path native/win/Cargo.toml   # Windows yardımcısının W
 - Uygulamalar Apple/Microsoft sertifikasıyla imzalı değil. İlk açılışta yukarıdaki uyarılar çıkar.
 - 4096×2304'ten büyük ekranlar: macOS'ta kayıt bu boyuta sığdırılır. Windows'ta HEVC kullanılır ve bu kayıtlar ancak HEVC çözebilen bilgisayarlarda düzenlenebilir.
 - Linux'ta düzenleme ve dışa aktarma çalışır, kayıt henüz desteklenmiyor.
-- Çoklu klip, video içe aktarma ve ses düzeyi arayüzü sonraki aşamada. Veri modeli ve dışa aktarma bunları zaten destekliyor.
+- Hızı 1× olmayan kliplerde ses kapatılır (sesi perdesini bozmadan hızlandırma henüz yok).
+- Durgun anlar yalnızca Odak'ın kendi ekran kayıtlarında aranır; içe aktarılan videolarda imleç verisi olmadığı için analiz edilmez.

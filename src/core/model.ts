@@ -22,6 +22,8 @@ export interface Clip {
   sourceStart: number;
   sourceEnd: number;
   zooms: ZoomSegment[];
+  /** Playback speed (1 = normal). Audio is muted while a clip plays faster or slower. */
+  speed: number;
   videoVolume: number;
   systemAudioVolume: number;
   microphoneVolume: number;
@@ -171,7 +173,7 @@ export function newProject(name: string): Project {
 }
 
 export function newClip(mediaID: string, sourceStart: number, sourceEnd: number): Clip {
-  return { id: uuid(), mediaID, sourceStart, sourceEnd, zooms: [], videoVolume: 1, systemAudioVolume: 1, microphoneVolume: 1 };
+  return { id: uuid(), mediaID, sourceStart, sourceEnd, zooms: [], speed: 1, videoVolume: 1, systemAudioVolume: 1, microphoneVolume: 1 };
 }
 
 /** Fills fields missing from older or foreign project files with defaults. */
@@ -190,7 +192,11 @@ export const isFollow = (f: Focus): f is { followCursor: Record<string, never> }
 export const followCursor = (): Focus => ({ followCursor: {} });
 export const fixedFocus = (x: number, y: number): Focus => ({ fixed: { x, y } });
 
-export const clipDuration = (c: Clip) => Math.max(0, c.sourceEnd - c.sourceStart);
+/** Length of the clip on the output timeline (source length divided by speed). */
+export const clipDuration = (c: Clip) => Math.max(0, (c.sourceEnd - c.sourceStart) / (c.speed || 1));
+/** Clip-local timeline seconds <-> source seconds. */
+export const toSource = (c: Clip, local: number) => c.sourceStart + local * (c.speed || 1);
+export const toLocal = (c: Clip, source: number) => (source - c.sourceStart) / (c.speed || 1);
 export const projectDuration = (p: Project) => p.clips.reduce((s, c) => s + clipDuration(c), 0);
 export const assetOf = (p: Project, id: string) => p.media.find((m) => m.id === id);
 
@@ -206,7 +212,7 @@ export function locate(p: Project, time: number): { index: number; sourceTime: n
     const c = p.clips[i];
     const d = clipDuration(c);
     if (time < t + d || i === p.clips.length - 1) {
-      return { index: i, sourceTime: c.sourceStart + Math.min(Math.max(time - t, 0), d) };
+      return { index: i, sourceTime: toSource(c, Math.min(Math.max(time - t, 0), d)) };
     }
     t += d;
   }

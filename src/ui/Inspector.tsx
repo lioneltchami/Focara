@@ -1,18 +1,22 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   type CameraSettings, type Clip, type CursorStyle, type RGBA, type StyleSettings, type ZoomSegment,
-  assetOf, fixedFocus, followCursor, isFollow, zoomSpeeds,
+  assetOf, clipDuration, clipStarts, fixedFocus, followCursor, isFollow, toLocal, zoomSpeeds,
 } from '../core/model.ts';
 import { odak } from '../bridge.ts';
 import { drawCursor } from '../render/renderer.ts';
 import { gradientPresets, themeCanvas, themes } from '../render/themes.ts';
-import { updateZoom } from '../core/edit.ts';
+import { setClipSpeed, trimClip, updateZoom } from '../core/edit.ts';
 import type { MediaLibrary } from '../media/media.ts';
-import { timecode } from './Editor.tsx';
+import { type EditActions, timecode } from './Editor.tsx';
 import type { EditorStore } from './store.ts';
 
-export function Inspector({ store, lib, seek, onDelete }: { store: EditorStore; lib: MediaLibrary; seek: (t: number) => void; onDelete: () => void }) {
+export function Inspector({ store, lib, seek, onDelete, actions }: {
+  store: EditorStore; lib: MediaLibrary; seek: (t: number) => void; onDelete: () => void; actions: EditActions;
+}) {
   const s = store.selection;
+  const selClip = s?.kind === 'clip' ? store.project.clips.find((c) => c.id === s.clipID) : undefined;
+  if (selClip) return <aside className="inspector"><ClipInspector store={store} clip={selClip} actions={actions} seek={seek} /></aside>;
   const clip = s?.kind === 'zoom' ? store.project.clips.find((c) => c.id === s.clipID) : undefined;
   const zoom = s?.kind === 'zoom' ? clip?.zooms.find((z) => z.id === s.zoomID) : undefined;
   return (
@@ -30,8 +34,7 @@ function ZoomInspector({ store, lib, clip, zoom, seek, onDelete }: {
   const set = (key: string, change: (z: ZoomSegment) => ZoomSegment) =>
     store.update((p) => updateZoom(p, clip.id, zoom.id, change), `${key}-${zoom.id}`);
   const fixed = !isFollow(zoom.focus);
-  const starts = store.project.clips.map((_, i, a) => a.slice(0, i).reduce((t, c) => t + (c.sourceEnd - c.sourceStart), 0));
-  const clipStart = starts[store.project.clips.findIndex((c) => c.id === clip.id)] ?? 0;
+  const clipStart = clipStarts(store.project)[store.project.clips.findIndex((c) => c.id === clip.id)] ?? 0;
 
   const switchFocus = async (toFixed: boolean) => {
     if (!toFixed) { set('focus', (z) => ({ ...z, focus: followCursor() })); return; }
@@ -72,7 +75,7 @@ function ZoomInspector({ store, lib, clip, zoom, seek, onDelete }: {
         <TimeField label="Bitiş" value={zoom.end - clip.sourceStart} onCommit={(v) => set('end', (z) => ({ ...z, end: clip.sourceStart + v }))} />
         <div className="field row between"><span>Süre</span><span className="mono">{(zoom.end - zoom.start).toFixed(2)} sn</span></div>
         <div className="row between">
-          <button onClick={() => seek(clipStart + Math.max(0, zoom.start - clip.sourceStart - 0.5))}>Başına Git</button>
+          <button onClick={() => seek(clipStart + Math.max(0, toLocal(clip, zoom.start) - 0.5))}>Başına Git</button>
           <button className="danger" onClick={onDelete}>Sil</button>
         </div>
       </section>
@@ -320,3 +323,53 @@ function CursorThumb({ style, color }: { style: CursorStyle; color: RGBA }) {
 
 const toHex = (c: RGBA) => '#' + [c.r, c.g, c.b].map((v) => Math.round(v * 255).toString(16).padStart(2, '0')).join('');
 const fromHex = (h: string): RGBA => ({ r: parseInt(h.slice(1, 3), 16) / 255, g: parseInt(h.slice(3, 5), 16) / 255, b: parseInt(h.slice(5, 7), 16) / 255, a: 1 });
+
+const SPEEDS = [0.5, 1, 1.5, 2, 4, 8];
+
+function ClipInspector({ store, clip, actions, seek }: { store: EditorStore; clip: Clip; actions: EditActions; seek: (t: number) => void }) {
+  const p = store.project;
+  const media = assetOf(p, clip.mediaID);
+  const index = p.clips.findIndex((c) => c.id === clip.id);
+  const start = clipStarts(p)[index] ?? 0;
+  const vol = (key: 'systemAudioVolume' | 'microphoneVolume' | 'videoVolume', v: number) =>
+    store.update((q) => ({ ...q, clips: q.clips.map((c) => (c.id === clip.id ? { ...c, [key]: v } : c)) }), `vol-${key}-${clip.id}`);
+  return (
+    <>
+      <section>
+        <h3>Klip {index + 1} / {p.clips.length}</h3>
+        <span className={`badge ${media?.kind === 'externalVideo' ? 'manual' : 'auto'}`}>
+          {media?.kind === 'externalVideo' ? 'Eklenen video' : 'Ekran kaydı'} · {media?.displayName}
+        </span>
+        <TimeField label="Kaynakta başlangıç" value={clip.sourceStart} onCommit={(v) => store.update((q) => trimClip(q, clip.id, 'start', v))} />
+        <TimeField label="Kaynakta bitiş" value={clip.sourceEnd} onCommit={(v) => store.update((q) => trimClip(q, clip.id, 'end', v))} />
+        <div className="field row between"><span>Videodaki süre</span><span className="mono">{clipDuration(clip).toFixed(2)} sn</span></div>
+        <p className="muted small">İpucu: zaman çizelgesinde klibin kenarlarını sürükleyerek de kırpabilirsin; bitiş kenarı oynatma çizgisine yapışır.</p>
+      </section>
+      <section>
+        <h3>Hız</h3>
+        <div className="segmented">
+          {SPEEDS.map((sp) => <button key={sp} className={(clip.speed || 1) === sp ? 'on' : ''} onClick={() => store.update((q) => setClipSpeed(q, clip.id, sp))}>×{sp}</button>)}
+        </div>
+        {(clip.speed || 1) !== 1 && <p className="muted small">Bu klip ×{clip.speed} oynuyor; sesi kapalı.</p>}
+      </section>
+      {media && (media.systemAudioFile || media.microphoneFile || media.kind === 'externalVideo') && (
+        <section>
+          <h3>Bu klibin sesi</h3>
+          {media.systemAudioFile && <label className="field">Sistem sesi<input type="range" min={0} max={2} step={0.01} value={clip.systemAudioVolume} onChange={(e) => vol('systemAudioVolume', Number(e.target.value))} /></label>}
+          {media.microphoneFile && <label className="field">Mikrofon<input type="range" min={0} max={2} step={0.01} value={clip.microphoneVolume} onChange={(e) => vol('microphoneVolume', Number(e.target.value))} /></label>}
+          {media.kind === 'externalVideo' && <label className="field">Video sesi<input type="range" min={0} max={2} step={0.01} value={clip.videoVolume} onChange={(e) => vol('videoVolume', Number(e.target.value))} /></label>}
+        </section>
+      )}
+      <section>
+        <h3>İşlemler</h3>
+        <div className="row wrap">
+          <button onClick={actions.split} title="S">✂ Oynatma çizgisinden böl</button>
+          <button onClick={() => actions.duplicate(clip.id)}>⧉ Çoğalt</button>
+          <button onClick={() => seek(start)}>Başına git</button>
+          <button className="danger" onClick={() => actions.deleteClip(clip.id)}>Sil</button>
+        </div>
+        <p className="muted small">Sıralamak için klibi zaman çizelgesinde sürükle.</p>
+      </section>
+    </>
+  );
+}

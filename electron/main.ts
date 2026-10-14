@@ -180,6 +180,29 @@ ipcMain.handle('dialog:saveVideo', async (_e, name: string) => {
   return r.canceled ? null : r.filePath ?? null;
 });
 
+ipcMain.handle('dialog:importVideo', async () => {
+  const r = await dialog.showOpenDialog(mainWindow!, {
+    title: 'Video Ekle', properties: ['openFile', 'multiSelections'],
+    filters: [{ name: 'Videolar', extensions: ['mp4', 'mov', 'm4v', 'webm', 'mkv'] }],
+  });
+  return r.canceled ? [] : r.filePaths;
+});
+
+/** Copies an external video into the project (projects stay self-contained). */
+ipcMain.handle('project:importMedia', async (_e, pkg: string, src: string) => {
+  const id = randomUUID().toUpperCase();
+  const name = path.basename(src).replace(/[\\/:*?"<>|]/g, '-');
+  const rel = `media/${id}/${name}`;
+  await fsp.mkdir(path.join(pkg, 'media', id), { recursive: true });
+  await fsp.copyFile(src, inPackage(pkg, rel));
+  log('media imported', { src, rel });
+  return { id, rel, name: path.basename(src).replace(/\.[^.]+$/, '') };
+});
+
+ipcMain.handle('project:removeMedia', async (_e, pkg: string, id: string) => {
+  await fsp.rm(inPackage(pkg, `media/${id}`), { recursive: true, force: true });
+});
+
 ipcMain.handle('dialog:pickImage', async () => {
   const r = await dialog.showOpenDialog(mainWindow!, {
     title: 'Arka Plan Görseli Seç', properties: ['openFile'],
@@ -290,11 +313,15 @@ ipcMain.handle('media:ask', async (_e, kind: 'camera' | 'microphone') => {
   return systemPreferences.askForMediaAccess(kind);
 });
 
-ipcMain.handle('capture:start', async (_e, o: { displayId: number; systemAudio: boolean }) => {
+ipcMain.handle('capture:start', async (_e, o: { displayId: number; systemAudio: boolean; pkg?: string }) => {
   if (recording) return { ok: false, error: 'Zaten kayıt yapılıyor.' };
   const display = screen.getAllDisplays().find((d) => d.id === o.displayId) ?? screen.getPrimaryDisplay();
-  const stamp = new Date().toISOString().slice(0, 19).replace('T', ' ').replace(/:/g, '.');
-  const pkg = await createPackage(`Kayıt ${stamp}`);
+  // Local time, as the user reads the clock (toISOString would be UTC).
+  const now = new Date(), two = (n: number) => String(n).padStart(2, '0');
+  const stamp = `${now.getFullYear()}-${two(now.getMonth() + 1)}-${two(now.getDate())} ${two(now.getHours())}.${two(now.getMinutes())}.${two(now.getSeconds())}`;
+  // Adding a recording to an open project writes into that project's package.
+  const appending = !!o.pkg && fs.existsSync(path.join(o.pkg, 'project.json'));
+  const pkg = appending ? o.pkg! : await createPackage(`Kayıt ${stamp}`);
   const mediaID = randomUUID().toUpperCase();
   const out = path.join(pkg, 'media', mediaID);
   await fsp.mkdir(out, { recursive: true });
@@ -335,7 +362,7 @@ ipcMain.handle('capture:start', async (_e, o: { displayId: number; systemAudio: 
   if (first.event !== 'started') {
     log('capture:start failed', first, { stderr: r.stderr.trim().slice(-2000) });
     proc.kill();
-    await fsp.rm(pkg, { recursive: true, force: true });
+    await fsp.rm(appending ? out : pkg, { recursive: true, force: true });
     const msg = first.code === 'permission'
       ? 'macOS ekran kaydına izin vermedi.\n\nSistem Ayarları › Gizlilik ve Güvenlik › Ekran ve Sistem Sesi Kaydı\'nda Odak açık görünüyorsa bile, uygulama güncellendiyse macOS eski izni geçersiz sayar: Odak\'ı listeden “–” ile kaldırın, sonra Odak\'ta kaydı yeniden başlatıp izin verin ve Odak\'ı yeniden açın.'
       : String(first.message ?? (r.stderr.trim() || 'Kayıt başlatılamadı.'));

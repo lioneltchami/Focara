@@ -3,7 +3,7 @@ import type { CursorTrack, Project } from './core/model.ts';
 
 export interface DisplayInfo { id: number; name: string; width: number; height: number; scaleFactor: number; primary: boolean }
 
-export interface RecordingOptions { displayId: number; systemAudio: boolean }
+export interface RecordingOptions { displayId: number; systemAudio: boolean; /** add to this project instead of creating one */ pkg?: string }
 
 /** Written by the native capture helper (same fields on macOS and Windows). */
 export interface RecordingInfo {
@@ -35,6 +35,9 @@ export interface OdakAPI {
   log(...parts: unknown[]): void;
   revealLog(): Promise<void>;
   pickImage(): Promise<string | null>;
+  importVideoDialog(): Promise<string[]>;
+  importMedia(pkg: string, src: string): Promise<{ id: string; rel: string; name: string }>;
+  removeMedia(pkg: string, id: string): Promise<void>;
   importAsset(pkg: string, src: string): Promise<string>;
   createPackage(name: string): Promise<string>;
   loadProject(pkg: string): Promise<{ project?: Project; error?: string }>;

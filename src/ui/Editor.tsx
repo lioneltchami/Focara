@@ -1,11 +1,17 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { odak } from '../bridge.ts';
-import { type ZoomSegment, assetOf, clipDuration, clipStarts, isFollow, projectDuration } from '../core/model.ts';
-import { addZoomAt, deleteZoom, regenerateAutoZooms, updateZoom } from '../core/edit.ts';
+import { type Clip, type MediaAsset, type ZoomSegment, assetOf, clipDuration, clipStarts, isFollow, newClip, projectDuration, toLocal } from '../core/model.ts';
+import {
+  addZoomAt, deleteClip, deleteZoom, duplicateClip, insertClip, moveClip, regenerateAutoZooms, removeRange, splitAt,
+  trimClip, updateZoom,
+} from '../core/edit.ts';
 import { MediaLibrary } from '../media/media.ts';
 import { Player } from '../media/player.ts';
+import type { SideDevices } from '../media/sideRecorder.ts';
 import { ExportDialog } from './ExportDialog.tsx';
 import { Inspector } from './Inspector.tsx';
+import { QuietDialog } from './QuietDialog.tsx';
+import { RecordSetup } from './RecordSetup.tsx';
 import { type EditorStore, useStore } from './store.ts';
 
 export function timecode(t: number, cs = true) {
@@ -14,7 +20,17 @@ export function timecode(t: number, cs = true) {
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}${cs ? '.' + String(c).padStart(2, '0') : ''}`;
 }
 
-export function Editor({ store, onClose }: { store: EditorStore; onClose: () => void }) {
+export interface EditActions {
+  split: () => void;
+  duplicate: (clipID: string) => void;
+  deleteClip: (clipID: string) => void;
+  time: () => number;
+}
+
+export function Editor({ store, onClose, busy, onRecordInto }: {
+  store: EditorStore; onClose: () => void; busy: boolean;
+  onRecordInto: (displayId: number, systemAudio: boolean, devices: SideDevices) => Promise<boolean>;
+}) {
   useStore(store);
   const p = store.project;
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -22,8 +38,10 @@ export function Editor({ store, onClose }: { store: EditorStore; onClose: () => 
   const [player, setPlayer] = useState<Player | null>(null);
   const [time, setTime] = useState(0);
   const [playing, setPlaying] = useState(false);
-  const [showExport, setShowExport] = useState(false);
+  const [dialog, setDialog] = useState<'export' | 'record' | 'quiet' | null>(null);
   const [aspect, setAspect] = useState(16 / 9);
+  const [range, setRange] = useState<{ a: number; b: number } | null>(null);
+  const [importing, setImporting] = useState(false);
 
   useEffect(() => {
     const pl = new Player(canvasRef.current!, lib, setTime, setPlaying);
@@ -38,45 +56,113 @@ export function Editor({ store, onClose }: { store: EditorStore; onClose: () => 
       .catch((e) => store.setError(`Önizleme hazırlanamadı: ${(e as Error).message}`));
   }, [player, p, store]);
 
-  useEffect(() => {
-    const open = () => setShowExport(true);
-    window.addEventListener('odak:export', open);
-    return () => window.removeEventListener('odak:export', open);
-  }, []);
+  const seek = useCallback((t: number) => { player?.pause(); void player?.seek(t); }, [player]);
+  const now = () => player?.currentTime ?? time;
 
-  const seek = (t: number) => { player?.pause(); void player?.seek(t); };
-  const step = (frames: number) => seek((player?.currentTime ?? time) + frames / p.export.fps);
+  useEffect(() => {
+    const open = () => setDialog('export');
+    const toClip = (e: Event) => {
+      const i = store.project.clips.findIndex((c) => c.id === (e as CustomEvent).detail);
+      if (i >= 0) seek(clipStarts(store.project)[i]);
+    };
+    window.addEventListener('odak:export', open);
+    window.addEventListener('odak:seekToClip', toClip);
+    return () => { window.removeEventListener('odak:export', open); window.removeEventListener('odak:seekToClip', toClip); };
+  }, [seek, store]);
+
+  const step = (frames: number) => seek(now() + frames / p.export.fps);
   const sel = store.selection;
 
   const addZoom = () => {
-    const r = addZoomAt(p, player?.currentTime ?? time);
+    const r = addZoomAt(p, now());
     if ('error' in r) { store.setError(r.error); return; }
     store.update(() => r.project);
     store.select({ kind: 'zoom', clipID: r.clipID, zoomID: r.zoomID });
   };
-  const deleteSelected = () => {
-    if (sel?.kind !== 'zoom') return;
-    store.update((q) => deleteZoom(q, sel.clipID, sel.zoomID));
+  const split = () => {
+    const r = splitAt(store.project, now());
+    if ('error' in r) { store.setError(r.error); return; }
+    store.update(() => r.project);
+    store.select({ kind: 'clip', clipID: r.rightID });
+  };
+  const removeClip = (clipID: string) => {
+    if (store.project.clips.length <= 1) { store.setError('Projede en az bir klip kalmalı.'); return; }
+    store.update((q) => deleteClip(q, clipID));
     store.select(null);
+  };
+  const duplicate = (clipID: string) => {
+    const r = duplicateClip(store.project, clipID);
+    if (r) { store.update(() => r.project); store.select({ kind: 'clip', clipID: r.newID }); }
+  };
+  const deleteSelected = () => {
+    if (range) {
+      const q = removeRange(store.project, range.a, range.b);
+      if (!q.clips.length) { store.setError('Tüm içerik silinemez; en az bir parça kalmalı.'); return; }
+      store.update(() => q);
+      setRange(null);
+      seek(range.a);
+      return;
+    }
+    if (sel?.kind === 'zoom') { store.update((q) => deleteZoom(q, sel.clipID, sel.zoomID)); store.select(null); }
+    else if (sel?.kind === 'clip') removeClip(sel.clipID);
   };
   const regenerate = async () => {
     const tracks = new Map(await Promise.all(p.media.map(async (m) => [m.id, await lib.cursor(m)] as const)));
     store.update((q) => regenerateAutoZooms(q, (id) => tracks.get(id) ?? null));
   };
 
+  /** Copies a video file into the project and appends it as a clip (after the selected clip). */
+  const importFile = useCallback(async (src: string) => {
+    const { id, rel, name } = await odak().importMedia(store.pkg, src);
+    try {
+      const f = await lib.open(rel);
+      if (!f.video) throw new Error('Dosyada video bulunamadı.');
+      if (!f.videoSink) throw new Error('Bu videonun kodeği bu bilgisayarda çözülemiyor (H.264/HEVC/VP9/AV1 MP4 ya da MOV deneyin).');
+      const duration = await f.input.computeDuration();
+      const asset: MediaAsset = {
+        id, kind: 'externalVideo', displayName: name, videoFile: rel, duration,
+        pixelWidth: f.video.displayWidth, pixelHeight: f.video.displayHeight, pixelsPerPoint: 1,
+      };
+      const clip = newClip(id, 0, duration);
+      const q = store.project;
+      const after = store.selection?.kind === 'clip' ? q.clips.findIndex((c) => c.id === (store.selection as { clipID: string }).clipID) : q.clips.length - 1;
+      store.update((x) => insertClip({ ...x, media: [...x.media, asset] }, clip, after));
+      store.select({ kind: 'clip', clipID: clip.id });
+      return clip.id;
+    } catch (e) {
+      await odak().removeMedia(store.pkg, id);
+      throw e;
+    }
+  }, [lib, store]);
+
+  const importVideos = async () => {
+    const files = await odak().importVideoDialog();
+    if (!files.length) return;
+    setImporting(true);
+    for (const f of files) {
+      try { await importFile(f); } catch (e) { store.setError(`“${f.replace(/^.*[\\/]/, '')}” eklenemedi: ${(e as Error).message}`); }
+    }
+    setImporting(false);
+  };
+
+  if (odak().isUiTest) Object.assign(window, { __odakEditor: { importFile, setRange, player } });
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      const t = e.target as HTMLElement;
-      if (t.closest('input, textarea, select')) return;
+      const t = e.target as HTMLElement | null;
+      if (t?.closest?.('input, textarea, select') || dialog) return;
       if (e.key === ' ') { e.preventDefault(); player?.toggle(); }
       else if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); deleteSelected(); }
-      else if (e.key === 'ArrowLeft') { e.preventDefault(); step(-1); }
-      else if (e.key === 'ArrowRight') { e.preventDefault(); step(1); }
+      else if (e.key === 'ArrowLeft') { e.preventDefault(); step(e.shiftKey ? -10 : -1); }
+      else if (e.key === 'ArrowRight') { e.preventDefault(); step(e.shiftKey ? 10 : 1); }
+      else if ((e.key === 's' || e.key === 'S') && !e.metaKey && !e.ctrlKey) { e.preventDefault(); split(); }
+      else if (e.key === 'Escape') { setRange(null); store.select(null); }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   });
 
+  const actions: EditActions = { split, duplicate, deleteClip: removeClip, time: now };
   const duration = projectDuration(p);
   return (
     <div className="editor">
@@ -87,7 +173,7 @@ export function Editor({ store, onClose }: { store: EditorStore; onClose: () => 
           <button disabled={!store.canUndo} onClick={() => store.undo()} title="Geri Al">↶</button>
           <button disabled={!store.canRedo} onClick={() => store.redo()} title="Yinele">↷</button>
           <button onClick={() => void odak().reveal(`${store.pkg}/project.json`)} title="Proje klasörünü göster">Klasör</button>
-          <button className="primary" onClick={() => setShowExport(true)}>Dışa Aktar</button>
+          <button className="primary" onClick={() => setDialog('export')}>Dışa Aktar</button>
         </div>
       </header>
       <div className="workspace">
@@ -96,19 +182,45 @@ export function Editor({ store, onClose }: { store: EditorStore; onClose: () => 
             <canvas ref={canvasRef} style={{ aspectRatio: String(aspect) }} onClick={() => player?.toggle()} />
           </div>
           <div className="transport">
-            <button className="ghost" onClick={() => step(-1)} title="Bir kare geri (←)">⏮</button>
+            <button className="ghost" onClick={() => step(-1)} title="Bir kare geri (←, Shift+← 10 kare)">⏮</button>
             <button className="ghost play" onClick={() => player?.toggle()} title="Oynat / Duraklat (boşluk)">{playing ? '❚❚' : '▶'}</button>
             <button className="ghost" onClick={() => step(1)} title="Bir kare ileri (→)">⏭</button>
             <span className="mono muted">{timecode(time)} / {timecode(duration)}</span>
             <span className="spacer" />
-            <button onClick={addZoom} title="Oynatma çizgisinde yeni zoom">＋ Zoom Ekle</button>
-            <button onClick={() => void regenerate()} title="Dokunulmamış otomatik zoom'ları tıklamalardan yeniden üret; elle düzenlenenler korunur">✦ Otomatik Zoom</button>
+            <div className="tool-group">
+              <button onClick={split} title="Oynatma çizgisinden böl (S)">✂ Böl</button>
+              <button onClick={deleteSelected} disabled={!range && !sel} title="Seçili klibi, zoom'u ya da aralığı sil (Sil)">⌫ Sil</button>
+            </div>
+            <div className="tool-group">
+              <button onClick={() => void importVideos()} disabled={importing} title="Bilgisayardan video ekle">{importing ? 'Ekleniyor…' : '＋ Video'}</button>
+              <button onClick={() => setDialog('record')} disabled={busy} title="Bu projeye yeni bir ekran kaydı ekle">● Kayıt</button>
+              <button onClick={() => setDialog('quiet')} title="Ekranın değişmediği, imlecin durduğu ve sesin olmadığı anları bul">⏩ Durgun anlar</button>
+            </div>
+            <div className="tool-group">
+              <button onClick={addZoom} title="Oynatma çizgisinde yeni zoom">＋ Zoom</button>
+              <button onClick={() => void regenerate()} title="Dokunulmamış otomatik zoom'ları tıklamalardan yeniden üret; elle düzenlenenler korunur">✦ Oto zoom</button>
+            </div>
           </div>
         </div>
-        <Inspector store={store} lib={lib} seek={seek} onDelete={deleteSelected} />
+        <Inspector store={store} lib={lib} seek={seek} onDelete={deleteSelected} actions={actions} />
       </div>
-      <Timeline store={store} time={time} seek={seek} />
-      {showExport && <ExportDialog store={store} lib={lib} onClose={() => setShowExport(false)} />}
+      <Timeline store={store} lib={lib} time={time} playing={playing} seek={seek} range={range} setRange={setRange} onDeleteRange={deleteSelected} />
+      {dialog === 'export' && <ExportDialog store={store} lib={lib} onClose={() => setDialog(null)} />}
+      {dialog === 'quiet' && <QuietDialog store={store} lib={lib} onClose={() => setDialog(null)} />}
+      {dialog === 'record' && (
+        <div className="modal-backdrop">
+          <div className="modal">
+            <h2>Projeye kayıt ekle</h2>
+            <p className="muted small">Yeni kayıt bu projenin sonuna eklenir; otomatik zoom'ları da oluşturulur.</p>
+            <RecordSetup busy={busy} startLabel="● Kaydı Başlat ve Ekle" onStart={async (d, a, dev) => {
+              const ok = await onRecordInto(d, a, dev);
+              if (ok) setDialog(null);
+              return ok;
+            }} />
+            <div className="row end"><button onClick={() => setDialog(null)}>Vazgeç</button></div>
+          </div>
+        </div>
+      )}
       {store.error && (
         <div className="modal-backdrop" onClick={() => store.setError(null)}>
           <div className="modal small" onClick={(e) => e.stopPropagation()}>
@@ -124,101 +236,253 @@ export function Editor({ store, onClose }: { store: EditorStore; onClose: () => 
 // ---------------------------------------------------------------- timeline
 
 const INSET = 18;
+const SNAP_PX = 7;
 
-function Timeline({ store, time, seek }: { store: EditorStore; time: number; seek: (t: number) => void }) {
+function Timeline({ store, lib, time, playing, seek, range, setRange, onDeleteRange }: {
+  store: EditorStore; lib: MediaLibrary; time: number; playing: boolean; seek: (t: number) => void;
+  range: { a: number; b: number } | null; setRange: (r: { a: number; b: number } | null) => void; onDeleteRange: () => void;
+}) {
   const p = store.project;
-  const ref = useRef<HTMLDivElement>(null);
+  const scroller = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(800);
+  const [zoom, setZoom] = useState(1);
+  const [drop, setDrop] = useState<{ clipID: string; index: number; x: number } | null>(null);
+  const [envelopes, setEnvelopes] = useState<Map<string, Float32Array | null>>(new Map());
   useLayoutEffect(() => {
     const ro = new ResizeObserver(([e]) => setWidth(e.contentRect.width));
-    ro.observe(ref.current!);
+    ro.observe(scroller.current!);
     return () => ro.disconnect();
   }, []);
-  const duration = Math.max(projectDuration(p), 0.5);
-  const pps = (width - INSET * 2) / duration;
-  const starts = clipStarts(p);
+  // Waveforms (decoded once per media, in the background).
+  const mediaKey = p.media.map((m) => m.id).join(',');
+  useEffect(() => {
+    let alive = true;
+    for (const m of store.project.media) {
+      void lib.envelope(m).then((e) => { if (alive) setEnvelopes((old) => new Map(old).set(m.id, e)); });
+    }
+    return () => { alive = false; };
+  }, [lib, mediaKey, store]);
 
-  const scrub = (e: React.PointerEvent) => {
-    const el = ref.current!;
-    const at = (x: number) => seek((x - el.getBoundingClientRect().left - INSET) / pps);
-    store.select(null);
-    at(e.clientX);
+  const duration = Math.max(projectDuration(p), 0.5);
+  const pps = ((width - INSET * 2) / duration) * zoom;
+  const inner = Math.max(width, INSET * 2 + duration * pps);
+  const starts = clipStarts(p);
+  const xOf = (t: number) => INSET + t * pps;
+  const tOf = (clientX: number) => {
+    const el = scroller.current!;
+    return (clientX - el.getBoundingClientRect().left + el.scrollLeft - INSET) / pps;
+  };
+
+  // Keep the playhead in view while playing.
+  useEffect(() => {
+    const el = scroller.current;
+    if (!el || !playing) return;
+    const x = xOf(time);
+    if (x < el.scrollLeft + 40 || x > el.scrollLeft + el.clientWidth - 40) el.scrollLeft = x - 80;
+  });
+
+  const zoomBy = (f: number, anchorClientX?: number) => {
+    const el = scroller.current!;
+    const anchorT = anchorClientX !== undefined ? tOf(anchorClientX) : time;
+    const next = Math.min(80, Math.max(1, zoom * f));
+    setZoom(next);
+    requestAnimationFrame(() => {
+      const npps = ((width - INSET * 2) / duration) * next;
+      const off = anchorClientX !== undefined ? anchorClientX - el.getBoundingClientRect().left : el.clientWidth / 2;
+      el.scrollLeft = INSET + anchorT * npps - off;
+    });
+  };
+
+  const drag = (e: React.PointerEvent, onMove: (ev: PointerEvent, dx: number) => void, onUp?: (ev: PointerEvent, moved: boolean) => void) => {
+    const el = e.currentTarget as HTMLElement;
     try { el.setPointerCapture(e.pointerId); } catch { /* synthetic or lost pointer */ }
-    const move = (ev: PointerEvent) => at(ev.clientX);
-    const up = () => { el.removeEventListener('pointermove', move); el.removeEventListener('pointerup', up); };
+    const x0 = e.clientX;
+    let moved = false;
+    const move = (ev: PointerEvent) => { if (Math.abs(ev.clientX - x0) > 3) moved = true; onMove(ev, ev.clientX - x0); };
+    const up = (ev: PointerEvent) => { el.removeEventListener('pointermove', move); el.removeEventListener('pointerup', up); onUp?.(ev, moved); };
     el.addEventListener('pointermove', move);
     el.addEventListener('pointerup', up);
   };
 
-  const steps = [0.5, 1, 2, 5, 10, 15, 30, 60, 120, 300];
+  // Empty lanes: scrub.
+  const scrub = (e: React.PointerEvent) => {
+    if (e.button !== 0) return;
+    store.select(null); setRange(null);
+    seek(tOf(e.clientX));
+    drag(e, (ev) => seek(tOf(ev.clientX)));
+  };
+
+  // Ruler: click to seek, drag to select a range.
+  const ruler = (e: React.PointerEvent) => {
+    e.stopPropagation();
+    const t0 = Math.max(0, Math.min(duration, tOf(e.clientX)));
+    drag(e, (ev, dx) => {
+      if (Math.abs(dx) < 4) return;
+      const t1 = Math.max(0, Math.min(duration, tOf(ev.clientX)));
+      setRange({ a: Math.min(t0, t1), b: Math.max(t0, t1) });
+    }, (_ev, moved) => { if (!moved) { setRange(null); seek(t0); } });
+  };
+
+  const steps = [0.1, 0.25, 0.5, 1, 2, 5, 10, 15, 30, 60, 120, 300];
   const tick = steps.find((s) => s * pps >= 70) ?? 600;
   const ticks: number[] = [];
   for (let t = 0; t <= duration + 1e-6; t += tick) ticks.push(t);
 
   return (
-    <div className="timeline" ref={ref} onPointerDown={scrub}>
-      {ticks.map((t) => (
-        <div key={t} className="tick" style={{ left: INSET + t * pps }}><span>{timecode(t, false)}</span></div>
-      ))}
-      <div className="lane-label">ZOOM</div>
-      {p.clips.map((clip, i) => {
-        const x = INSET + starts[i] * pps;
-        const media = assetOf(p, clip.mediaID);
-        const selected = store.selection?.kind === 'clip' && store.selection.clipID === clip.id;
-        return (
-          <div key={clip.id}>
-            <div className={`clip ${selected ? 'selected' : ''}`} style={{ left: x, width: Math.max(clipDuration(clip) * pps, 2) }}
-                 onPointerDown={(e) => { e.stopPropagation(); store.select({ kind: 'clip', clipID: clip.id }); }}>
-              <span>{media?.kind === 'externalVideo' ? '🎞' : '🖥'} {media?.displayName ?? '?'} <i>{timecode(clipDuration(clip), false)}</i></span>
-            </div>
-            {clip.zooms.map((z) => {
-              const s = Math.max(z.start, clip.sourceStart), e = Math.min(z.end, clip.sourceEnd);
-              if (e <= s) return null;
-              return <ZoomBlock key={z.id} store={store} clipID={clip.id} zoom={z} pps={pps} seek={seek}
-                                left={x + (s - clip.sourceStart) * pps} width={Math.max((e - s) * pps, 6)}
-                                toTimeline={(src) => starts[i] + (src - clip.sourceStart)} />;
-            })}
+    <div className="timeline-wrap">
+      <div className="timeline-tools">
+        <button className="ghost tiny" onClick={() => zoomBy(1 / 1.6)} title="Uzaklaştır">−</button>
+        <button className="ghost tiny" onClick={() => zoomBy(1.6)} title="Yakınlaştır (Ctrl/⌘ + tekerlek)">＋</button>
+        <button className="ghost tiny" onClick={() => setZoom(1)} title="Tümünü sığdır">⤢</button>
+      </div>
+      <div className="timeline" ref={scroller}
+           onWheel={(e) => { if (e.ctrlKey || e.metaKey) { e.preventDefault(); zoomBy(e.deltaY < 0 ? 1.15 : 1 / 1.15, e.clientX); } }}>
+        <div className="timeline-inner" style={{ width: inner }} onPointerDown={scrub}>
+          <div className="ruler" onPointerDown={ruler} title="Tıkla: git · Sürükle: aralık seç">
+            {ticks.map((t) => (
+              <div key={t} className="tick" style={{ left: xOf(t) }}><span>{timecode(t, tick < 1)}</span></div>
+            ))}
           </div>
-        );
-      })}
-      <div className="playhead" style={{ left: INSET + time * pps }} />
+          {range && (
+            <div className="range" style={{ left: xOf(range.a), width: Math.max(2, (range.b - range.a) * pps) }}>
+              <button className="range-del" onPointerDown={(e) => e.stopPropagation()} onClick={onDeleteRange}>⌫ Aralığı sil ({(range.b - range.a).toFixed(1)} sn)</button>
+            </div>
+          )}
+          <div className="lane-label">ZOOM</div>
+          {p.clips.map((clip, i) => {
+            const x = xOf(starts[i]), w = clipDuration(clip) * pps;
+            const media = assetOf(p, clip.mediaID);
+            const selected = store.selection?.kind === 'clip' && store.selection.clipID === clip.id;
+            return (
+              <div key={clip.id}>
+                <ClipBlock store={store} clip={clip} media={media} index={i} left={x} width={w} pps={pps} selected={selected}
+                           envelope={envelopes.get(clip.mediaID) ?? null} drag={drag} time={time} clipStart={starts[i]}
+                           seek={seek} tOf={tOf} starts={starts} setDrop={setDrop} xOf={xOf} />
+                {clip.zooms.map((z) => {
+                  const s = Math.max(z.start, clip.sourceStart), e = Math.min(z.end, clip.sourceEnd);
+                  if (e <= s) return null;
+                  return <ZoomBlock key={z.id} store={store} clip={clip} zoom={z} pps={pps} seek={seek}
+                                    left={x + toLocal(clip, s) * pps} width={Math.max(toLocal(clip, e) * pps - toLocal(clip, s) * pps, 6)}
+                                    toTimeline={(src) => starts[i] + toLocal(clip, src)} drag={drag} />;
+                })}
+              </div>
+            );
+          })}
+          {drop && <div className="drop-marker" style={{ left: drop.x }} />}
+          <div className="playhead" style={{ left: xOf(time) }} />
+        </div>
+      </div>
     </div>
   );
 }
 
-function ZoomBlock({ store, clipID, zoom, pps, left, width, seek, toTimeline }: {
-  store: EditorStore; clipID: string; zoom: ZoomSegment; pps: number; left: number; width: number;
+function ClipBlock({ store, clip, media, index, left, width, pps, selected, envelope, drag, time, clipStart, seek, tOf, starts, setDrop, xOf }: {
+  store: EditorStore; clip: Clip; media: MediaAsset | undefined; index: number; left: number; width: number; pps: number;
+  selected: boolean; envelope: Float32Array | null; time: number; clipStart: number; starts: number[];
+  drag: (e: React.PointerEvent, m: (ev: PointerEvent, dx: number) => void, u?: (ev: PointerEvent, moved: boolean) => void) => void;
+  seek: (t: number) => void; tOf: (x: number) => number; xOf: (t: number) => number;
+  setDrop: (d: { clipID: string; index: number; x: number } | null) => void;
+}) {
+  const speed = clip.speed || 1;
+  // Body: click selects and seeks; drag reorders.
+  const body = (e: React.PointerEvent) => {
+    e.stopPropagation();
+    store.select({ kind: 'clip', clipID: clip.id });
+    const clips = store.project.clips;
+    let target = index;
+    drag(e, (ev) => {
+      const t = tOf(ev.clientX);
+      target = clips.length;
+      for (let k = 0; k < clips.length; k++) if (t < starts[k] + clipDuration(clips[k]) / 2) { target = k; break; }
+      const x = target < clips.length ? xOf(starts[target]) : xOf(starts[clips.length - 1] + clipDuration(clips[clips.length - 1]));
+      setDrop({ clipID: clip.id, index: target, x });
+    }, (ev, moved) => {
+      setDrop(null);
+      if (!moved) { seek(tOf(ev.clientX)); return; }
+      if (target !== index && target !== index + 1) store.update((q) => moveClip(q, clip.id, target));
+    });
+  };
+  // Edges: trim (the end edge snaps to the playhead).
+  const edge = (which: 'start' | 'end') => (e: React.PointerEvent) => {
+    e.stopPropagation();
+    store.select({ kind: 'clip', clipID: clip.id });
+    const s0 = clip.sourceStart, e0 = clip.sourceEnd;
+    drag(e, (_ev, dx) => {
+      let src = (which === 'start' ? s0 : e0) + (dx / pps) * speed;
+      if (which === 'end') {
+        const edgeT = clipStart + (src - s0) / speed;
+        if (Math.abs(edgeT - time) * pps < SNAP_PX) src = s0 + (time - clipStart) * speed;
+      }
+      store.update((q) => trimClip(q, clip.id, which, src), `trim-${clip.id}-${which}`);
+      seek(which === 'start' ? clipStart : clipStart + (Math.max(src, s0) - s0) / speed - 0.001);
+    });
+  };
+  return (
+    <div className={`clip ${media?.kind === 'externalVideo' ? 'external' : ''} ${selected ? 'selected' : ''}`}
+         style={{ left, width: Math.max(width, 2) }} onPointerDown={body}>
+      <Waveform envelope={envelope} clip={clip} width={Math.max(width, 2)} />
+      <span className="clip-label">
+        {media?.kind === 'externalVideo' ? '🎞' : '🖥'} {media?.displayName ?? '?'} <i>{timecode(clipDuration(clip), false)}</i>
+        {speed !== 1 && <b className="speed">×{speed}</b>}
+        {media?.cameraFile && <i title="Kamera var"> · 📷</i>}
+      </span>
+      <div className="trim l" onPointerDown={edge('start')} title="Başı kırp" />
+      <div className="trim r" onPointerDown={edge('end')} title="Sonu kırp (oynatma çizgisine yapışır)" />
+    </div>
+  );
+}
+
+function Waveform({ envelope, clip, width }: { envelope: Float32Array | null; clip: Clip; width: number }) {
+  const ref = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    const c = ref.current;
+    if (!c) return;
+    const w = Math.min(Math.round(width), 4096), h = 50, dpr = 2;
+    c.width = w * dpr; c.height = h * dpr;
+    const ctx = c.getContext('2d')!;
+    ctx.clearRect(0, 0, c.width, c.height);
+    if (!envelope) return;
+    ctx.fillStyle = 'rgba(255,255,255,0.28)';
+    const step = MediaLibrary.ENVELOPE_STEP, len = clip.sourceEnd - clip.sourceStart;
+    for (let x = 0; x < w; x++) {
+      const a = clip.sourceStart + (x / w) * len, b = clip.sourceStart + ((x + 1) / w) * len;
+      let v = 0;
+      for (let k = Math.floor(a / step); k <= Math.floor(b / step) && k < envelope.length; k++) v = Math.max(v, envelope[k] ?? 0);
+      const bh = Math.max(1, Math.min(1, v * 1.6) * h * 0.9) * dpr;
+      ctx.fillRect(x * dpr, (h * dpr - bh) / 2, dpr, bh);
+    }
+  }, [envelope, clip.sourceStart, clip.sourceEnd, width]);
+  return <canvas ref={ref} className="wave" style={{ width: Math.min(width, 4096) }} />;
+}
+
+function ZoomBlock({ store, clip, zoom, pps, left, width, seek, toTimeline, drag }: {
+  store: EditorStore; clip: Clip; zoom: ZoomSegment; pps: number; left: number; width: number;
   seek: (t: number) => void; toTimeline: (src: number) => number;
+  drag: (e: React.PointerEvent, m: (ev: PointerEvent, dx: number) => void, u?: (ev: PointerEvent, moved: boolean) => void) => void;
 }) {
   const selected = store.selection?.kind === 'zoom' && store.selection.zoomID === zoom.id;
-
-  const drag = (part: 'body' | 'left' | 'right') => (e: React.PointerEvent) => {
+  const speed = clip.speed || 1;
+  const start = (part: 'body' | 'left' | 'right') => (e: React.PointerEvent) => {
     e.stopPropagation();
-    const el = e.currentTarget as HTMLElement;
-    try { el.setPointerCapture(e.pointerId); } catch { /* synthetic or lost pointer */ }
-    const snap = { ...zoom }, x0 = e.clientX;
-    store.select({ kind: 'zoom', clipID, zoomID: zoom.id });
-    const move = (ev: PointerEvent) => {
-      const d = (ev.clientX - x0) / pps;
-      if (Math.abs(ev.clientX - x0) < 2) return;
-      store.update((q) => updateZoom(q, clipID, zoom.id, (z) => {
+    const snap = { ...zoom };
+    store.select({ kind: 'zoom', clipID: clip.id, zoomID: zoom.id });
+    drag(e, (_ev, dx) => {
+      if (Math.abs(dx) < 2) return;
+      const d = (dx / pps) * speed;
+      store.update((q) => updateZoom(q, clip.id, zoom.id, (z) => {
         if (part === 'body') return { ...z, start: snap.start + d, end: snap.end + d };
         if (part === 'left') return { ...z, start: Math.min(snap.start + d, snap.end - 0.3) };
         return { ...z, end: Math.max(snap.end + d, snap.start + 0.3) };
       }), `drag-${zoom.id}`);
       seek(toTimeline(part === 'right' ? snap.end + d : snap.start + d));
-    };
-    const up = () => { el.removeEventListener('pointermove', move); el.removeEventListener('pointerup', up); };
-    el.addEventListener('pointermove', move);
-    el.addEventListener('pointerup', up);
+    });
   };
-
   return (
     <div className={`zoom ${zoom.isGenerated ? 'auto' : 'manual'} ${selected ? 'selected' : ''}`} style={{ left, width }}
-         onPointerDown={drag('body')} title={`${zoom.isGenerated ? 'Otomatik' : 'Düzenlenmiş'} zoom · sürükle: taşı · kenarlar: süre`}>
-      <div className="handle l" onPointerDown={drag('left')} />
+         onPointerDown={start('body')} title={`${zoom.isGenerated ? 'Otomatik' : 'Düzenlenmiş'} zoom · sürükle: taşı · kenarlar: süre`}>
+      <div className="handle l" onPointerDown={start('left')} />
       <span>{isFollow(zoom.focus) ? '➚' : '⌖'} ×{zoom.scale.toFixed(1)}</span>
-      <div className="handle r" onPointerDown={drag('right')} />
+      <div className="handle r" onPointerDown={start('right')} />
     </div>
   );
 }

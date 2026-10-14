@@ -1,4 +1,4 @@
-import { ALL_FORMATS, AudioBufferSink, CustomSource, Input, VideoSampleSink, type InputAudioTrack, type InputVideoTrack } from 'mediabunny';
+import { ALL_FORMATS, AudioBufferSink, CustomSource, EncodedPacketSink, Input, VideoSampleSink, type InputAudioTrack, type InputVideoTrack } from 'mediabunny';
 import { type Clip, type CursorTrack, type MediaAsset, type Project, type StyleSettings, assetOf } from '../core/model.ts';
 import { type ClipRenderData, makeRenderData } from '../render/renderer.ts';
 import { odak } from '../bridge.ts';
@@ -18,6 +18,9 @@ export class MediaLibrary {
   private cursors = new Map<string, Promise<CursorTrack | null>>();
   private renderCache = new Map<string, ClipRenderData>();
   private images = new Map<string, Promise<ImageBitmap | null>>();
+  private envelopes = new Map<string, Promise<Float32Array | null>>();
+  private frameTimesCache = new Map<string, Promise<Float64Array | null>>();
+  static readonly ENVELOPE_STEP = 0.05;
 
   constructor(readonly pkg: string) {}
 
@@ -107,6 +110,56 @@ export class MediaLibrary {
       if (f.audioSink) out.push({ sink: f.audioSink, volume });
     }
     return out;
+  }
+
+  /** Peak loudness per 50 ms over all audio of a media (for waveforms and quiet detection). */
+  envelope(asset: MediaAsset): Promise<Float32Array | null> {
+    let e = this.envelopes.get(asset.id);
+    if (!e) {
+      e = (async () => {
+        const files = asset.kind === 'screenRecording' ? [asset.systemAudioFile, asset.microphoneFile] : [asset.videoFile];
+        const step = MediaLibrary.ENVELOPE_STEP;
+        const out = new Float32Array(Math.ceil(asset.duration / step) + 1);
+        let any = false;
+        for (const rel of files) {
+          if (!rel) continue;
+          const f = await this.open(rel);
+          if (!f.audioSink) continue;
+          any = true;
+          for await (const b of f.audioSink.buffers()) {
+            const rate = b.buffer.sampleRate, chs = b.buffer.numberOfChannels;
+            const data = Array.from({ length: chs }, (_, c) => b.buffer.getChannelData(c));
+            for (let i = 0; i < b.buffer.length; i += 32) {
+              const k = Math.floor((b.timestamp + i / rate) / step);
+              if (k < 0 || k >= out.length) continue;
+              let v = 0;
+              for (const d of data) v = Math.max(v, Math.abs(d[i]));
+              if (v > out[k]) out[k] = v;
+            }
+          }
+        }
+        return any ? out : null;
+      })().catch(() => null);
+      this.envelopes.set(asset.id, e);
+    }
+    return e;
+  }
+
+  /** Timestamps of the screen video's frames (read from packet headers, no decoding). */
+  frameTimes(asset: MediaAsset): Promise<Float64Array | null> {
+    let f = this.frameTimesCache.get(asset.id);
+    if (!f) {
+      f = (async () => {
+        const m = await this.open(asset.videoFile);
+        if (!m.video) return null;
+        const sink = new EncodedPacketSink(m.video);
+        const times: number[] = [];
+        for (let p = await sink.getFirstPacket({ metadataOnly: true }); p; p = await sink.getNextPacket(p, { metadataOnly: true })) times.push(p.timestamp);
+        return Float64Array.from(times.sort((a, b) => a - b));
+      })().catch(() => null);
+      this.frameTimesCache.set(asset.id, f);
+    }
+    return f;
   }
 
   dispose() {
