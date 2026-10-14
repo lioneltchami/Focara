@@ -216,3 +216,10 @@ input[type=checkbox] { accent-color: var(--accent); }
 .positions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; margin: 4px 0 8px; }
 .positions button { padding: 6px 0; }
 .positions button.on { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+/* Back to the general settings: stays at the top of the panel while it scrolls. */
+.inspector-back { position: sticky; top: -14px; z-index: 3; display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  margin: -14px -16px 12px; padding: 10px 16px; background: var(--panel); border-bottom: 1px solid var(--line); }
+.inspector-back button { flex: 1; text-align: left; font-weight: 600; background: var(--panel-2); }
+.inspector-back button:hover { border-color: var(--accent); }
+.inspector-back kbd { font: 10px ui-monospace, Menlo, monospace; color: var(--muted); border: 1px solid var(--line); border-radius: 4px; padding: 1px 5px; }

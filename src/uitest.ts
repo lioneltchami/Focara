@@ -101,7 +101,16 @@ export async function runUiTest() {
     const redone = selectedZoom()?.focus;
     check(!!redone && 'fixed' in redone && Math.abs(redone.fixed.x - 0.8) < 0.01, 'redo restores it');
 
-    // Deselect by clicking the timeline, then change the look.
+    // “‹ Genel ayarlara dön” leaves the zoom panel; then deselect by clicking the timeline and change the look.
+    const backTo = async (what: string) => {
+      const b = byText('.inspector-back button', 'Genel ayarlara dön');
+      click(b);
+      await until(`back from ${what}`, () => !!byText('.inspector h3', 'Arka plan'));
+      check(!!b && store().selection === null, `“‹ Genel ayarlara dön” leaves the ${what} panel`);
+    };
+    await backTo('zoom');
+    store().select({ kind: 'zoom', clipID: project().clips[0].id, zoomID: project().clips[0].zooms[0].id });
+    await until('zoom panel', () => !!byText('.inspector h3', 'Zoom'));
     pointer(tl, 'pointerdown', r.left + 30, r.top + 10); pointer(tl, 'pointerup', r.left + 30, r.top + 10);
     await until('style inspector', () => !!byText('.inspector h3', 'Arka plan'));
     click(byText('.inspector label', 'Gölge')?.querySelector('input') ?? null);
@@ -160,6 +169,10 @@ export async function runUiTest() {
     await sleep(50);
     const selC = () => project().clips.find((c) => c.id === (store().selection as { clipID: string }).clipID)!;
     check(selC().speed === 2, 'speed ×2 from the clip inspector');
+    const backClip = selC().id;
+    await backTo('clip');
+    store().select({ kind: 'clip', clipID: backClip });
+    await sleep(30);
 
     const first = clipEls()[0], h = first.querySelector('.trim.r')!, hr = h.getBoundingClientRect();
     const end0 = project().clips[0].sourceEnd;
@@ -280,7 +293,10 @@ export async function runUiTest() {
     store().undo();
     await sleep(50);
     check(!!$('.cam-seg'), 'undo brings it back');
-    store().select(null);
+    if (store().selection?.kind !== 'camera') store().select({ kind: 'camera', clipID: project().clips.find((c) => c.cameraSegments.length)!.id, segID: project().clips.find((c) => c.cameraSegments.length)!.cameraSegments[0].id });
+    await until('camera panel', () => !!byText('.inspector h3', 'Kamera bölümü'));
+    log.push(`shot: ${await odak().uiTestCapture('5d-camera-panel')}`);
+    await backTo('camera segment');
 
     const cam = project().media.find((m) => m.cameraFile)?.cameraFile;
     const newId = await ed.importFile(`${pkg}/${cam}`);

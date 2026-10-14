@@ -16,21 +16,27 @@ export function Inspector({ store, lib, seek, onDelete, actions }: {
   store: EditorStore; lib: MediaLibrary; seek: (t: number) => void; onDelete: () => void; actions: EditActions;
 }) {
   const s = store.selection;
+  const panel = (body: React.ReactNode) => <aside className="inspector"><BackBar store={store} />{body}</aside>;
   const selClip = s?.kind === 'clip' ? store.project.clips.find((c) => c.id === s.clipID) : undefined;
-  if (selClip) return <aside className="inspector"><ClipInspector store={store} clip={selClip} actions={actions} seek={seek} /></aside>;
+  if (selClip) return panel(<ClipInspector store={store} clip={selClip} actions={actions} seek={seek} />);
   if (s?.kind === 'camera') {
     const c = store.project.clips.find((x) => x.id === s.clipID);
     const seg = c?.cameraSegments.find((x) => x.id === s.segID);
-    if (c && seg) return <aside className="inspector"><CameraSegmentInspector key={seg.id} store={store} clip={c} seg={seg} seek={seek} onDelete={onDelete} /></aside>;
+    if (c && seg) return panel(<CameraSegmentInspector key={seg.id} store={store} clip={c} seg={seg} seek={seek} onDelete={onDelete} />);
   }
   const clip = s?.kind === 'zoom' ? store.project.clips.find((c) => c.id === s.clipID) : undefined;
   const zoom = s?.kind === 'zoom' ? clip?.zooms.find((z) => z.id === s.zoomID) : undefined;
+  if (clip && zoom) return panel(<ZoomInspector key={zoom.id} store={store} lib={lib} clip={clip} zoom={zoom} seek={seek} onDelete={onDelete} />);
+  return <aside className="inspector"><StyleInspector store={store} lib={lib} /></aside>;
+}
+
+/** Always on top of a clip/zoom/camera panel: back to the project's general settings. */
+function BackBar({ store }: { store: EditorStore }) {
   return (
-    <aside className="inspector">
-      {clip && zoom
-        ? <ZoomInspector key={zoom.id} store={store} lib={lib} clip={clip} zoom={zoom} seek={seek} onDelete={onDelete} />
-        : <StyleInspector store={store} lib={lib} />}
-    </aside>
+    <div className="inspector-back">
+      <button onClick={() => store.select(null)} title="Seçimi bırak ve genel ayarlara (arka plan, imleç, kamera, ses) dön">‹ Genel ayarlara dön</button>
+      <kbd title="Klavyeden de dönebilirsin">Esc</kbd>
+    </div>
   );
 }
 
