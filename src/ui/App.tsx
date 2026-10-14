@@ -12,7 +12,17 @@ const mod = odak().platform === 'darwin' ? '⌘' : 'Ctrl+';
 
 export function App() {
   const [store, setStore] = useState<EditorStore | null>(null);
-  const [alert, setAlert] = useState<string | null>(null);
+  const [alert, setAlertState] = useState<{ text: string; permission: boolean } | null>(null);
+  const setAlert = useCallback((text: string | null, permission = false) => {
+    if (text) odak().log('alert', text);
+    setAlertState(text ? { text, permission } : null);
+  }, []);
+  useEffect(() => {
+    const onError = (e: ErrorEvent) => odak().log('error', e.message, e.error?.stack ?? '');
+    const onReject = (e: PromiseRejectionEvent) => odak().log('unhandled', String(e.reason?.stack ?? e.reason));
+    window.addEventListener('error', onError); window.addEventListener('unhandledrejection', onReject);
+    return () => { window.removeEventListener('error', onError); window.removeEventListener('unhandledrejection', onReject); };
+  }, []);
   const [busy, setBusy] = useState(false);
   const storeRef = useRef(store);
   storeRef.current = store;
@@ -27,13 +37,18 @@ export function App() {
       side.current = await SideRecorder.open(devices);
     } catch (e) {
       setBusy(false);
-      setAlert(`Kamera/mikrofon açılamadı: ${(e as Error).message}\nSistem ayarlarında Odak'a kamera ve mikrofon izni verildiğinden emin ol.`);
+      const err = e as Error;
+      odak().log('camera/mic open failed', err.name, err.message, devices);
+      const denied = err.name === 'NotAllowedError' || err.name === 'SecurityError';
+      setAlert(denied
+        ? 'macOS kameraya/mikrofona erişime izin vermedi. Uygulama güncellendiyse eski izin geçersiz kalmış olabilir: “İzinleri Sıfırla”ya bas, sonra kaydı yeniden başlatıp izin ver.'
+        : `Kamera/mikrofon açılamadı: ${err.name}: ${err.message}`, denied);
       return false;
     }
     const r = await odak().startRecording({ displayId, systemAudio });
     if (!r.ok) {
       await side.current?.cancel(); side.current = null;
-      setBusy(false); setAlert(r.error);
+      setBusy(false); setAlert(r.error, r.code === 'permission');
       return false;
     }
     await side.current?.setTarget(r.pkg, r.mediaID, r.t0);
@@ -63,11 +78,12 @@ export function App() {
 
   // A finished recording becomes a project with automatic zooms, then opens in the editor.
   useEffect(() => odak().onRecordingFinished(async (r: RecordingFinished) => {
+    odak().log('recording finished', r.ok ? { pkg: r.pkg, info: r.info } : { error: r.error });
     const rec = side.current;
     side.current = null;
     if (!r.ok) { await rec?.cancel(); setBusy(false); setAlert(r.error); return; }
     const { info } = r;
-    const extra: SideResult = rec ? await rec.stop(info.duration).catch((e): SideResult => { setAlert(`Kamera/mikrofon kaydı tamamlanamadı: ${(e as Error).message}`); return {}; }) : {};
+    const extra: SideResult = rec ? await rec.stop(info.duration).catch((e): SideResult => { odak().log('camera/mic stop failed', String((e as Error).stack ?? e)); setAlert(`Kamera/mikrofon kaydı tamamlanamadı: ${(e as Error).message}`); return {}; }) : {};
     setBusy(false);
     const track = await odak().readCursor(r.pkg, info.cursor);
     const asset: MediaAsset = {
@@ -104,8 +120,19 @@ export function App() {
         <div className="modal-backdrop" onClick={() => setAlert(null)}>
           <div className="modal small" onClick={(e) => e.stopPropagation()}>
             <h3>Odak</h3>
-            <p className="pre">{alert}</p>
-            <div className="row end"><button className="primary" onClick={() => setAlert(null)}>Tamam</button></div>
+            <p className="pre">{alert.text}</p>
+            <div className="row between">
+              <button className="ghost" onClick={() => void odak().revealLog()}>Tanılama Kaydı</button>
+              <span className="row">
+                {alert.permission && odak().platform === 'darwin' && (
+                  <button onClick={async () => {
+                    await odak().resetPermissions();
+                    setAlert('Odak\'ın izinleri sıfırlandı.\n\nŞimdi “Kaydı Başlat”a bas: macOS ekran kaydı (ve seçtiysen kamera/mikrofon) iznini yeniden soracak. Ekran kaydı iznini verdikten sonra macOS Odak\'ı kapatıp yeniden açmanı isteyebilir.');
+                  }}>İzinleri Sıfırla</button>
+                )}
+                <button className="primary" onClick={() => setAlert(null)}>Tamam</button>
+              </span>
+            </div>
           </div>
         </div>
       )}
@@ -180,6 +207,7 @@ function Home({ onOpen, onShowOpen, busy, onStart }: {
 
   const start = async () => {
     if (display === null) return;
+    odak().log('record clicked', { display, systemAudio, camera: !!camId, mic: !!micId });
     // Release the preview so the recorder can open the camera.
     (preview.current?.srcObject as MediaStream | null)?.getTracks().forEach((t) => t.stop());
     const ok = await onStart(display, systemAudio, { cameraId: camId || null, micId: micId || null, noiseSuppression });
@@ -207,6 +235,7 @@ function Home({ onOpen, onShowOpen, busy, onStart }: {
                 if (!(await odak().requestScreenPermission())) await odak().openPermissionSettings();
                 void refresh();
               }}>İzin İste / Ayarları Aç</button>
+              <button onClick={async () => { await odak().resetPermissions(); void refresh(); }} title="Odak güncellendiyse eski izinleri temizler">İzinleri Sıfırla</button>
               <button onClick={() => void refresh()}>Yeniden Denetle</button></div>
           </div>
         )}

@@ -1,5 +1,5 @@
 import { app, BrowserWindow, dialog, globalShortcut, ipcMain, Menu, screen, shell, systemPreferences } from 'electron';
-import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
+import { execFile, spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import fsp from 'node:fs/promises';
@@ -24,6 +24,26 @@ if (isTest) {
   app.commandLine.appendSwitch('use-fake-device-for-media-stream');
   app.commandLine.appendSwitch('use-fake-ui-for-media-stream');
 }
+
+// ---------------------------------------------------------------- diagnostics log
+
+/** ~/Library/Logs/Odak/odak.log (macOS) or %APPDATA%/Odak/logs/odak.log (Windows). */
+const logFile = () => path.join(app.getPath('logs'), 'odak.log');
+function log(...parts: unknown[]) {
+  const line = `${new Date().toISOString()} ${parts.map((p) => (typeof p === 'string' ? p : JSON.stringify(p))).join(' ')}\n`;
+  try {
+    fs.mkdirSync(path.dirname(logFile()), { recursive: true });
+    if (fs.existsSync(logFile()) && fs.statSync(logFile()).size > 2_000_000) fs.renameSync(logFile(), logFile() + '.1');
+    fs.appendFileSync(logFile(), line);
+  } catch { /* logging must never break the app */ }
+}
+function permissions() {
+  if (!isMac) return {};
+  return { screen: systemPreferences.getMediaAccessStatus('screen'), camera: systemPreferences.getMediaAccessStatus('camera'),
+           microphone: systemPreferences.getMediaAccessStatus('microphone') };
+}
+ipcMain.on('log', (_e, ...parts: unknown[]) => log('[ui]', ...parts));
+ipcMain.handle('log:reveal', () => { log('log revealed'); shell.showItemInFolder(logFile()); });
 
 // ---------------------------------------------------------------- paths & files
 
@@ -212,6 +232,18 @@ ipcMain.handle('capture:requestPermission', async () => {
   return out.includes('"granted":true');
 });
 
+ipcMain.handle('capture:resetPermissions', async () => {
+  if (!isMac) return true;
+  const id = 'com.odak.app';
+  const results: string[] = [];
+  for (const service of ['ScreenCapture', 'Camera', 'Microphone']) {
+    results.push(await new Promise<string>((resolve) => execFile('tccutil', ['reset', service, id], (err, out, errOut) =>
+      resolve(`${service}: ${err ? `hata ${errOut || err.message}` : (out.trim() || 'ok')}`))));
+  }
+  log('permissions reset by user', results);
+  return true;
+});
+
 ipcMain.handle('capture:openSettings', () => {
   if (isMac) return shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture');
   return shell.openExternal('ms-settings:privacy');
@@ -276,9 +308,11 @@ ipcMain.handle('capture:start', async (_e, o: { displayId: number; systemAudio: 
   // The microphone (and camera) are recorded by the app itself, so the user can pick devices.
   if (o.systemAudio) args.push('--system-audio');
 
+  log('capture:start', { version: app.getVersion(), platform: process.platform, helper: helperPath(), args, permissions: permissions() });
   const proc = spawn(helperPath(), args, { stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true });
   const r: Recording = { proc, pkg, mediaID, startedAt: Date.now() / 1000, events: [], waiters: [], stopping: false, stderr: '' };
   const emit = (ev: { event: string; [k: string]: unknown }) => {
+    log('helper', ev);
     r.events.push(ev);
     r.waiters = r.waiters.filter((w) => !w(ev));
     if (ev.event === 'error' && recording === r && !r.stopping) void stopRecording(String(ev.message ?? 'Kayıt hatası'));
@@ -299,12 +333,13 @@ ipcMain.handle('capture:start', async (_e, o: { displayId: number; systemAudio: 
 
   const first = await nextEvent(r, ['started'], 20000);
   if (first.event !== 'started') {
+    log('capture:start failed', first, { stderr: r.stderr.trim().slice(-2000) });
     proc.kill();
     await fsp.rm(pkg, { recursive: true, force: true });
     const msg = first.code === 'permission'
       ? 'macOS ekran kaydına izin vermedi.\n\nSistem Ayarları › Gizlilik ve Güvenlik › Ekran ve Sistem Sesi Kaydı\'nda Odak açık görünüyorsa bile, uygulama güncellendiyse macOS eski izni geçersiz sayar: Odak\'ı listeden “–” ile kaldırın, sonra Odak\'ta kaydı yeniden başlatıp izin verin ve Odak\'ı yeniden açın.'
       : String(first.message ?? (r.stderr.trim() || 'Kayıt başlatılamadı.'));
-    return { ok: false, error: msg };
+    return { ok: false, error: msg, code: first.code === 'permission' ? 'permission' : 'error' };
   }
   recording = r;
   mainWindow?.hide();
@@ -321,6 +356,7 @@ async function stopRecording(failure?: string) {
   globalShortcut.unregister('CommandOrControl+Shift+2');
   if (r.proc.exitCode === null) r.proc.stdin.write('stop\n');
   const fin = await nextEvent(r, ['finished'], 60000);
+  log('capture:stop', fin, r.stderr.trim() ? { stderr: r.stderr.trim().slice(-2000) } : '');
   recording = null;
   hudWindow?.close(); hudWindow = null;
   mainWindow?.show(); mainWindow?.focus();
@@ -422,6 +458,10 @@ function buildMenu() {
       ],
     },
     {
+      label: 'Yardım',
+      submenu: [{ label: 'Tanılama Kaydını Göster', click: () => { shell.showItemInFolder(logFile()); } }],
+    },
+    {
       label: 'Görünüm',
       submenu: [{ role: 'togglefullscreen', label: 'Tam Ekran' }, { role: 'toggleDevTools', label: 'Geliştirici Araçları' }],
     },
@@ -455,6 +495,7 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+  log('app start', { version: app.getVersion(), platform: process.platform, arch: process.arch, packaged: app.isPackaged, permissions: permissions() });
   buildMenu();
   createWindow();
   app.on('activate', () => { if (!mainWindow) createWindow(); else mainWindow.show(); });

@@ -31,6 +31,9 @@ export interface OdakAPI {
   uiTestCapture(name: string): Promise<string>;
   requestScreenPermission(): Promise<boolean>;
   askMediaAccess(kind: 'camera' | 'microphone'): Promise<boolean>;
+  resetPermissions(): Promise<boolean>;
+  log(...parts: unknown[]): void;
+  revealLog(): Promise<void>;
   pickImage(): Promise<string | null>;
   importAsset(pkg: string, src: string): Promise<string>;
   createPackage(name: string): Promise<string>;
@@ -53,7 +56,7 @@ export interface OdakAPI {
   screenPermission(): Promise<'granted' | 'denied' | 'not-determined' | 'restricted' | 'unknown'>;
   openPermissionSettings(): Promise<void>;
   captureAvailable(): Promise<{ ok: boolean; reason?: string }>;
-  startRecording(o: RecordingOptions): Promise<{ ok: true; pkg: string; mediaID: string; t0: number } | { ok: false; error: string }>;
+  startRecording(o: RecordingOptions): Promise<{ ok: true; pkg: string; mediaID: string; t0: number } | { ok: false; error: string; code?: 'permission' | 'error' }>;
   stopRecording(): Promise<void>;
   onRecordingFinished(cb: (r: RecordingFinished) => void): () => void;
   onMenu(cb: (cmd: MenuCommand) => void): () => void;
