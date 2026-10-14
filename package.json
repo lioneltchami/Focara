@@ -87,6 +87,7 @@
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "artifactName": "Odak-Kurulum-${version}.${ext}"
-    }
+    },
+    "afterSign": "scripts/after-sign.cjs"
   }
 }

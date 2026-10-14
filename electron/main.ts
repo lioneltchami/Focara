@@ -302,7 +302,7 @@ ipcMain.handle('capture:start', async (_e, o: { displayId: number; systemAudio: 
     proc.kill();
     await fsp.rm(pkg, { recursive: true, force: true });
     const msg = first.code === 'permission'
-      ? 'Ekran kaydı izni yok. Sistem Ayarları › Gizlilik ve Güvenlik › Ekran ve Sistem Sesi Kaydı\'nda Odak\'ı açın ve uygulamayı yeniden başlatın.'
+      ? 'macOS ekran kaydına izin vermedi.\n\nSistem Ayarları › Gizlilik ve Güvenlik › Ekran ve Sistem Sesi Kaydı\'nda Odak açık görünüyorsa bile, uygulama güncellendiyse macOS eski izni geçersiz sayar: Odak\'ı listeden “–” ile kaldırın, sonra Odak\'ta kaydı yeniden başlatıp izin verin ve Odak\'ı yeniden açın.'
       : String(first.message ?? (r.stderr.trim() || 'Kayıt başlatılamadı.'));
     return { ok: false, error: msg };
   }
