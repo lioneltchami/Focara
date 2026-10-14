@@ -310,7 +310,7 @@ function Timeline({ store, lib, time, playing, seek, range, setRange, tool, bar,
   const [scrubbing, setScrubbing] = useState(false);
   const [bladeAt, setBladeAt] = useState<number | null>(null);
   useLayoutEffect(() => {
-    const ro = new ResizeObserver(([e]) => setWidth(e.contentRect.width));
+    const ro = new ResizeObserver(([e]) => setWidth((w) => (Math.abs(w - e.contentRect.width) < 0.5 ? w : e.contentRect.width)));
     ro.observe(scroller.current!);
     return () => ro.disconnect();
   }, []);

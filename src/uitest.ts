@@ -173,6 +173,17 @@ export async function runUiTest() {
     await sleep(80);
     check(project().clips[0].id === lastId, 'dragging a clip reorders it to the front');
 
+    // Zooming the timeline view must only widen the timeline's content, never the window layout.
+    const appW = () => $('.editor')!.getBoundingClientRect().width;
+    const w0 = appW(), in0 = inner().getBoundingClientRect().width;
+    click($$('.bar-zoom button')[1]);
+    await sleep(600);
+    const w1 = appW(), in1 = inner().getBoundingClientRect().width;
+    check(Math.abs(w1 - w0) < 1 && in1 > in0 * 1.5 && in1 < in0 * 1.7 && document.documentElement.scrollWidth <= window.innerWidth,
+      `timeline ＋ zooms the timeline only (window ${w0.toFixed(0)} → ${w1.toFixed(0)} px, timeline ${in0.toFixed(0)} → ${in1.toFixed(0)} px)`);
+    click($$('.bar-zoom button')[2]);
+    await sleep(200);
+
     // Playhead: grab the red head and drag it; the ruler scrubs too.
     const knob = $('.playhead-knob')!, kr = knob.getBoundingClientRect();
     pointer(knob, 'pointerdown', kr.left + 8, kr.top + 8); pointer(knob, 'pointermove', xAt(3), kr.top + 8);
