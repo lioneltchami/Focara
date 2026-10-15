@@ -1,12 +1,30 @@
-# Odak
+<p align="center"><img src="docs/images/tr/banner.png" alt="ODAK / FOCUS: tıkladığın yere zoom yapan ekran kayıtları; kamera düzenleri, büyüteç ve gerçek bir editör" width="100%"></p>
 
-🇬🇧 [English README](README.md)
+# ODAK / FOCUS
+
+🇬🇧 [English README](README.md) · İngilizce adı *Focus*.
 
 ![Odak demo](docs/images/demo.gif)
 
-**Editör çalışırken:** temalar, makasla kesme, bir kısmı ×4 hızlandırma, tam ekran kamera.
+**Editör çalışırken:** Her tıklama zaten bir zoom. Birini derinleştir ya da sabit bir noktaya çevir, kameraya kendi düzenlerini ver:
 
-![Odak editörü](docs/images/editing.gif)
+![Odak editörü: zoom derinleştirilip sabit bir noktaya çevriliyor, kamera tam ekran olup sol üste kayıyor](docs/images/editing.gif)
+
+İmleci takip eden bir büyüteç ekle, temaları dene:
+
+![Odak editörü: grafiğin üstüne büyüteç ekleniyor, ardından dört tema](docs/images/looks.gif)
+
+Makasla kes, yavaş bir kısmı ×4 hızlandır, dışa aktar:
+
+![Zaman çizelgesi: makasla kesme, ×4 hızlandırılan aralık, dışa aktarma penceresi](docs/images/cutting.gif)
+
+| Hikâyeni takip eden kamera | Ayrıntılar için büyüteç |
+|---|---|
+| ![Kamera girişte tam ekran, sonra sağ üste kayıyor, gizleniyor, sol altta büyüyor](docs/images/camera.gif) | ![İmleci takip eden büyüteç](docs/images/magnifier.gif) |
+
+**Tek kayıt, her biçim:** aynı proje 16:9, dikey 9:16 ve kare 1:1 olarak yan yana:
+
+![Aynı kayıt 16:9, 9:16 ve 1:1](docs/images/formats.gif)
 
 Ekran kaydı, otomatik zoom ve zoom'ları elle düzenleme. **macOS ve Windows'ta aynı şekilde çalışır.**
 
@@ -176,8 +194,8 @@ npm run uitest -- "examples/Örnek Proje.odak"   # gerçek arayüz: zoom'lar, b�
                                                #   oynat, otomatik kayıt, Ayarlar'dan dil değiştirme ve İngilizce
                                                #   arayüzde Türkçe metin kalmaması (`--lang en` ile her akış İngilizce;
                                                #   CI ikisini de çalıştırır)
-npm run docshots       # docs/images: ekran görüntüleri, kareler, tema galerileri, GIF'ler (İngilizce arayüz)
-npm run docshots:tr    # editör ekran görüntüleri Türkçe arayüzle → docs/images/tr (bu README)
+npm run docshots       # docs/images: banner, ekran görüntüleri, kareler, tema galerileri, GIF'ler (İngilizce arayüz)
+npm run docshots:tr    # banner ve editör ekran görüntüleri Türkçe arayüzle → docs/images/tr (bu README)
 npm run perftest       # performans: 40 sn 2560×1600@60 kayıt + kamera + 2 ses izi, 16 klip, zoom'lar ve kamera bölümleri;
                        #   gerçek editörde oynatma (kesimler dahil), sürükleme, düzenleme, zaman çizelgesi, dışa aktarma
 zsh native/mac/test.sh                         # macOS yardımcısı: WAV hizalaması, anahtar karelerin en fazla ~1 sn arayla olması

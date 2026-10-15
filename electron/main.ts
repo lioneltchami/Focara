@@ -608,7 +608,8 @@ function createWindow() {
         : docshotsDir ? ['--docshots'] : uiTestProject ? ['--uitest'] : [],
       // Keep timers and capture running while the window is hidden during a recording.
       backgroundThrottling: false,
-      offscreen: !!uiTestProject || !!docshotsDir,
+      // Documentation images at 2× (sharp on high-DPI screens, and the editor GIF zooms into them).
+      offscreen: docshotsDir ? { deviceScaleFactor: 2 } : !!uiTestProject,
     },
   });
   if (devUrl) void mainWindow.loadURL(devUrl);
@@ -623,7 +624,7 @@ function createWindow() {
   });
   if (isTest) {
     mainWindow.webContents.on('console-message', (e) => process.stdout.write(`[renderer] ${e.message}\n`));
-    setTimeout(() => { process.stdout.write('SELFTEST TIMEOUT\n'); app.exit(2); }, isPerftest ? 900000 : 240000);
+    setTimeout(() => { process.stdout.write('SELFTEST TIMEOUT\n'); app.exit(2); }, isPerftest || docshotsDir ? 900000 : 240000);
   }
   mainWindow.on('closed', () => { mainWindow = null; });
 }

@@ -1,7 +1,9 @@
-# Odak
+<p align="center"><img src="docs/images/banner.png" alt="ODAK / FOCUS: screen recordings that zoom where you click, with webcam layouts, a magnifier and a real editor" width="100%"></p>
+
+# ODAK / FOCUS
 
 **Record your screen. Odak zooms in where you click, follows your cursor, puts your webcam where your story needs it — and gives you a real editor to finish the video.**
-Free, runs on **macOS and Windows**, works completely offline.
+Free, runs on **macOS and Windows**, works completely offline. *Odak* is Turkish for *focus*.
 
 🇹🇷 [Türkçe README](README.tr.md)
 
@@ -11,9 +13,19 @@ Free, runs on **macOS and Windows**, works completely offline.
 
 ### The editor in action
 
-Picking themes, cutting with the scissors, speeding up a slow part ×4 and giving the camera a full-frame moment:
+Every click is already a zoom. Make one deeper or point it at a fixed spot, and give the webcam its own layouts:
 
-![The Odak editor: choosing themes, a scissors cut, a range sped up ×4, a full-frame camera layout](docs/images/editing.gif)
+![The Odak editor: a zoom made deeper and pointed at a fixed spot, the webcam full frame and then moved to the top left](docs/images/editing.gif)
+
+Add a magnifier that follows your cursor, try themes:
+
+![The Odak editor: a magnifier added over the chart, then four themes one after another](docs/images/looks.gif)
+
+Cut with the scissors, play a slow part ×4, export:
+
+![The Odak timeline: a scissors cut, a range sped up ×4, the export dialog](docs/images/cutting.gif)
+
+<sub>Recorded from the real editor; the camera moves in on each step the same way Odak zooms in on your clicks.</sub>
 
 ---
 
@@ -21,6 +33,7 @@ Picking themes, cutting with the scissors, speeding up a slow part ×4 and givin
 
 - [The editor in action](#the-editor-in-action)
 - [Highlights](#highlights)
+- [In motion](#in-motion)
 - [How is Odak different?](#how-is-odak-different)
 - [Screenshots](#screenshots)
 - [Download and install](#download-and-install)
@@ -51,6 +64,16 @@ Picking themes, cutting with the scissors, speeding up a slow part ×4 and givin
 - 📤 **Export anything.** MP4, MOV, WebM, GIF, audio-only (M4A, WAV) or a single PNG frame for your thumbnail. 720p to 4K, 24/30/60 fps, H.264 / HEVC / AV1 / VP9, three quality levels — in **16:9, 9:16 vertical (Shorts, Reels, TikTok), 1:1 square** or the recording's own shape. Export the whole video or just a selected range.
 - 🎞️ **What you see is what you export.** The preview and the exporter use the same renderer and the same frame-selection rule; audio is aligned to the millisecond (verified by automated tests).
 - 🌐 **English and Turkish.** The interface follows your computer's language, and you can switch it any time in **⚙ Settings** — instantly, with your project still open.
+
+## In motion
+
+| A webcam that follows your story | A magnifier for the details |
+|---|---|
+| ![The webcam full frame for the intro, then moved to the top right, hidden, and bigger at the bottom left](docs/images/camera.gif) | ![A magnifier lens following the cursor over a chart](docs/images/magnifier.gif) |
+
+**One recording, every format** — the same project as 16:9, vertical 9:16 and square 1:1, playing side by side:
+
+![The same recording exported as 16:9, 9:16 and 1:1](docs/images/formats.gif)
 
 ## How is Odak different?
 
@@ -373,8 +396,8 @@ Requirements:
 - **Windows:** [Rust](https://rustup.rs) and *Visual Studio Build Tools* ("Desktop development with C++")
 
 ```bash
-git clone https://github.com/YildizDikme/Odak.git
-cd Odak
+git clone https://github.com/YildizDikme/Focus.git
+cd Focus
 npm install
 npm run build:helper:mac      # macOS: Swift capture helper (universal: Apple Silicon + Intel)
 npm run build:helper:win      # Windows: Rust capture helper
@@ -436,9 +459,9 @@ npm run uitest -- "examples/Örnek Proje.odak"   # the real UI driven by DOM eve
                                                #   Settings: switching language in place, no Turkish left in English
                                                #   (add `--lang en` to run every flow in English; CI runs both)
 npm run perftest       # performance (see above)
-npm run docshots       # regenerates docs/images from a demo project: screenshots, frames, theme galleries,
-                       #   the demo GIF and the editor-in-action GIF (English interface)
-npm run docshots:tr    # the editor screenshots with the Turkish interface → docs/images/tr (README.tr.md)
+npm run docshots       # regenerates docs/images from a demo project: the banner, screenshots, frames, theme
+                       #   galleries, the demo GIF, the feature GIFs and the editor GIFs (English interface)
+npm run docshots:tr    # the banner and editor screenshots with the Turkish interface → docs/images/tr (README.tr.md)
 zsh native/mac/test.sh # macOS helper: WAV alignment, key frames at most ~1 s apart
 cargo test --manifest-path native/win/Cargo.toml   # Windows helper: WAV alignment
 node scripts/helper-smoke.mjs                      # records 3 s of this screen with the helper (needs permission)

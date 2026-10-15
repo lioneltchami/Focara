@@ -33,11 +33,16 @@ async function writeFile(path: string, build: (target: StreamTarget) => Promise<
     await build(new StreamTarget(new WritableStream({ write: (c) => odak().fileWrite(h, c.data, c.position) }), { chunked: true }));
   } finally { await odak().fileClose(h); }
 }
-/** Collects GIF frames in memory; delays are rounded against the ideal clock so the length never drifts. */
+/**
+ * Collects GIF frames in memory; delays are rounded against the ideal clock so the length never drifts.
+ * After the first frame only the pixels that changed are stored (the rest are transparent and keep the
+ * frame before), and a frame with no change just lengthens the one before: a still editor costs little.
+ */
 class Gif {
   private enc = GIFEncoder({ auto: false });
   private parts: Uint8Array[] = [];
-  private first = true;
+  private shown: Uint8ClampedArray | null = null; // what a viewer shows after the frames so far
+  private pending: { index: Uint8Array; palette: number[][]; transparent: boolean; delayCs: number } | null = null;
   private frames = 0;
   private writtenCs = 0;
   constructor(private w: number, private h: number, private fps: number) { this.enc.writeHeader(); }
@@ -45,12 +50,38 @@ class Gif {
     this.frames += hold;
     const delay = Math.max(2, Math.round((this.frames / this.fps) * 100) - this.writtenCs);
     this.writtenCs += delay;
-    const palette = quantize(rgba, 256);
-    this.enc.writeFrame(applyPalette(rgba, palette), this.w, this.h, { palette, delay: delay * 10, first: this.first, repeat: 0 });
-    this.first = false;
+    const n = this.w * this.h, shown = this.shown;
+    const changed = new Uint8Array(n);
+    let count = 0;
+    for (let i = 0, p = 0; i < n; i++, p += 4) {
+      if (!shown || Math.abs(rgba[p] - shown[p]) > 3 || Math.abs(rgba[p + 1] - shown[p + 1]) > 3 || Math.abs(rgba[p + 2] - shown[p + 2]) > 3) { changed[i] = 1; count++; }
+    }
+    if (shown && count === 0 && this.pending) { this.pending.delayCs += delay; return; }
+    this.flush();
+    const px = new Uint8ClampedArray(Math.max(1, count) * 4);
+    for (let i = 0, j = 0; i < n; i++) if (changed[i]) { const p = i * 4; px[j] = rgba[p]; px[j + 1] = rgba[p + 1]; px[j + 2] = rgba[p + 2]; px[j + 3] = 255; j += 4; }
+    const palette = quantize(px, shown ? 255 : 256);
+    const index = applyPalette(rgba, palette);
+    const next = shown ?? new Uint8ClampedArray(n * 4);
+    const clear = palette.length;
+    for (let i = 0, p = 0; i < n; i++, p += 4) {
+      if (!changed[i]) { index[i] = clear; continue; }
+      const c = palette[index[i]]; next[p] = c[0]; next[p + 1] = c[1]; next[p + 2] = c[2]; next[p + 3] = 255;
+    }
+    if (shown) palette.push([0, 0, 0]);
+    this.shown = next;
+    this.pending = { index, palette, transparent: !!shown, delayCs: delay };
+  }
+  private flush() {
+    const f = this.pending;
+    if (!f) return;
+    this.enc.writeFrame(f.index, this.w, this.h, { palette: f.palette, delay: f.delayCs * 10, first: this.parts.length === 0, repeat: 0,
+      transparent: f.transparent, transparentIndex: f.palette.length - 1, dispose: 1 });
     this.parts.push(this.enc.bytes()); this.enc.reset();
+    this.pending = null;
   }
   bytes() {
+    this.flush();
     this.enc.finish(); this.parts.push(this.enc.bytes());
     const out = new Uint8Array(this.parts.reduce((n, p) => n + p.length, 0));
     let o = 0; for (const p of this.parts) { out.set(p, o); o += p.length; }
@@ -58,14 +89,14 @@ class Gif {
   }
 }
 
-/** A caption pill at the bottom left of a frame (for the README videos). */
-function caption(ctx: OffscreenCanvasRenderingContext2D, w: number, h: number, text: string, alpha: number) {
+/** A caption pill at the bottom left (or top left) of a frame (for the README videos). */
+function caption(ctx: OffscreenCanvasRenderingContext2D, w: number, h: number, text: string, alpha: number, top = false, size = 0.052) {
   if (alpha <= 0) return;
-  const fs = Math.round(h * 0.052), pad = fs * 0.7;
+  const fs = Math.round(h * size), pad = fs * 0.7;
   ctx.save();
   ctx.globalAlpha = alpha;
   ctx.font = `650 ${fs}px -apple-system, "Segoe UI", Helvetica, Arial, sans-serif`;
-  const tw = ctx.measureText(text).width, x = h * 0.05, y = h - h * 0.05 - fs - pad * 1.2;
+  const tw = ctx.measureText(text).width, x = h * 0.05, y = top ? h * 0.05 : h - h * 0.05 - fs - pad * 1.2;
   ctx.fillStyle = 'rgba(17,18,40,0.82)'; ctx.beginPath(); ctx.roundRect(x, y, tw + pad * 2, fs + pad * 1.2, (fs + pad * 1.2) / 2); ctx.fill();
   ctx.fillStyle = '#fff'; ctx.fillText(text, x + pad, y + fs * 0.98 + pad * 0.3);
   ctx.restore();
@@ -268,6 +299,59 @@ function drawLandscape(w: number, h: number): OffscreenCanvas {
   return c;
 }
 
+/** The README banner: the name, what it does, and the editor (a 2× screenshot) with a magnifier over its timeline. */
+async function banner(editorPng: Uint8Array): Promise<Uint8Array> {
+  const BW = 1800, BH = 620, tr = lang() === 'tr';
+  const c = new OffscreenCanvas(BW, BH), ctx = c.getContext('2d')!;
+  const font = (px: number, w = 650) => `${w} ${px}px -apple-system, "Segoe UI", Helvetica, Arial, sans-serif`;
+  ctx.fillStyle = '#0b0b12'; ctx.fillRect(0, 0, BW, BH);
+  for (const [x, y, r, color] of [[260, -60, 620, 'rgba(124,92,255,0.42)'], [1500, 700, 720, 'rgba(236,72,153,0.26)'], [900, 300, 520, 'rgba(168,85,247,0.14)']] as const) {
+    const g = ctx.createRadialGradient(x, y, 0, x, y, r); g.addColorStop(0, color); g.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, BW, BH);
+  }
+  ctx.fillStyle = 'rgba(255,255,255,0.05)';
+  for (let y = 14; y < BH; y += 28) for (let x = 14; x < BW; x += 28) ctx.fillRect(x, y, 2, 2);
+
+  // The editor, glowing, on the right.
+  const img = await createImageBitmap(new Blob([new Uint8Array(editorPng)], { type: 'image/png' }));
+  const ew = 860, eh = Math.round((ew * img.height) / img.width), ex = BW - ew - 60, ey = Math.round((BH - eh) / 2);
+  ctx.save(); ctx.shadowColor = 'rgba(124,92,255,0.55)'; ctx.shadowBlur = 90;
+  ctx.fillStyle = '#14151c'; ctx.beginPath(); ctx.roundRect(ex, ey, ew, eh, 16); ctx.fill(); ctx.restore();
+  ctx.save(); ctx.beginPath(); ctx.roundRect(ex, ey, ew, eh, 16); ctx.clip();
+  ctx.imageSmoothingQuality = 'high'; ctx.drawImage(img, ex, ey, ew, eh); ctx.restore();
+  ctx.strokeStyle = 'rgba(255,255,255,0.14)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.roundRect(ex, ey, ew, eh, 16); ctx.stroke();
+  // A lens over the clip and zoom lanes (window pixels of the 1440 × 900 editor).
+  const k = ew / 1440, src = { x: 511, y: 757, r: 58 }, lr = 112, lx = ex + src.x * k, ly = ey + src.y * k, s = img.width / 1440;
+  ctx.save(); ctx.shadowColor = 'rgba(0,0,0,0.6)'; ctx.shadowBlur = 40; ctx.fillStyle = '#000';
+  ctx.beginPath(); ctx.arc(lx, ly, lr, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+  ctx.save(); ctx.beginPath(); ctx.arc(lx, ly, lr, 0, Math.PI * 2); ctx.clip();
+  ctx.drawImage(img, (src.x - src.r) * s, (src.y - src.r) * s, src.r * 2 * s, src.r * 2 * s, lx - lr, ly - lr, lr * 2, lr * 2); ctx.restore();
+  ctx.strokeStyle = '#fff'; ctx.lineWidth = 5; ctx.beginPath(); ctx.arc(lx, ly, lr, 0, Math.PI * 2); ctx.stroke();
+  img.close();
+
+  // Name and what it does, on the left (sizes shrink until they fit beside the editor).
+  const x = 90, room = ex - x - 60;
+  const fit = (text: string, px: number, weight: number) => { while (px > 12) { ctx.font = font(px, weight); if (ctx.measureText(text).width <= room) break; px -= 2; } return px; };
+  const pill = tr ? 'macOS · Windows · Ücretsiz · Çevrimdışı' : 'macOS · Windows · Free · Offline';
+  ctx.font = font(22, 600);
+  const pw = ctx.measureText(pill).width + 40;
+  ctx.fillStyle = 'rgba(124,92,255,0.18)'; ctx.strokeStyle = 'rgba(167,139,250,0.5)'; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.roundRect(x, 150, pw, 44, 22); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = '#d8d0ff'; ctx.fillText(pill, x + 20, 180);
+  ctx.font = font(fit('ODAK / FOCUS', 104, 800), 800);
+  const wOdak = ctx.measureText('ODAK').width, wSlash = ctx.measureText(' / ').width, wFocus = ctx.measureText('FOCUS').width;
+  ctx.fillStyle = '#fff'; ctx.fillText('ODAK', x, 312);
+  ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.fillText(' / ', x + wOdak, 312);
+  const g = ctx.createLinearGradient(x + wOdak + wSlash, 0, x + wOdak + wSlash + wFocus, 0);
+  g.addColorStop(0, '#8b6cff'); g.addColorStop(0.55, '#c084fc'); g.addColorStop(1, '#f472b6');
+  ctx.fillStyle = g; ctx.fillText('FOCUS', x + wOdak + wSlash, 312);
+  const lines = tr ? ['Tıkladığın yere zoom yapan ekran kayıtları.', 'Kamera düzenleri, büyüteç ve gerçek bir editör.']
+    : ['Screen recordings that zoom where you click.', 'Webcam layouts, a magnifier and a real editor.'];
+  ctx.font = font(Math.min(...lines.map((l) => fit(l, 34, 500))), 500); ctx.fillStyle = '#d4d5ea';
+  lines.forEach((l, i) => ctx.fillText(l, x, 386 + i * 50));
+  return png(c);
+}
+
 // ---------------------------------------------------------------- run
 
 export async function runDocshots() {
@@ -407,6 +491,77 @@ export async function runDocshots() {
         }
         await save('demo.gif', gif.bytes());
       }
+
+      // Feature GIFs: the output of one feature each, with captions.
+      const outputGif = async (name: string, proj: Project, from: number, to: number, fps: number, captions: [number, number, string][], top = false) => {
+        const size = { width: 800, height: 450 };
+        const gif = new Gif(size.width, size.height, fps);
+        const ctx = new OffscreenCanvas(size.width, size.height).getContext('2d', { willReadFrequently: true })!;
+        const data = await lib.allRenderData(proj);
+        for await (const k of renderFrames(proj, lib, data, ctx, size, fps, from, Math.round((to - from) * fps))) {
+          const t = from + k / fps;
+          for (const [a, b, text] of captions) {
+            if (t >= a && t < b) caption(ctx, size.width, size.height, text, Math.min(1, (t - a) / 0.2 + 0.4, (b - t) / 0.2 + 0.4), top);
+          }
+          gif.add(ctx.getImageData(0, 0, size.width, size.height).data);
+        }
+        await save(name, gif.bytes());
+      };
+      {
+        // The webcam's layouts on the timeline: full frame, out of the way, hidden, bigger elsewhere
+        // (captions at the top: the camera ends at the bottom left).
+        let cam: Project = { ...p, clips: p.clips.map((c) => ({ ...c, cameraSegments: [] })),
+          style: { ...p.style, backgroundKind: 'theme', backgroundTheme: 'aurora', padding: 0.07 } };
+        cam = addCameraSegment(cam, 0, 1.6, { mode: 'full', position: 'center', size: 0.26 }).project;
+        cam = addCameraSegment(cam, 3.1, 4.7, { mode: 'bubble', position: 'top-right', size: 0.22 }).project;
+        cam = addCameraSegment(cam, 5.7, 7.3, { mode: 'hidden', position: 'bottom-right', size: 0.26 }).project;
+        cam = addCameraSegment(cam, 8.2, 10.0, { mode: 'bubble', position: 'bottom-left', size: 0.36 }).project;
+        await outputGif('camera.gif', cam, 0, 10.2, 12, [
+          [0, 1.6, '🎥 Webcam full frame for the intro'], [1.8, 5.0, '↗ Moves out of the way for a moment'],
+          [5.2, 7.6, '⊘ Hides while you show something'], [7.8, 10.2, '↙ Any corner, any size'],
+        ], true);
+      }
+      {
+        // The magnifier over the whole screen (no zoom), following the cursor.
+        const flat: Project = { ...p, clips: p.clips.map((c) => ({ ...c, zooms: [], cameraSegments: [] })),
+          style: { ...p.style, backgroundKind: 'theme', backgroundTheme: 'gece', padding: 0.06 } };
+        const lens = addMagnifier(flat, 9.0, 14, { size: 0.34, zoom: 2.4, shape: 'circle' }).project;
+        await outputGif('magnifier.gif', lens, 9.3, 13.9, 15, [[9.3, 13.9, '🔍 A magnifier follows your cursor']]);
+      }
+      {
+        // One recording, three shapes, playing side by side.
+        const fps = 12, from = 1.6, count = Math.round(4.8 * fps), CW = 1040, CH = 420;
+        const panes = ([['wide', 480, 270, '16:9 · YouTube'], ['vertical', 152, 270, '9:16 · Shorts, Reels, TikTok'], ['square', 270, 270, '1:1 · Feeds']] as const)
+          .map(([aspect, width, height, label]) => {
+            const proj: Project = { ...p, style: { ...p.style, backgroundKind: 'theme', backgroundTheme: 'pastel', padding: 0.07 }, export: { ...p.export, aspect } };
+            const ctx = new OffscreenCanvas(width, height).getContext('2d', { willReadFrequently: true })!;
+            return { proj, ctx, size: { width, height }, label };
+          });
+        const its = await Promise.all(panes.map(async (q) => renderFrames(q.proj, lib, await lib.allRenderData(q.proj), q.ctx, q.size, fps, from, count)));
+        const gif = new Gif(CW, CH, fps);
+        const out = new OffscreenCanvas(CW, CH).getContext('2d', { willReadFrequently: true })!;
+        const font = (px: number, w = 650) => `${w} ${px}px -apple-system, "Segoe UI", Helvetica, Arial, sans-serif`;
+        for (let k = 0; k < count; k++) {
+          for (const it of its) await it.next();
+          const bg = out.createLinearGradient(0, 0, CW, CH); bg.addColorStop(0, '#12111f'); bg.addColorStop(1, '#1d1230');
+          out.fillStyle = bg; out.fillRect(0, 0, CW, CH);
+          out.fillStyle = '#fff'; out.font = font(26, 750); out.textAlign = 'center';
+          out.fillText('One recording → every format', CW / 2, 46);
+          let x = (CW - panes.reduce((s, q) => s + q.size.width, 0) - 2 * 40) / 2;
+          for (const q of panes) {
+            const y = 74;
+            out.save(); out.beginPath(); out.roundRect(x, y, q.size.width, q.size.height, 10); out.clip();
+            out.drawImage(q.ctx.canvas, x, y); out.restore();
+            out.strokeStyle = 'rgba(255,255,255,0.14)'; out.lineWidth = 1; out.beginPath(); out.roundRect(x + 0.5, y + 0.5, q.size.width - 1, q.size.height - 1, 10); out.stroke();
+            out.fillStyle = '#d9d6f5'; out.font = font(16, 600); out.fillText(q.label, x + q.size.width / 2, y + q.size.height + 30);
+            x += q.size.width + 40;
+          }
+          out.textAlign = 'start';
+          gif.add(out.getImageData(0, 0, CW, CH).data);
+        }
+        await Promise.all(its.map((it) => it.return(undefined)));
+        await save('formats.gif', gif.bytes());
+      }
       lib.dispose();
     }
 
@@ -417,7 +572,9 @@ export async function runDocshots() {
     const shot = async (name: string) => {
       await sleep(250); await ed().player.idle(); await sleep(150);
       const f = await odak().uiTestCapture(name.replace(/\.png$/, ''));
-      await save(name, await odak().readFile(dirOf(f), baseOf(f), 0, await odak().fileSize(dirOf(f), baseOf(f))));
+      const bytes = await odak().readFile(dirOf(f), baseOf(f), 0, await odak().fileSize(dirOf(f), baseOf(f)));
+      await save(name, bytes);
+      return bytes;
     };
     const key = (k: string) => document.body.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true }));
     while (!$('.home')) await sleep(30);
@@ -426,7 +583,7 @@ export async function runDocshots() {
     await sleep(1500);
 
     await ed().player.seek(3.9);
-    await shot('editor.png');
+    await save('banner.png', await banner(await shot('editor.png')));
 
     const seg = store().project.clips[0].cameraSegments.find((s) => s.mode === 'bubble')!;
     store().select({ kind: 'camera', clipID: store().project.clips[0].id, segID: seg.id });
@@ -460,27 +617,51 @@ export async function runDocshots() {
     document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     while ($('.modal.settings')) await sleep(30);
 
-    // Editor GIF: the real editor, step by step, with a drawn mouse pointer.
+    // Editor GIFs: the real editor with a drawn mouse pointer, filmed by a camera that moves in on
+    // each step, the way Odak zooms in on clicks.
     if (!uiOnly) {
-      const fps = 8, W2 = 960, H2 = 600;
-      const gif = new Gif(W2, H2, fps);
-      const ctx = new OffscreenCanvas(W2, H2).getContext('2d', { willReadFrequently: true })!;
-      const player = ed().player as unknown as { seek: (t: number) => Promise<void>; idle: () => Promise<void>; currentTime: number };
-      let pointerAt = { x: 760, y: 420 }, clock = 1.0, pressed = 0, step = 1 / fps;
+      const fps = 12, OW = 1000, OH = 625, WW = innerWidth, WH = innerHeight;
+      const ctx = new OffscreenCanvas(OW, OH).getContext('2d', { willReadFrequently: true })!;
+      const player = ed().player as unknown as { seek: (t: number) => Promise<void>; idle: () => Promise<void> };
+      // The camera's view: a part of the window (window pixels) with the window's shape. Each move
+      // glides there in a fixed number of frames and then holds still, so still moments stay cheap.
+      type View = { x: number; y: number; w: number };
+      const viewAt = (cx: number, cy: number, z: number): View => {
+        const w = WW / z, h = WH / z;
+        return { x: Math.min(Math.max(cx - w / 2, 0), WW - w), y: Math.min(Math.max(cy - h / 2, 0), WH - h), w };
+      };
+      const MOVE = 10;
+      let gif = new Gif(OW, OH, fps);
+      let pointerAt = { x: 980, y: 520 }, clock = 1.5, pressed = 0, step = 1 / fps;
+      let cam = viewAt(WW / 2, WH / 2, 1), camFrom = cam, camTo = cam, movedAt = 0;
+      let say = '', saidAt = 0, frame = 0;
+      const moveTo = (v: View) => { camFrom = cam; camTo = v; movedAt = frame; };
+      const look = (r: { left: number; top: number; width: number; height: number }, z: number) => moveTo(viewAt(r.left + r.width / 2, r.top + r.height / 2, z));
+      const wide = () => moveTo(viewAt(WW / 2, WH / 2, 1));
+      const tell = (text: string) => { say = text; saidAt = frame; };
+      const restart = () => { gif = new Gif(OW, OH, fps); frame = 0; cam = camFrom = camTo; movedAt = -MOVE; };
       const snap = async (advance = true) => {
         if (advance) { clock = Math.min(clock + step, projectDuration(store().project) - 0.2); await player.seek(clock); }
-        await player.idle(); await sleep(60);
+        await player.idle(); await sleep(40);
+        const q = ease((frame - movedAt + 1) / MOVE);
+        cam = { x: lerp(camFrom.x, camTo.x, q), y: lerp(camFrom.y, camTo.y, q), w: Math.exp(lerp(Math.log(camFrom.w), Math.log(camTo.w), q)) };
+        const vx = cam.x, vy = cam.y, vw = cam.w, vh = (cam.w * WH) / WW;
         const f = await odak().uiTestCapture('editor-frame');
         const bytes = await odak().readFile(dirOf(f), baseOf(f), 0, await odak().fileSize(dirOf(f), baseOf(f)));
         const bmp = await createImageBitmap(new Blob([new Uint8Array(bytes)], { type: 'image/png' }));
-        const k = W2 / bmp.width;
-        ctx.drawImage(bmp, 0, 0, W2, H2);
+        const s = bmp.width / WW, m = OW / vw;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(bmp, vx * s, vy * s, vw * s, vh * s, 0, 0, OW, OH);
+        bmp.close();
+        const px = (pointerAt.x - vx) * m, py = (pointerAt.y - vy) * m;
         if (pressed > 0) {
-          ctx.fillStyle = 'rgba(123,108,255,0.35)'; ctx.beginPath(); ctx.arc(pointerAt.x * k, pointerAt.y * k, 16, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = 'rgba(123,108,255,0.35)'; ctx.beginPath(); ctx.arc(px, py, 13 * m, 0, Math.PI * 2); ctx.fill();
           pressed--;
         }
-        drawCursor(ctx, { x: pointerAt.x * k, y: pointerAt.y * k }, 1.15, 'arrow', { r: 1, g: 1, b: 1, a: 1 });
-        gif.add(ctx.getImageData(0, 0, W2, H2).data);
+        drawCursor(ctx, { x: px, y: py }, 1.7 * m, 'arrow', { r: 1, g: 1, b: 1, a: 1 });
+        if (say) caption(ctx, OW, OH, say, Math.min(1, (frame - saidAt) / 3 + 0.3), true, 0.045);
+        gif.add(ctx.getImageData(0, 0, OW, OH).data);
+        frame++;
       };
       const center = (el: Element | null) => { if (!el) throw new Error('element not found'); el.scrollIntoView({ block: 'nearest' }); const r = el.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; };
       const glide = async (to: { x: number; y: number }, frames: number, onStep?: (pt: { x: number; y: number }) => void) => {
@@ -500,40 +681,104 @@ export async function runDocshots() {
       const pe = (el: Element, type: string, x: number, y: number) =>
         el.dispatchEvent(new PointerEvent(type, { bubbles: true, clientX: x, clientY: y, pointerId: 1, isPrimary: true, button: 0 }));
 
+      const upper = { left: 240, top: 0, width: 1200, height: 750 }; // preview and the whole side panel
+      const lane = (t0: number) => ({ left: xAt(t0) - 300, top: 600, width: 600, height: 300 });
+      const clip0 = () => store().project.clips[0];
       store().update((q) => ({ ...q, style: { ...q.style, backgroundKind: 'theme', backgroundTheme: 'pastel', padding: 0.07 } }));
       store().select(null); key('Escape');
-      // Themes, while the view is wide (between the two zooms); the playhead moves slowly here.
-      clock = 8.1; await player.seek(clock);
-      step = 0.03;
+      clock = 1.5; await player.seek(clock); await sleep(300);
+
+      // 1. The zooms are already there.
+      tell('✦ Every click became a zoom, automatically');
+      await hold(16);
+      // 2. Edit one: a deeper zoom, then a fixed point to zoom into.
+      const zoomEl = $$('.zoom')[0];
+      look(zoomEl.getBoundingClientRect(), 2.2);
+      await glide(center(zoomEl), 10);
+      pressed = 2; store().select({ kind: 'zoom', clipID: clip0().id, zoomID: clip0().zooms[0].id });
+      step = 0; // edited while paused, as you would
       await hold(4);
-      await tap(byText('.theme', t('Topoğrafya')), 6); await hold(5);
-      await tap(byText('.theme', t('Aurora')), 4); await hold(5);
-      await tap(byText('.theme', t('Geometrik')), 4); await hold(4);
-      await tap(byText('.theme', t('Pastel')), 4); await hold(3);
+      tell('🎯 Every zoom is editable');
+      look(upper, 1.2);
+      await tap(byText('.inspector .chips button', '×3'), 9); await hold(10);
+      await tap(byText('.inspector .segmented button', t('Sabit nokta')), 7);
+      while (!$('.focus-picker')) await sleep(30);
+      await sleep(300);
+      const fp = $('.focus-picker')!, fr = fp.getBoundingClientRect(), spot = { x: fr.left + fr.width * 0.7, y: fr.top + fr.height * 0.66 };
+      await glide(spot, 8);
+      pressed = 2; pe(fp, 'pointerdown', spot.x, spot.y); pe(fp, 'pointerup', spot.x, spot.y);
+      await hold(12);
+      await tap(byText('.inspector-back button', t('Genel ayarlara dön')), 7);
+      // 3. The webcam: full frame for a moment, then out of the way.
+      tell('🎥 The webcam gets its own layouts');
+      step = 0.04;
+      const camButton = byText('.timeline-bar button', t('Kamera'))!;
+      look(camButton.getBoundingClientRect(), 1.5);
+      await tap(camButton, 9);
+      look(upper, 1.2); await hold(3);
+      await tap(byText('.inspector .segmented button', t('Tam ekran')), 9); await hold(10);
+      await tap(byText('.inspector .segmented button', t('Balon')), 7);
+      await tap($$('.positions button').find((b) => b.title === t('Sol üst')) ?? null, 6); await hold(9);
+      await tap(byText('.inspector-back button', t('Genel ayarlara dön')), 6);
+      wide(); await hold(8);
+      await save('editing.gif', gif.bytes());
+
+      // Second GIF: the magnifier and themes.
+      restart();
+      // 4. A magnifier where the cursor moves over the chart.
+      clock = 10.6; await player.seek(clock);
+      tell('🔍 A magnifier that follows your cursor');
       step = 1 / fps;
-      // Scissors: cut where you click
-      await tap(byText('.timeline-bar button', t('Makas')), 7);
+      const lensButton = byText('.timeline-bar button', t('Büyüteç'))!;
+      look(lensButton.getBoundingClientRect(), 1.5);
+      await tap(lensButton, 9);
+      look($('.preview')!.getBoundingClientRect(), 1.35);
+      await hold(18);
+      step = 0.02;
+      look(upper, 1.2);
+      await tap(byText('.inspector .chips button', '×3'), 7); await hold(10);
+      await tap(byText('.inspector-back button', t('Genel ayarlara dön')), 6);
+      // 5. Themes, while the view is wide (between two zooms).
+      clock = 9.3; await player.seek(clock);
+      step = 0;
+      tell('🎨 22 themes, one click each');
+      await tap(byText('.theme', t('Topoğrafya')), 8); await hold(5);
+      await tap(byText('.theme', t('Aurora')), 5); await hold(5);
+      await tap(byText('.theme', t('Geometrik')), 5); await hold(5);
+      await tap(byText('.theme', t('Pastel')), 5); await hold(4);
+      wide(); await hold(8);
+      await save('looks.gif', gif.bytes());
+
+      // Third GIF: cutting and speeding up on the timeline, then export.
+      restart();
+      clock = 4.6; await player.seek(clock); step = 1 / fps;
+      tell('✂ Cut where you click');
+      look(lane(5.4), 1.9);
+      await tap(byText('.timeline-bar button', t('Makas')), 8);
       const cutT = 5.4;
-      await glide({ x: xAt(cutT), y: clipY() }, 6, (pt) => pe(inner(), 'pointermove', pt.x, pt.y));
+      await glide({ x: xAt(cutT), y: clipY() }, 7, (pt) => pe(inner(), 'pointermove', pt.x, pt.y));
       await hold(2);
       pressed = 2; pe($('.clip')!, 'pointerdown', xAt(cutT), clipY()); pe(inner(), 'pointerup', xAt(cutT), clipY());
       clock = cutT;
-      await hold(5);
-      // Range: select a slow part and play it four times faster
-      await tap(byText('.timeline-bar button', t('Aralık')), 6);
-      await glide({ x: xAt(6.6), y: clipY() }, 5);
+      await hold(6);
+      tell('⏩ Select a slow part, play it ×4');
+      look(lane(7.5), 1.8);
+      await tap(byText('.timeline-bar button', t('Aralık')), 7);
+      await glide({ x: xAt(6.6), y: clipY() }, 6);
       const clipAt = () => $$('.clip').find((c) => { const r = c.getBoundingClientRect(); return r.left <= pointerAt.x && r.right >= pointerAt.x; }) ?? $('.clip')!;
       pressed = 1; pe(clipAt(), 'pointerdown', pointerAt.x, pointerAt.y);
-      await glide({ x: xAt(8.4), y: clipY() }, 6, (pt) => pe(inner(), 'pointermove', pt.x, pt.y));
+      await glide({ x: xAt(8.4), y: clipY() }, 7, (pt) => pe(inner(), 'pointermove', pt.x, pt.y));
       pe(inner(), 'pointerup', pointerAt.x, pointerAt.y);
       await hold(3);
-      await tap(byText('.range-bar button', '×4'), 5); await hold(5);
-      // Camera: full frame for a moment
-      clock = 2.0; await player.seek(clock);
-      await tap(byText('.timeline-bar button', t('Kamera')), 7); await hold(2);
-      await tap(byText('.inspector .segmented button', t('Tam ekran')), 7); await hold(10);
-      await tap(byText('.inspector-back button', t('Genel ayarlara dön')), 6); await hold(4);
-      await save('editing.gif', gif.bytes());
+      await tap(byText('.range-bar button', '×4'), 6); await hold(8);
+      tell('📤 Export MP4, GIF, vertical 9:16, square 1:1…');
+      wide();
+      await tap(byText('.toolbar button', t('Dışa Aktar')), 10);
+      while (!byText('.modal h2', t('Dışa Aktar'))) await sleep(30);
+      look($('.modal')!.getBoundingClientRect(), 1.35); await hold(14);
+      click(byText('.modal button', t('Kapat')));
+      wide(); await hold(6);
+      await save('cutting.gif', gif.bytes());
     }
   } catch (e) {
     log.push(`FAIL: ${(e as Error).stack ?? e}`);
