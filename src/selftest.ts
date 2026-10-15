@@ -173,6 +173,13 @@ export async function runSelftest() {
     const loaded = await odak().loadProject(pkg);
     check(!!loaded.project && JSON.stringify(normalizeProject(loaded.project)) === JSON.stringify(project), 'project round-trips through project.json');
     const reopened = normalizeProject(loaded.project!);
+    // Autosaves can overlap (on a slow disk the next one starts before the last has finished):
+    // every save must succeed and the last one must win.
+    const saves = await Promise.allSettled(Array.from({ length: 20 }, (_, k) => odak().saveProject(pkg, { ...project, name: `SelfTest ${k}` })));
+    const lastSaved = await odak().loadProject(pkg);
+    const failedSaves = saves.filter((r) => r.status === 'rejected').length;
+    check(!failedSaves && lastSaved.project?.name === 'SelfTest 19', `20 overlapping saves all succeed and the last one wins (${failedSaves} failed, saved “${lastSaved.project?.name}”)`);
+    await odak().saveProject(pkg, project);
 
     // 3. Export.
     const lib = new MediaLibrary(pkg);

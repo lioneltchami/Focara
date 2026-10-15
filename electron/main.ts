@@ -78,10 +78,29 @@ async function createPackage(name: string): Promise<string> {
   return pkg;
 }
 
+/**
+ * Writes through a temporary file and a rename, so a crash never leaves a half-written file.
+ * Writes to the same file run one after another (autosaves can overlap on a slow disk), each with
+ * its own temporary name; on Windows a rename that a virus scanner or indexer briefly blocks is retried.
+ */
+const writeQueues = new Map<string, Promise<void>>();
+let tmpSeq = 0;
 async function writeAtomic(file: string, data: string | Uint8Array) {
-  const tmp = `${file}.${process.pid}.tmp`;
-  await fsp.writeFile(tmp, data);
-  await fsp.rename(tmp, file);
+  const run = async () => {
+    const tmp = `${file}.${process.pid}.${++tmpSeq}.tmp`;
+    await fsp.writeFile(tmp, data);
+    for (let attempt = 0; ; attempt++) {
+      try { await fsp.rename(tmp, file); return; } catch (e) {
+        const code = (e as NodeJS.ErrnoException).code;
+        if (attempt < 5 && (code === 'EPERM' || code === 'EBUSY' || code === 'EACCES')) { await new Promise((r) => setTimeout(r, 30 * (attempt + 1))); continue; }
+        await fsp.rm(tmp, { force: true });
+        throw e;
+      }
+    }
+  };
+  const next = (writeQueues.get(file) ?? Promise.resolve()).catch(() => {}).then(run);
+  writeQueues.set(file, next);
+  try { await next; } finally { if (writeQueues.get(file) === next) writeQueues.delete(file); }
 }
 
 const readHandles = new Map<string, Promise<fsp.FileHandle>>();
