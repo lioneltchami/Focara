@@ -109,7 +109,10 @@ function balloon(ctx: Ctx, x: number, y: number, r: number, color: string) {
 
 /** Fine film grain from a small noise tile (deterministic). */
 function grain(ctx: Ctx, w: number, h: number, alpha: number, seed = 5) {
-  const size = 192, tile = new OffscreenCanvas(size, size), t = tile.getContext('2d')!;
+  // The tile lives where the canvas it fills does (thumbnails are drawn on the CPU): a thumbnail
+  // filled from a GPU tile waits for the GPU to hand the pixels back, and a full-size background
+  // filled from a CPU tile made the first frames of playback late.
+  const size = 192, tile = new OffscreenCanvas(size, size), t = tile.getContext('2d', { willReadFrequently: onCpu.has(ctx) })!;
   const img = t.createImageData(size, size), r = rng(seed);
   for (let i = 0; i < img.data.length; i += 4) {
     const v = r() < 0.5 ? 0 : 255;
@@ -669,10 +672,14 @@ export const themesOf = (group: ThemeGroup) => themes.filter((t) => t.group === 
 
 const cache = new Map<string, OffscreenCanvas>();
 const thumbs = new Map<string, OffscreenCanvas>();
+/** Contexts of thumbnails, which are drawn on the CPU (see themeCanvas). */
+const onCpu = new WeakSet<Ctx>();
 
 /**
  * The theme rendered at a given size (cached: themes are static). Small thumbnails are kept in
- * their own cache, so opening the theme list never pushes out the full-size background.
+ * their own cache, so opening the theme list never pushes out the full-size background. They are
+ * drawn on the CPU (quick at that size): on the GPU every theme's kinds of drawing need pipelines
+ * of their own, which on a first launch keeps the GPU from showing anything for a moment.
  */
 export function themeCanvas(id: string, w: number, h: number): OffscreenCanvas {
   const key = `${id}|${w}x${h}`;
@@ -680,7 +687,8 @@ export function themeCanvas(id: string, w: number, h: number): OffscreenCanvas {
   let c = store.get(key);
   if (!c) {
     c = new OffscreenCanvas(w, h);
-    const ctx = c.getContext('2d')!;
+    const ctx = c.getContext('2d', { willReadFrequently: store === thumbs })!;
+    if (store === thumbs) onCpu.add(ctx);
     (themes.find((t) => t.id === id) ?? themes[0]).draw(ctx, w, h);
     if (store === cache && cache.size >= 4) cache.delete(cache.keys().next().value!);
     store.set(key, c);

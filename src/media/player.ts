@@ -1,6 +1,6 @@
 import type { VideoSample, VideoSampleSink } from 'mediabunny';
 import { type ExportSettings, type Project, type Size, assetOf, canvasSize, clipDuration, clipStarts, locate, projectDuration } from '../core/model.ts';
-import { type ClipRenderData, drawFrame } from '../render/renderer.ts';
+import { type ClipRenderData, drawFrame, frameKind } from '../render/renderer.ts';
 import { type MediaLibrary, frameTime } from './media.ts';
 import { odak } from '../bridge.ts';
 
@@ -58,6 +58,9 @@ export class PlaybackStats {
   }
 }
 
+/** Frame kinds drawn once already: the GPU keeps their pipelines while the app runs (see frameKind). */
+const warmKinds = new Set<string>();
+
 /**
  * Preview playback. The Web Audio clock is the master clock: audio buffers of every source are
  * scheduled on it, and video frames are drawn for the time it reports.
@@ -77,6 +80,10 @@ export class Player {
   private lastError = 0;
   /** Set by the performance test only. */
   stats: PlaybackStats | null = null;
+  /** The last GPU warm-up: frame kinds it drew and how long it took (for the performance test). */
+  warmUpInfo: { drawn: number; ms: number } | null = null;
+  private warmGen = 0;
+  private warmPending: (() => void) | null = null;
   private nodes: AudioScheduledSourceNode[] = [];
   private clockStart = 0;
   private timeStart = 0;
@@ -165,8 +172,84 @@ export class Player {
     ]);
     if (this.playing) { sample?.close(); camSample?.close(); return; }
     renderSample(this.ctx, this.size, sample, this.data[loc.index], loc.sourceTime, camSample);
+    if (sample) this.scheduleWarmUp(p, loc.index, loc.sourceTime, sample, camSample);
     sample?.close(); camSample?.close();
     if (this.stats) { this.stats.stills++; this.stats.drawMs.push(performance.now() - began); }
+  }
+
+  /**
+   * Once the paused preview has rested for a moment, draws one frame of every kind the project
+   * needs (see frameKind) into a hidden canvas, so playback never waits for the GPU to build a
+   * pipeline. The frame on screen stands in for the others (only its format and size matter);
+   * clips of other recordings are covered when the preview rests in one of them.
+   */
+  private scheduleWarmUp(p: Project, index: number, sourceTime: number, screen: VideoSample, camera: VideoSample | null) {
+    this.cancelWarmUp();
+    const gen = this.warmGen, s = screen.clone(), c = camera?.clone() ?? null;
+    const release = () => { s.close(); c?.close(); };
+    const timer = setTimeout(() => {
+      this.warmPending = null;
+      void this.warmUp(gen, p, index, sourceTime, s, c)
+        .catch((e) => odak().log('gpu warm-up failed', { error: String((e as Error)?.message ?? e) })).finally(release);
+    }, 300);
+    this.warmPending = () => { clearTimeout(timer); release(); };
+  }
+
+  private cancelWarmUp() {
+    this.warmGen++;
+    this.warmPending?.();
+    this.warmPending = null;
+  }
+
+  private async warmUp(gen: number, p: Project, index: number, sourceTime: number, screen: VideoSample, camera: VideoSample | null) {
+    const began = performance.now();
+    const live = () => gen === this.warmGen && !this.playing && this.project === p;
+    const breathe = () => new Promise((r) => setTimeout(r, 0));
+    if (!live()) return;
+    const size = this.size, data = this.data, media = p.clips[index].mediaID;
+    const src = { width: screen.displayWidth, height: screen.displayHeight };
+    const cam = camera && { width: camera.displayWidth, height: camera.displayHeight };
+    // Pixel formats and canvas sizes get pipelines of their own.
+    const base = `${size.width}x${size.height} ${screen.format} ${camera?.format ?? '-'} `;
+    // This recording's frames as often as the display shows them, one of each kind.
+    const todo = new Map<string, { index: number; sourceTime: number }>();
+    const duration = projectDuration(p), step = Math.max(1 / 120, duration / 100000);
+    let slice = performance.now();
+    for (let t = 0; t < duration; t += step) {
+      const loc = locate(p, t);
+      if (!loc || p.clips[loc.index].mediaID !== media) continue;
+      const kind = base + frameKind(size, src, data[loc.index], loc.sourceTime, cam);
+      if (!warmKinds.has(kind) && !todo.has(kind)) todo.set(kind, loc);
+      if (performance.now() - slice > 4) { await breathe(); if (!live()) return; slice = performance.now(); }
+    }
+    let n = 0;
+    if (todo.size) {
+      const canvas = document.createElement('canvas');
+      canvas.width = size.width; canvas.height = size.height;
+      const ctx = canvas.getContext('2d', { alpha: false })!;
+      const nextPaint = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+      let sent: Promise<void>[] = [];
+      for (const [kind, loc] of todo) {
+        if (!live()) break;
+        renderSample(ctx, size, screen, data[loc.index], loc.sourceTime, camera);
+        // Sent to the GPU frame by frame, like playback does: how the GPU splits a batch of drawing
+        // into passes (and so which pipelines it needs) depends on what else is in the batch.
+        sent.push(createImageBitmap(canvas).then((b) => b.close()));
+        warmKinds.add(kind);
+        // A few frames at a time, then wait for the GPU to catch up: building pipelines can keep it
+        // busy for a while, and playback must not start behind a queue of them. Animation frames
+        // don't wait for a canvas that isn't shown, so the frame on screen is drawn again (the same
+        // picture): showing it waits for everything sent before, and so do the next paints.
+        if (++n % 8 === 0 || n === todo.size) {
+          await Promise.all(sent); sent = [];
+          if (!live()) break;
+          renderSample(this.ctx, size, screen, data[index], sourceTime, camera);
+          await nextPaint();
+        }
+      }
+      canvas.width = canvas.height = 0;
+    }
+    if (live()) this.warmUpInfo = { drawn: n, ms: performance.now() - began };
   }
 
   async seek(t: number) {
@@ -188,6 +271,7 @@ export class Player {
     if (this.currentTime >= this.duration - 0.05) this.currentTime = 0;
     this.audio ??= new AudioContext({ sampleRate: 48000, latencyHint: 'interactive' });
     void this.audio.resume();
+    this.cancelWarmUp();
     const gen = ++this.gen;
     this.playing = true; this.onPlaying(true);
     this.timeStart = this.currentTime;
@@ -337,6 +421,7 @@ export class Player {
   }
 
   destroy() {
+    this.cancelWarmUp();
     this.stopPlayback();
     void this.audio?.close();
   }

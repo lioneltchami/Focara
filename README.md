@@ -345,7 +345,7 @@ Results on an Apple M4 Pro with a 120 Hz display (packaged app):
 | Export 1080p60 | ~3× faster than real time; the interface stays smooth |
 | Choosing a theme | drawn once at 1080p in ~3–60 ms, then reused for every frame |
 
-How: the decoders for the next clip are opened before playback reaches a cut; scrubbing shows the nearest key frame first; macOS recordings get a key frame at least every second (even when the screen is still).
+How: the decoders for the next clip are opened before playback reaches a cut; while the editor is idle, every kind of frame the project will show is drawn once off screen, so the GPU never stops mid-playback to prepare a new kind of drawing (the cursor and the theme thumbnails are drawn on the CPU, and only the time and the play button are redrawn while playing, so this holds even on a first launch, before the GPU has cached anything); scrubbing shows the nearest key frame first; macOS recordings get a key frame at least every second (even when the screen is still).
 
 Windows performance has not been measured on real hardware yet; the CI workflow runs the same test on Windows (report only, CI machines have no GPU).
 

@@ -11,7 +11,7 @@ import { MediaLibrary } from '../media/media.ts';
 import { Player } from '../media/player.ts';
 import type { SideDevices } from '../media/sideRecorder.ts';
 import { ExportDialog } from './ExportDialog.tsx';
-import { Inspector } from './Inspector.tsx';
+import { Inspector, holdThumbs } from './Inspector.tsx';
 import { QuietDialog } from './QuietDialog.tsx';
 import { RecordSetup } from './RecordSetup.tsx';
 import { type EditorStore, saveStatusText, useStore } from './store.ts';
@@ -64,7 +64,7 @@ export function Editor({ store, onClose, busy, onRecordInto, onSettings }: {
   };
 
   useEffect(() => {
-    const pl = new Player(canvasRef.current!, lib, setTime, setPlaying);
+    const pl = new Player(canvasRef.current!, lib, setTime, (p) => { holdThumbs(p); setPlaying(p); });
     setPlayer(pl);
     return () => { pl.destroy(); lib.dispose(); };
   }, [lib]);
@@ -272,7 +272,7 @@ export function Editor({ store, onClose, busy, onRecordInto, onSettings }: {
             <button className="ghost" onClick={() => step(-1)} title={t('Bir kare geri (←, Shift+← 10 kare)')}>⏮</button>
             <button className="ghost play" onClick={() => player?.toggle()} title={t('Oynat / Duraklat (boşluk)')}>{playing ? '❚❚' : '▶'}</button>
             <button className="ghost" onClick={() => step(1)} title={t('Bir kare ileri (→)')}>⏭</button>
-            <span className="mono muted">{timecode(time)} / {timecode(duration)}</span>
+            <span className="mono muted time">{timecode(time)} / {timecode(duration)}</span>
           </div>
         </div>
         <Inspector store={store} lib={lib} seek={seek} onDelete={deleteSelected} actions={actions} />
@@ -573,7 +573,8 @@ function Timeline({ store, lib, time, playing, seek, scrubTo, range, setRange, t
           {tool === 'blade' && bladeAt !== null && (
             <div className={`blade-line ${bladeAt === time ? 'snapped' : ''}`} style={{ left: xOf(bladeAt) }}><span>✂ {timecode(bladeAt)}</span></div>
           )}
-          <div className={`playhead ${scrubbing ? 'dragging' : ''}`} style={{ left: xOf(time) }}>
+          {/* Moved by a transform (its own layer): playing never repaints the timeline under it. */}
+          <div className={`playhead ${scrubbing ? 'dragging' : ''}`} style={{ transform: `translateX(${xOf(time)}px)` }}>
             <div className="playhead-knob" onPointerDown={scrub} title={t('Tut ve sürükle: videoda ileri-geri git')} />
             {tool === 'select' && <div className="playhead-grip" onPointerDown={scrub} />}
             {scrubbing && <span className="playhead-time">{timecode(time)}</span>}

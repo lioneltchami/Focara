@@ -130,7 +130,7 @@ export function drawFrame(ctx: Ctx, canvas: Size, source: DrawSource | null, src
         g.addColorStop(0, css(style.cursorColor, 0.42)); g.addColorStop(0.7, css(style.cursorColor, 0.22)); g.addColorStop(1, css(style.cursorColor, 0));
         ctx.fillStyle = g; ctx.beginPath(); ctx.arc(at.x, at.y, rad, 0, Math.PI * 2); ctx.fill();
       }
-      drawCursor(ctx, at, pointScale, style.cursorStyle, style.cursorColor);
+      drawCursorImage(ctx, at, pointScale, style.cursorStyle, style.cursorColor);
       ctx.restore();
     }
   }
@@ -190,6 +190,39 @@ export function drawCursor(ctx: Ctx, tip: { x: number; y: number }, scale: numbe
   ctx.lineWidth = 1.3;
   ctx.strokeStyle = stroke;
   ctx.stroke();
+  ctx.restore();
+}
+
+const cursorImage: { key: string; canvas: OffscreenCanvas | null } = { key: '', canvas: null };
+
+/**
+ * The cursor art for a frame: drawn on the CPU at its exact size and sub-pixel position, then copied
+ * in pixel for pixel. Drawn directly, the GPU blurs the arrow's shadow in textures sized to fit, and
+ * in the odd frame where one fits exactly it needs a pipeline of its own, which it then builds in
+ * the middle of playback. A copied image always draws the same way.
+ */
+function drawCursorImage(ctx: Ctx, tip: { x: number; y: number }, scale: number, style: CursorStyle, color: RGBA) {
+  // Room for the art and its shadow: the arrow reaches 17 points right of the tip and 25 below,
+  // the dot 12 around it.
+  const left = Math.ceil(12 * scale) + 2, top = left;
+  const width = left + Math.ceil(17 * scale) + 2, height = top + Math.ceil(25 * scale) + 2;
+  const x = Math.floor(tip.x) - left, y = Math.floor(tip.y) - top;
+  const probe: unknown = ctx;
+  if (probe instanceof KindProbe) { probe.copy('cursor', x, y, width, height); return; }
+  const fx = tip.x - Math.floor(tip.x), fy = tip.y - Math.floor(tip.y);
+  const key = `${style} ${css(color)} ${scale} ${fx} ${fy}`;
+  if (cursorImage.key !== key || !cursorImage.canvas) {
+    const c = cursorImage.canvas ??= new OffscreenCanvas(width, height);
+    if (c.width !== width || c.height !== height) { c.width = width; c.height = height; }
+    const g = c.getContext('2d', { willReadFrequently: true })!;
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    g.clearRect(0, 0, width, height);
+    drawCursor(g, { x: left + fx, y: top + fy }, scale, style, color);
+    cursorImage.key = key;
+  }
+  ctx.save();
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(cursorImage.canvas, x, y);
   ctx.restore();
 }
 
@@ -267,4 +300,117 @@ function drawCamera(ctx: Ctx, canvas: Size, cam: Overlay, style: StyleSettings, 
     ctx.restore();
   }
   ctx.restore();
+}
+
+/**
+ * What a frame is drawn with — shapes, paints, blur sizes, image scaling, opacity, clips — but not
+ * where. Chromium's GPU canvas builds a pipeline the first time it meets a new kind of drawing, and
+ * the window presents nothing until it's ready: well under a millisecond normally, 100–350 ms when
+ * the machine is busy or the system's shader cache is cold. Frames of the same kind need the same
+ * pipelines, so the player draws one frame of each kind before playback needs it.
+ */
+export function frameKind(canvas: Size, srcSize: Size, data: ClipRenderData, t: number, camera: Size | null): string {
+  const probe = new KindProbe(canvas);
+  drawFrame(probe as unknown as Ctx, canvas, probe.image('screen', srcSize), srcSize, data, t,
+    camera ? { draw: probe.image('camera', camera), size: camera } : null);
+  return probe.kinds.join(' ');
+}
+
+/** A piece of a path in canvas pixels (bounds, and a rounded rect's corner radius). */
+interface Piece { kind: string; x0: number; y0: number; x1: number; y1: number; r: number }
+
+/** Stands in for a 2D context and writes down the kind of each drawing (see frameKind). */
+class KindProbe {
+  readonly kinds: string[] = [];
+  private shape: Piece[] = [];
+  // drawFrame only translates, scales and mirrors, so a, d, e, f is all of its transform.
+  private s = { a: 1, d: 1, e: 0, f: 0, alpha: 1, blur: 0, offset: 0, shadow: false, fill: 'color', stroke: 'color', line: 1, clip: '' };
+  private stack: (typeof this.s)[] = [];
+  private canvas: Size;
+  constructor(canvas: Size) { this.canvas = canvas; }
+
+  save() { this.stack.push({ ...this.s }); }
+  restore() { this.s = this.stack.pop() ?? this.s; }
+  setTransform(a: number, _b: number, _c: number, d: number, e: number, f: number) { Object.assign(this.s, { a, d, e, f }); }
+  translate(x: number, y: number) { this.s.e += this.s.a * x; this.s.f += this.s.d * y; }
+  scale(x: number, y: number) { this.s.a *= x; this.s.d *= y; }
+  set globalAlpha(a: number) { this.s.alpha = a; }
+  set shadowBlur(b: number) { this.s.blur = b; }
+  set shadowOffsetY(o: number) { this.s.offset = o; }
+  set shadowColor(c: string) { this.s.shadow = c !== 'transparent' && !/,\s*0(\.0*)?\)$/.test(c); }
+  set fillStyle(p: string | { kind: string }) { this.s.fill = typeof p === 'string' ? 'color' : p.kind; }
+  set strokeStyle(p: string | { kind: string }) { this.s.stroke = typeof p === 'string' ? 'color' : p.kind; }
+  set lineWidth(w: number) { this.s.line = w; }
+  set lineJoin(_: string) {}
+  set imageSmoothingEnabled(_: boolean) {}
+  set imageSmoothingQuality(_: string) {}
+  createLinearGradient() { return { kind: 'linear', addColorStop() {} }; }
+  createRadialGradient() { return { kind: 'radial', addColorStop() {} }; }
+
+  beginPath() { this.shape = []; }
+  roundRect(x: number, y: number, w: number, h: number, r: number) { this.shape.push(this.piece(r > 0 ? 'rrect' : 'rect', x, y, x + w, y + h, Math.min(r, w / 2, h / 2))); }
+  arc(x: number, y: number, r: number) { this.shape.push(this.piece('arc', x - r, y - r, x + r, y + r, 0)); }
+  moveTo(x: number, y: number) { this.shape.push(this.piece('path', x, y, x, y, 0)); }
+  lineTo(x: number, y: number) {
+    const last = this.shape[this.shape.length - 1], p = this.piece('', x, y, x, y, 0);
+    if (last) Object.assign(last, { x0: Math.min(last.x0, p.x0), y0: Math.min(last.y0, p.y0), x1: Math.max(last.x1, p.x1), y1: Math.max(last.y1, p.y1) });
+  }
+  closePath() {}
+  clip() { this.s.clip += `[${this.describe(0)}]`; }
+  fill() { this.add(`fill(${this.describe(this.spread())})`, this.s.fill); }
+  stroke() {
+    const hairline = Math.abs(this.s.line * this.s.a) < 1 ? ' hairline' : '';
+    this.add(`stroke(${this.describe(this.spread() + Math.abs(this.s.line * this.s.a) / 2)}${hairline})`, this.s.stroke);
+  }
+  fillRect(x: number, y: number, w: number, h: number) { this.add(`fill(${this.where(this.piece('rect', x, y, x + w, y + h, 0), this.spread())})`, this.s.fill); }
+  drawImage() { this.add('background', ''); }
+  /** Stands in for copying an image made on the CPU (the cursor) in at whole pixels. */
+  copy(name: string, x: number, y: number, w: number, h: number) { this.add(`${name}(${this.where(this.piece('', x, y, x + w, y + h, 0), 0)})`, ''); }
+  /** Stands in for drawing a video frame: scaled up or down, and where. */
+  image(name: string, size: Size): DrawSource {
+    return (_c, x, y, w, h) => {
+      const p = this.piece('', x, y, x + w, y + h, 0);
+      this.add(`${name}(${p.x1 - p.x0 > size.width ? 'up' : 'down'} ${this.where(p, 0)})`, '');
+    };
+  }
+
+  private piece(kind: string, x0: number, y0: number, x1: number, y1: number, r: number): Piece {
+    const { a, d, e, f } = this.s;
+    const X = [a * x0 + e, a * x1 + e], Y = [d * y0 + f, d * y1 + f];
+    return { kind, x0: Math.min(...X), x1: Math.max(...X), y0: Math.min(...Y), y1: Math.max(...Y), r: r * Math.abs(a) };
+  }
+
+  /** How far a shadow reaches past the shape. */
+  private spread() { const s = this.s; return s.shadow && s.blur > 0 ? s.blur * 1.5 + Math.abs(s.offset) : 0; }
+
+  private describe(spread: number) { return this.shape.map((p) => `${p.kind} ${this.where(p, spread)}`).join('+'); }
+
+  /**
+   * Where a piece lies: covering the canvas, inside it or crossing its edges; whether the edges
+   * that show fall between pixels (anti-aliased) and rounded corners show; and, when it is blurred
+   * or masked, its size class (masks are drawn into textures of a few sizes).
+   */
+  private where(p: Piece, spread: number) {
+    const { width: W, height: H } = this.canvas;
+    const x0 = p.x0 - spread, y0 = p.y0 - spread, x1 = p.x1 + spread, y1 = p.y1 + spread, r = p.r;
+    const size = this.spread() > 0 || p.kind === 'rrect' ? ` ${Math.round(Math.log2(Math.max(1, x1 - x0, y1 - y0)) * 2)}` : '';
+    // A canvas corner is covered unless it falls in the rounded-off part of a corner.
+    const covered = (px: number, py: number) =>
+      Math.hypot(px - Math.min(Math.max(px, x0 + r), x1 - r), py - Math.min(Math.max(py, y0 + r), y1 - r)) <= r;
+    if (x0 <= 0 && y0 <= 0 && x1 >= W && y1 >= H && covered(0, 0) && covered(W, 0) && covered(0, H) && covered(W, H)) return 'covers' + size;
+    const showsBetween = (v: number, end: number) => v > 0 && v < end && Math.abs(v - Math.round(v)) > 1e-3;
+    const aa = showsBetween(x0, W) || showsBetween(x1, W) || showsBetween(y0, H) || showsBetween(y1, H) ? ' aa' : '';
+    const corners = r > 0 && [[x0, y0], [x1 - r, y0], [x0, y1 - r], [x1 - r, y1 - r]].some(([cx, cy]) => cx < W && cx + r > 0 && cy < H && cy + r > 0) ? ' corners' : '';
+    return (x0 >= 0 && y0 >= 0 && x1 <= W && y1 <= H ? 'inside' : 'crosses') + aa + corners + size;
+  }
+
+  private add(op: string, paint: string) {
+    const s = this.s;
+    // Shadows are blurred with kernels of radius 3σ (σ = blur / 2), larger ones at a reduced scale:
+    // a kind per scale and radius.
+    let sigma = s.blur / 2, scale = 0;
+    while (sigma > 4) { sigma /= 2; scale++; }
+    const blur = s.shadow && s.blur > 0 ? ` blur${scale}:${Math.ceil(3 * sigma - 1e-9)}` : '';
+    this.kinds.push(`${op}${paint && ' ' + paint}${s.alpha < 1 ? ' translucent' : ''}${blur}${s.clip && ' clip' + s.clip}`);
+  }
 }

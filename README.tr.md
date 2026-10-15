@@ -202,8 +202,10 @@ Selftest ayrıca her dışa aktarma biçimini gerçekten üretip açar: boyut, s
 | Zaman çizelgesi yakınlaştırma/kaydırma | takılma yok |
 | 1080p60 dışa aktarma | gerçek zamanın ~3 katı hızında, bu sırada arayüz akıcı |
 
-Bunu sağlayan üç şey:
+Bunu sağlayan beş şey:
 - Oynatma bir kesime yaklaşınca sonraki klibin çözücüsü önceden açılır; kesim anında beklenmez.
+- Editör boştayken projede görünecek her kare türü bir kez ekran dışında çizilir. Böylece ekran kartı, oynatma sırasında yeni bir çizim türünü hazırlamak için durmaz.
+- İmleç ve tema önizlemeleri işlemcide çizilir; oynatırken yalnızca süre ve oynat düğmesi yeniden çizilir. Böylece ekran kartı henüz hiçbir şeyi önbelleğe almamışken, yani ilk açılışta bile oynatma takılmadan başlar.
 - Sürüklerken her konum için en yakın anahtar kare gösterilir (bir kare çözmek yeter), durunca tam kare gelir.
 - macOS kayıtlarında en az saniyede bir anahtar kare vardır. Ekran durgunken kareler seyrek geldiği için bu ayrıca zamana göre sınırlanır.
 

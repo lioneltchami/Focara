@@ -483,14 +483,28 @@ function StyleInspector({ store, lib }: { store: EditorStore; lib: MediaLibrary 
   );
 }
 
-// Theme thumbnails are drawn one per animation frame, so opening the list never blocks the UI.
+// Theme thumbnails are drawn one per animation frame, so opening the list never blocks the UI, and
+// none while the preview plays (see holdThumbs).
 const thumbQueue: (() => void)[] = [];
+let thumbsHeld = false, thumbsRunning = false;
+function pumpThumbs() {
+  if (thumbsRunning || thumbsHeld || !thumbQueue.length) return;
+  thumbsRunning = true;
+  const next = () => {
+    if (thumbsHeld) { thumbsRunning = false; return; }
+    thumbQueue.shift()?.();
+    if (thumbQueue.length) requestAnimationFrame(next); else thumbsRunning = false;
+  };
+  requestAnimationFrame(next);
+}
 function queueThumb(job: () => void) {
   thumbQueue.push(job);
-  if (thumbQueue.length === 1) {
-    const next = () => { thumbQueue.shift()?.(); if (thumbQueue.length) requestAnimationFrame(next); };
-    requestAnimationFrame(next);
-  }
+  pumpThumbs();
+}
+/** Holds back the thumbnails still to draw while the preview plays, so they never take its frames. */
+export function holdThumbs(hold: boolean) {
+  thumbsHeld = hold;
+  pumpThumbs();
 }
 
 function ThemeThumb({ id }: { id: string }) {
@@ -500,9 +514,10 @@ function ThemeThumb({ id }: { id: string }) {
     queueThumb(() => {
       const c = ref.current;
       if (!alive || !c) return;
-      // Drawn at twice the shown size so fine lines (blueprint, contours) stay visible.
+      // Drawn at twice the shown size so fine lines (blueprint, contours) stay visible. On the CPU,
+      // like the theme itself (see themeCanvas): the GPU doesn't build pipelines for them.
       c.width = 320; c.height = 180;
-      c.getContext('2d')!.drawImage(themeCanvas(id, 320, 180), 0, 0);
+      c.getContext('2d', { willReadFrequently: true })!.drawImage(themeCanvas(id, 320, 180), 0, 0);
     });
     return () => { alive = false; };
   }, [id]);

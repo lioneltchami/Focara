@@ -174,6 +174,11 @@ export async function runPerfTest() {
     const openMs = performance.now() - t;
     check(openMs < 2500, `open project → first frame: ${ms(openMs)}`);
     await sleep(1500); // waveforms etc. settle
+    // Meanwhile the player has prepared the GPU for playback (see Player.warmUp); on a busy machine
+    // or with cold shader caches that can take longer.
+    for (let k = 0; k < 200 && !player().warmUpInfo; k++) await sleep(50);
+    const warm = player().warmUpInfo;
+    log.push(`GPU warm-up before playback: ${warm ? `${warm.drawn} kinds of frame drawn in ${ms(warm.ms)}` : 'not finished after 10 s'}`);
 
     const mon = new FrameMonitor();
     // Input the test didn't make (someone using the machine meanwhile) and focus/visibility changes
