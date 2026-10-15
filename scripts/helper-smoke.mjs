@@ -4,7 +4,7 @@ import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { ALL_FORMATS, FilePathSource, Input } from 'mediabunny';
+import { ALL_FORMATS, EncodedPacketSink, FilePathSource, Input } from 'mediabunny';
 
 const exe = process.platform === 'win32' ? 'native/win/target/release/odak-capture.exe' : 'native/mac/build/odak-capture';
 if (process.platform === 'darwin') {
@@ -59,7 +59,12 @@ const vdur = await vt.computeDuration();
 check(fin.duration > 2.5 && fin.duration < 6, `recording length ${fin.duration.toFixed(2)}s`);
 check(vt && (await vt.getCodecParameterString())?.startsWith('avc') || fin.width > 4096, `video codec ${await vt.getCodecParameterString()}`);
 check(vt.displayWidth === fin.width && vt.displayHeight === fin.height, `video ${vt.displayWidth}×${vt.displayHeight}`);
-check(vdur > 0 && vdur <= fin.duration + 0.1, `video track ${vdur.toFixed(2)}s (≤ recording)`);
+// Every frame lies inside the recording. (On a still screen the last frame is shown until the
+// end; macOS ends the video exactly there, the Windows encoder may give that frame a longer duration.)
+const lastPacket = await new EncodedPacketSink(vt).getPacket(Infinity);
+check(!!lastPacket && lastPacket.timestamp <= fin.duration + 0.05, `last frame at ${lastPacket?.timestamp.toFixed(2)}s (≤ recording ${fin.duration.toFixed(2)}s)`);
+if (process.platform === 'darwin') check(Math.abs(vdur - fin.duration) < 0.1, `video ends with the recording (${vdur.toFixed(2)}s)`);
+else console.log(`NOTE: video track ${vdur.toFixed(2)}s`);
 const cursor = JSON.parse(fs.readFileSync(path.join(out, fin.cursor), 'utf8'));
 check(Array.isArray(cursor.samples) && cursor.samples.length > 0 && Array.isArray(cursor.clicks), `cursor.json has ${cursor.samples.length} samples`);
 if (fin.systemAudio) {

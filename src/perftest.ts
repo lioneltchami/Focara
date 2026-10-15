@@ -14,6 +14,7 @@ import { exportProject } from './media/exporter.ts';
 import { MediaLibrary } from './media/media.ts';
 import { PlaybackStats, type Player } from './media/player.ts';
 import type { EditorStore } from './ui/store.ts';
+import { themeCanvas, themes } from './render/themes.ts';
 
 const W = 2560, H = 1600, FPS = 60, SECONDS = 40;
 const log: string[] = [];
@@ -267,6 +268,16 @@ export async function runPerfTest() {
     const exUi = mon.stop();
     check(10 / exportSecs >= 1, `export 1080p60: ${(10 / exportSecs).toFixed(2)}× real time (10 s in ${exportSecs.toFixed(1)} s)`);
     check(exUi.max <= 250, `export UI: ${describe(exUi)}`);
+
+    // ---- 9. Backgrounds: drawing each theme once at 1080p (later frames reuse it).
+    // (an odd size so nothing is cached; reading a pixel makes the GPU actually finish drawing)
+    const themeTimes = themes.map((th) => {
+      const s0 = performance.now();
+      themeCanvas(th.id, 1921, 1080).getContext('2d')!.getImageData(0, 0, 1, 1);
+      return [th.id, performance.now() - s0] as const;
+    });
+    const slowest = themeTimes.reduce((a, b) => (b[1] > a[1] ? b : a));
+    check(slowest[1] <= 150, `themes at 1080p: slowest ${slowest[0]} ${ms(slowest[1])}, all ${themeTimes.length} in ${ms(themeTimes.reduce((s0, x) => s0 + x[1], 0))}`);
 
     const heap1 = heap();
     log.push(`JS heap: ${heap0.toFixed(0)} → ${heap1.toFixed(0)} MB`);

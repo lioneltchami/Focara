@@ -11,7 +11,12 @@ Ekran kaydı, otomatik zoom ve zoom'ları elle düzenleme. **macOS ve Windows'ta
 - Önizleme ile dışa aktarılan dosya aynı çizim koduyla üretilir. Görüntü, zamanlama ve ses senkronu aynıdır.
 - **Kamera:** Ekranla aynı anda kaydedilir. Videoda daire, yuvarlak köşe ya da kare balon olarak görünür; 9 konumdan birine yerleşir, boyutu, ayna görüntüsü ve çerçevesi ayarlanabilir. **Kamera bölümleri** ile videonun istediğin kısmında kamera başka yere kayar, tam ekran olur ya da gizlenir.
 - **Ses:** Sistem sesi ve mikrofon ayrı dosyalara kaydedilir, ses düzeyleri ayrı ayarlanır. Kamera ve mikrofon listeden seçilir (örneğin harici USB mikrofon), gürültü azaltma isteğe bağlıdır.
-- **Arka plan:** Hazır renk geçişleri, temalar ya da bilgisayarından seçtiğin bir görsel (bulanıklaştırılabilir). Temalar: Eğlenceli, Yılbaşı, Sonbahar, Kutlama, Bahar, Uzay, Okyanus, Sade açık, Sade koyu. Hepsi kod ile çizilir, dışarıdan görsel kullanılmaz.
+- **Arka plan:** Hazır renk geçişleri, temalar ya da bilgisayarından seçtiğin bir görsel (bulanıklaştırılabilir). 22 tema, iki grupta:
+  - **Profesyonel** (ürün tanıtımı, eğitim, iş videoları): Sade açık, Sade koyu, Kurumsal, Grafit, Mermer, Teknik çizim, Aurora, Pastel, Topoğrafya, Kağıt, Siyah & Altın, Ofis ışıkları, Finans, Cam, Geometrik.
+  - **Eğlenceli & mevsimsel:** Eğlenceli, Yılbaşı, Sonbahar, Kutlama, Bahar, Uzay, Okyanus.
+  - Hepsi kod ile çizilir, dışarıdan görsel kullanılmaz; her çözünürlükte keskin, önizlemede ve dışa aktarmada aynıdır.
+
+  ![Profesyonel temalar](docs/images/themes-business.png)
 - **İmleç:** Beyaz ok, siyah ok, renkli ok ya da nokta. Renk, boyut, vurgu halkası, hareketsizken gizleme, hareket yumuşatma ve tıklama efekti (halka ya da dolgu) ayarlanabilir.
 - Projeler `.odak` klasörlerinde saklanır: ham medya, imleç verisi ve düzenlemeler. Uygulamayı kapatıp açınca kaldığın yerden devam edersin.
 

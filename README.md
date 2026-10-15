@@ -37,7 +37,7 @@ Free, runs on **macOS and Windows**, works completely offline.
 - 🎥 **Webcam with timed layouts.** Record your camera together with the screen. Show it as a circle, rounded or square bubble — and for any part of the video choose a different layout: **move it to one of 9 positions, make it full frame, or hide it**. Odak animates between layouts smoothly (0.5 s eased transitions).
 - ✂️ **A real editor.** Split, trim, reorder, duplicate, change speed (×0.5–×8), delete a time range across clips, cut with a scissors tool, import other videos, add more recordings to the same project. Everything is undoable.
 - ⏩ **Quiet moments.** One click finds the parts where nothing happens (screen unchanged, cursor still, no sound) and speeds them up or cuts them out — with a small margin so no movement gets clipped.
-- 🖼️ **Looks.** 8 gradient presets, 9 themes drawn in code (Fun, New Year, Autumn, Celebration, Spring, Space, Ocean, Minimal light/dark) or **your own background image** (with optional blur). Padding, rounded corners, shadow.
+- 🖼️ **Looks.** 8 gradient presets, **22 themes drawn in code** — 15 calm, professional ones for product demos, courses and business videos (Corporate, Graphite, Marble, Blueprint, Aurora, Pastel, Topographic, Paper, Black & Gold, Office lights, Finance, Glass, Geometric, Minimal light/dark) and 7 playful or seasonal ones (Fun, New Year, Autumn, Celebration, Spring, Space, Ocean) — or **your own background image** (with optional blur). Padding, rounded corners, shadow.
 - 🖱️ **Cursor styles.** White, black or coloured arrow or a dot; size, highlight ring, hide when idle, motion smoothing, click effects (ring or pulse). The cursor is redrawn, so it stays sharp at any zoom.
 - 🔊 **Separate audio tracks.** System audio and microphone are recorded to separate files with separate volume controls (per project and per clip). Pick any microphone and camera, with optional noise suppression.
 - 📤 **Export anything.** MP4, MOV, WebM, GIF, audio-only (M4A, WAV) or a single PNG frame for your thumbnail. 720p to 4K, 24/30/60 fps, H.264 / HEVC / AV1 / VP9, three quality levels — in **16:9, 9:16 vertical (Shorts, Reels, TikTok), 1:1 square** or the recording's own shape. Export the whole video or just a selected range.
@@ -82,9 +82,19 @@ What Odak focuses on:
 |---|---|
 | ![Background image](docs/images/frame-background-image.png) | <img src="docs/images/frame-vertical.png" alt="Vertical 9:16 frame" width="300"> |
 
-**Built-in themes** — all drawn in code, no downloaded artwork:
+**Built-in themes** — all drawn in code (no downloaded artwork), sharp at any resolution and identical in preview and export.
 
-![Themes](docs/images/themes.png)
+*Professional* — for product demos, courses, sales and business videos:
+
+![Professional themes](docs/images/themes-business.png)
+
+The same recording on the *Corporate* theme:
+
+![A frame on the Corporate theme](docs/images/frame-business-theme.png)
+
+*Fun & seasonal:*
+
+![Fun and seasonal themes](docs/images/themes-fun.png)
 
 **Editing tools** — select, range and scissors; a selected range can be deleted, made its own clip, sped up ×2/×4 or given a camera layout:
 
@@ -217,7 +227,7 @@ The camera eases into the new layout at the start of the block and back at its e
 ### Looks
 
 - **Görüntü oranı** (*aspect ratio*): 16:9, **9:16 vertical**, 1:1 square or the recording's own. The preview changes immediately; the camera bubble keeps a consistent size in every shape.
-- **Arka plan** (*background*): **Renk** (gradient presets or your own two colours), **Tema** (9 themes drawn in code) or **Görsel** (your own image — PNG, JPG or WEBP, copied into the project — with optional blur).
+- **Arka plan** (*background*): **Renk** (gradient presets or your own two colours), **Tema** (22 themes drawn in code, in two groups: *Profesyonel* and *Eğlenceli & mevsimsel*) or **Görsel** (your own image — PNG, JPG or WEBP, copied into the project — with optional blur).
 - Padding, rounded corners and shadow.
 - **İmleç** (*cursor*): style (white / black / coloured arrow, dot), colour, size, highlight ring, hide when idle, smoothing, click effect (ring or pulse).
 - **Ses** (*audio*): separate volume for system audio and microphone.
@@ -275,6 +285,7 @@ Click **Dışa Aktar** (*Export*) at the top right or press **⌘E / Ctrl+E**.
 | Konum · Boyut | Position · Size |
 | Görüntü oranı | Aspect ratio |
 | Arka plan · Renk · Tema · Görsel | Background · Colour · Theme · Image |
+| Profesyonel · Eğlenceli & mevsimsel | Professional · Fun & seasonal |
 | İmleç · Vurgu halkası | Cursor · Highlight ring |
 | Ses · Sistem sesi | Audio · System audio |
 | Çoğalt · Hız | Duplicate · Speed |
@@ -318,6 +329,7 @@ Results on an Apple M4 Pro with a 120 Hz display (packaged app):
 | Editing (split, select, undo…) | ~17 ms from action to screen |
 | Timeline zoom and scroll | no dropped frames |
 | Export 1080p60 | ~3× faster than real time; the interface stays smooth |
+| Choosing a theme | drawn once at 1080p in ~3–60 ms, then reused for every frame |
 
 How: the decoders for the next clip are opened before playback reaches a cut; scrubbing shows the nearest key frame first; macOS recordings get a key frame at least every second (even when the screen is still).
 

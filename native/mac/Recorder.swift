@@ -40,6 +40,23 @@ enum HelperError: Error, CustomStringConvertible {
 }
 
 final class Recorder: NSObject, SCStreamOutput, SCStreamDelegate, @unchecked Sendable {
+    /// Ends the screen video exactly at `end`. A still screen produces no frames, so the last
+    /// frame is repeated one frame before the end, lasting one frame: the video then is as long as
+    /// the audio and cursor data, and not longer (also used by tests/EndOfRecordingTest.swift).
+    static func finishVideo(writer: AVAssetWriter, input: AVAssetWriterInput, last: CMSampleBuffer?, end: CMTime, fps: Int) async throws {
+        let frame = CMTime(value: 1, timescale: CMTimeScale(max(1, fps)))
+        let at = end - frame
+        if let last, at > last.presentationTimeStamp,
+           let copy = try? CMSampleBuffer(copying: last, withNewTiming: [
+               CMSampleTimingInfo(duration: frame, presentationTimeStamp: at, decodeTimeStamp: .invalid)]) {
+            while !input.isReadyForMoreMediaData { try await Task.sleep(nanoseconds: 2_000_000) }
+            input.append(copy)
+        }
+        input.markAsFinished()
+        writer.endSession(atSourceTime: end)
+        await writer.finishWriting()
+    }
+
     /// H.264 settings for the screen video (also used by tests/KeyframeTest.swift).
     static func videoSettings(width w: Int, height h: Int, fps: Int) -> [String: Any] {
         [
@@ -75,9 +92,11 @@ final class Recorder: NSObject, SCStreamOutput, SCStreamDelegate, @unchecked Sen
     private var displayFrame = CGRect.zero
     private var pixelsPerPoint = 2.0
     private var size = CGSize.zero
+    private var fps = 60
     var onFailure: ((Error) -> Void)?
 
     func start(_ o: RecordOptions) async throws {
+        fps = o.fps
         let content: SCShareableContent
         do { content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true) }
         catch { throw CGPreflightScreenCaptureAccess() ? error : HelperError.permission }
@@ -165,17 +184,7 @@ final class Recorder: NSObject, SCStreamOutput, SCStreamDelegate, @unchecked Sen
         stream = nil
         let raw = await MainActor.run { () -> CursorRecorder.Raw in cursor.stop(); return cursor.raw }
         guard let first, let writer, let input else { writer?.cancelWriting(); throw failure ?? HelperError.noFrames }
-        // A still screen produces no frames: repeat the last one at the stop time so the video
-        // is as long as the audio and cursor data.
-        if let last, endHost > last.presentationTimeStamp,
-           let copy = try? CMSampleBuffer(copying: last, withNewTiming: [
-               CMSampleTimingInfo(duration: .invalid, presentationTimeStamp: endHost, decodeTimeStamp: .invalid)]) {
-            while !input.isReadyForMoreMediaData { try await Task.sleep(nanoseconds: 2_000_000) }
-            input.append(copy)
-        }
-        input.markAsFinished()
-        writer.endSession(atSourceTime: endHost)
-        await writer.finishWriting()
+        try await Recorder.finishVideo(writer: writer, input: input, last: last, end: endHost, fps: fps)
         guard writer.status == .completed else { throw HelperError.writer(writer.error?.localizedDescription ?? "?") }
         let duration = (endHost - first).seconds
         let systemName = systemWav?.finish(duration: duration) == true ? systemWav?.url.lastPathComponent : nil

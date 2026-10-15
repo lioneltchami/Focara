@@ -300,20 +300,32 @@ export async function runDocshots() {
     await frame('frame-vertical.png', { ...p, export: { ...p.export, aspect: 'vertical' } }, 4.2, { resolution: 'p1080', aspect: 'vertical' });
     await frame('frame-chart.png', withImage, 12.4);
 
-    // Theme gallery
-    {
-      const tw = 600, th = 338, gap = 24, label = 46;
-      const g = new OffscreenCanvas(3 * tw + 4 * gap, 3 * (th + label) + 4 * gap), ctx = g.getContext('2d')!;
+    // Theme galleries
+    const english: Record<string, string> = {
+      eglenceli: 'Fun', yilbasi: 'New Year', sonbahar: 'Autumn', kutlama: 'Celebration', bahar: 'Spring', uzay: 'Space', okyanus: 'Ocean',
+      minimal: 'Minimal light', gece: 'Minimal dark', kurumsal: 'Corporate', grafit: 'Graphite', mermer: 'Marble', blueprint: 'Blueprint',
+      aurora: 'Aurora', pastel: 'Pastel', topografya: 'Topographic', kagit: 'Paper', 'siyah-altin': 'Black & Gold', bokeh: 'Office lights',
+      finans: 'Finance', cam: 'Glass', geometrik: 'Geometric',
+    };
+    const gallery = async (name: string, ids: string[], cols: number) => {
+      const tw = 600, th = 338, gap = 24, label = 46, rows = Math.ceil(ids.length / cols);
+      const g = new OffscreenCanvas(cols * tw + (cols + 1) * gap, rows * (th + label) + (rows + 1) * gap), ctx = g.getContext('2d')!;
       ctx.fillStyle = '#16161a'; ctx.fillRect(0, 0, g.width, g.height);
-      const english: Record<string, string> = { eglenceli: 'Fun', yilbasi: 'New Year', sonbahar: 'Autumn', kutlama: 'Celebration', bahar: 'Spring', uzay: 'Space', okyanus: 'Ocean', minimal: 'Minimal light', gece: 'Minimal dark' };
-      themes.forEach((th0, i) => {
-        const x = gap + (i % 3) * (tw + gap), y = gap + Math.floor(i / 3) * (th + label + gap);
+      ids.forEach((id, i) => {
+        const x = gap + (i % cols) * (tw + gap), y = gap + Math.floor(i / cols) * (th + label + gap);
         ctx.save(); ctx.beginPath(); ctx.roundRect(x, y, tw, th, 14); ctx.clip();
-        ctx.drawImage(themeCanvas(th0.id, tw, th), x, y); ctx.restore();
+        ctx.drawImage(themeCanvas(id, tw, th), x, y); ctx.restore();
         ctx.fillStyle = '#ececf1'; ctx.font = '600 24px -apple-system, "Segoe UI", sans-serif';
-        ctx.fillText(english[th0.id] ?? th0.title, x + 4, y + th + 33);
+        ctx.fillText(english[id] ?? id, x + 4, y + th + 33);
       });
-      await save('themes.png', await png(g));
+      await save(name, await png(g));
+    };
+    await gallery('themes-business.png', themes.filter((t) => t.group === 'pro').map((t) => t.id), 3);
+    await gallery('themes-fun.png', themes.filter((t) => t.group === 'fun').map((t) => t.id), 4);
+    {
+      // The editor with a business theme, for the README.
+      const biz: Project = { ...p, style: { ...p.style, backgroundKind: 'theme', backgroundTheme: 'kurumsal', padding: 0.08 } };
+      await frame('frame-business-theme.png', biz, 9.6);
     }
 
     // Demo GIF made by Odak itself

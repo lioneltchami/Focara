@@ -119,6 +119,12 @@ export async function runUiTest() {
 
     click(byText('.inspector .segmented button', 'Tema'));
     await until('themes', () => $$('.theme').length >= 8);
+    const groups = $$('.theme-group-title').map((e) => e.textContent);
+    const proCount = $$('.theme-group')[0]?.querySelectorAll('.theme').length ?? 0;
+    click(byText('.theme', 'Mermer'));
+    await sleep(300);
+    check(groups[0] === 'Profesyonel' && groups[1]?.startsWith('Eğlenceli') && proCount >= 15 && project().style.backgroundTheme === 'mermer',
+      `themes are grouped (${groups.join(' / ')}, ${proCount} professional) and “Mermer” can be chosen`);
     click(byText('.theme', 'Kutlama'));
     await sleep(400);
     check(project().style.backgroundKind === 'theme' && project().style.backgroundTheme === 'kutlama' && project().style.padding >= 0.1,

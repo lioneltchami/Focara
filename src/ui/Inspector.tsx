@@ -270,17 +270,20 @@ function StyleInspector({ store, lib }: { store: EditorStore; lib: MediaLibrary 
             </span>
           </div>
         </>}
-        {st.backgroundKind === 'theme' && (
-          <div className="themes">
-            {themes.map((t) => (
-              <button key={t.id} className={`theme ${st.backgroundTheme === t.id ? 'on' : ''}`} title={t.title}
-                      onClick={() => setMany({ backgroundTheme: t.id, padding: Math.max(st.padding, 0.1) }, 'theme')}>
-                <ThemeThumb id={t.id} />
-                <span>{t.emoji} {t.title}</span>
-              </button>
-            ))}
+        {st.backgroundKind === 'theme' && ([['pro', 'Profesyonel'], ['fun', 'Eğlenceli & mevsimsel']] as const).map(([group, title]) => (
+          <div key={group} className="theme-group">
+            <div className="theme-group-title">{title}</div>
+            <div className="themes">
+              {themes.filter((t) => t.group === group).map((t) => (
+                <button key={t.id} className={`theme ${st.backgroundTheme === t.id ? 'on' : ''}`} title={t.title}
+                        onClick={() => setMany({ backgroundTheme: t.id, padding: Math.max(st.padding, 0.1) }, 'theme')}>
+                  <ThemeThumb id={t.id} />
+                  <span>{t.emoji} {t.title}</span>
+                </button>
+              ))}
+            </div>
           </div>
-        )}
+        ))}
         {st.backgroundKind === 'image' && <>
           <div className="row">
             <button className="primary" onClick={() => void pickImage()}>Görsel Seç…</button>
@@ -371,14 +374,30 @@ function StyleInspector({ store, lib }: { store: EditorStore; lib: MediaLibrary 
   );
 }
 
+// Theme thumbnails are drawn one per animation frame, so opening the list never blocks the UI.
+const thumbQueue: (() => void)[] = [];
+function queueThumb(job: () => void) {
+  thumbQueue.push(job);
+  if (thumbQueue.length === 1) {
+    const next = () => { thumbQueue.shift()?.(); if (thumbQueue.length) requestAnimationFrame(next); };
+    requestAnimationFrame(next);
+  }
+}
+
 function ThemeThumb({ id }: { id: string }) {
   const ref = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
-    const c = ref.current!;
-    c.width = 160; c.height = 90;
-    c.getContext('2d')!.drawImage(themeCanvas(id, 160, 90), 0, 0);
+    let alive = true;
+    queueThumb(() => {
+      const c = ref.current;
+      if (!alive || !c) return;
+      // Drawn at twice the shown size so fine lines (blueprint, contours) stay visible.
+      c.width = 320; c.height = 180;
+      c.getContext('2d')!.drawImage(themeCanvas(id, 320, 180), 0, 0);
+    });
+    return () => { alive = false; };
   }, [id]);
-  return <canvas ref={ref} />;
+  return <canvas ref={ref} width={320} height={180} />;
 }
 
 function CursorThumb({ style, color }: { style: CursorStyle; color: RGBA }) {

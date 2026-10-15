@@ -232,3 +232,8 @@ input[type=checkbox] { accent-color: var(--accent); }
 .formats .format span { font-size: 10px; color: var(--muted); line-height: 1.25; }
 .formats .format.on { border-color: var(--accent); background: rgba(123,108,255,.18); }
 .formats .format.on span { color: var(--text); }
+
+/* Theme picker groups */
+.theme-group { display: flex; flex-direction: column; gap: 6px; }
+.theme-group + .theme-group { margin-top: 6px; }
+.theme-group-title { font-size: 10px; font-weight: 650; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
