@@ -39,10 +39,10 @@ cask "focara" do
   sha256 arm:   "$ARM_SHA",
          intel: "$INTEL_SHA"
 
-  url "https://github.com/lioneltchami/Focus/releases/download/v#{version}/Focara-#{version}-mac-#{arch}.dmg"
+  url "https://github.com/lioneltchami/Focara/releases/download/v#{version}/Focara-#{version}-mac-#{arch}.dmg"
   name "Focara"
   desc "Screen recorder with automatic, editable zoom"
-  homepage "https://github.com/lioneltchami/Focus"
+  homepage "https://github.com/lioneltchami/Focara"
 
   livecheck do
     url :url
