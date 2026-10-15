@@ -1,5 +1,11 @@
 import { createRoot } from 'react-dom/client';
 import { odak } from './bridge.ts';
+import { setLang } from './i18n/index.ts';
+
+// The interface language (the system's, or the one picked in Settings) before anything is drawn.
+const language = odak().settings();
+setLang(language.lang);
+document.documentElement.lang = language.lang;
 
 if (odak().isSelftest) {
   void import('./selftest.ts').then((m) => m.runSelftest());

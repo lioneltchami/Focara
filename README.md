@@ -26,7 +26,7 @@ Picking themes, cutting with the scissors, speeding up a slow part ×4 and givin
 - [Download and install](#download-and-install)
 - [Quick start: your first video in 2 minutes](#quick-start-your-first-video-in-2-minutes)
 - [User guide](#user-guide)
-- [Interface glossary (Turkish → English)](#interface-glossary-turkish--english)
+- [Language](#language)
 - [Projects, files and privacy](#projects-files-and-privacy)
 - [Performance](#performance)
 - [Troubleshooting](#troubleshooting)
@@ -50,6 +50,7 @@ Picking themes, cutting with the scissors, speeding up a slow part ×4 and givin
 - 🔊 **Separate audio tracks.** System audio and microphone are recorded to separate files with separate volume controls (per project and per clip). Pick any microphone and camera, with optional noise suppression.
 - 📤 **Export anything.** MP4, MOV, WebM, GIF, audio-only (M4A, WAV) or a single PNG frame for your thumbnail. 720p to 4K, 24/30/60 fps, H.264 / HEVC / AV1 / VP9, three quality levels — in **16:9, 9:16 vertical (Shorts, Reels, TikTok), 1:1 square** or the recording's own shape. Export the whole video or just a selected range.
 - 🎞️ **What you see is what you export.** The preview and the exporter use the same renderer and the same frame-selection rule; audio is aligned to the millisecond (verified by automated tests).
+- 🌐 **English and Turkish.** The interface follows your computer's language, and you can switch it any time in **⚙ Settings** — instantly, with your project still open.
 
 ## How is Odak different?
 
@@ -145,7 +146,7 @@ Odak is not signed with a paid Apple Developer ID or a Windows code-signing cert
    - **Screen & System Audio Recording** — required. After allowing it, macOS may ask you to quit and reopen Odak.
    - **Camera** and **Microphone** — only if you choose a camera or microphone.
 
-   You can change these any time in *System Settings › Privacy & Security*. If recording keeps failing after an update, use the **İzinleri Sıfırla** (*Reset permissions*) button that Odak shows with the error, then record again and allow.
+   You can change these any time in *System Settings › Privacy & Security*. If recording keeps failing after an update, use the **Reset Permissions** button that Odak shows with the error, then record again and allow.
 
 ### Windows
 
@@ -164,35 +165,35 @@ Prefer not to install? Download the `.zip`, unzip it and run `Odak.exe`.
 ## Quick start: your first video in 2 minutes
 
 1. **Open Odak.** On the home screen pick the display to record. Optionally tick *system audio* and choose a **microphone** and a **camera** (a live camera preview appears).
-2. Click **● Kaydı Başlat** (*Start recording*). Do your demo — click on the things you talk about; that's where Odak will zoom.
+2. Click **● Start Recording**. Do your demo — click on the things you talk about; that's where Odak will zoom.
 3. **Stop** with the small floating panel or **⌘⇧2** (macOS) / **Ctrl+Shift+2** (Windows).
 4. The recording opens in the editor with automatic zooms already made. Press **Space** to watch it.
-5. Pick a **background** on the right (*Arka plan*): a colour, a theme or your own image.
+5. Pick a **Background** on the right: a colour, a theme or your own image.
 6. Trim the start and end: drag the edges of the clip on the timeline.
-7. Click **Dışa Aktar** (*Export*) at the top right, choose **MP4** and **1080p**, save. Done.
+7. Click **Export** at the top right, choose **MP4** and **1080p**, save. Done.
 
 ## User guide
 
-> The interface is currently in Turkish. The [glossary](#interface-glossary-turkish--english) below translates every label used in this guide.
+> Odak's interface is in English or Turkish (see [Language](#language)); this guide uses the English labels.
 
 ### Recording
 
 - **What is recorded:** the screen *without* the system cursor (the cursor is drawn back later, so it can be smoothed, resized and highlighted), the cursor path and clicks, system audio, your microphone and your camera — each to its own file, all on one clock.
 - **Choose devices** on the home screen: display, system audio on/off, microphone (any input, e.g. a USB mic), camera, and noise suppression for the mic.
 - **Stop:** the floating panel or **⌘⇧2 / Ctrl+Shift+2**. The floating panel is hidden from the recording itself.
-- **Add another recording to an open project:** **● Kayıt** in the editor's toolbar. It is added to the end of the timeline with its own automatic zooms.
+- **Add another recording to an open project:** **● Record** in the editor's toolbar. It is added to the end of the timeline with its own automatic zooms.
 
 ### Zooms
 
 - Automatic zooms are created from your clicks: the view eases in a little before the click, holds while you work there and eases out after a pause. Clicks close to each other share one zoom.
 - **Move** a zoom by dragging it; **change its length** by dragging its edges. Click it to open its settings on the right:
-  - **Miktar** (*amount*): ×1.1 to ×4, with one-click presets ×1.25 / ×1.5 / ×2 / ×2.5 / ×3.
-  - **İmleci takip et** (*follow cursor*) or **Sabit nokta** (*fixed point*) — click or drag on the small picture to choose the point.
-  - **Geçiş** (*transition*): how gently every zoom eases in and out.
-  - **‹ Önceki / Sonraki ›** (*previous / next*): jump between zooms without hunting on the timeline.
-  - Every panel ends with a **Kısayollar** (*shortcuts*) card listing the keys for what you're editing.
-- **＋ Zoom** (or `Z`) adds a zoom at the playhead. **✦ Oto zoom** regenerates the automatic zooms; zooms you edited by hand are kept.
-- **Zoom hızı** (*zoom speed*) in the style panel: gentle, normal or quick camera motion.
+  - **Amount**: ×1.1 to ×4, with one-click presets ×1.25 / ×1.5 / ×2 / ×2.5 / ×3.
+  - **Follow cursor** or **Fixed point** — click or drag on the small picture to choose the point.
+  - **Transition**: how gently every zoom eases in and out.
+  - **‹ Previous / Next ›**: jump between zooms without hunting on the timeline.
+  - Every panel ends with a **Shortcuts** card listing the keys for what you're editing.
+- **＋ Zoom** (or `Z`) adds a zoom at the playhead. **✦ Auto zoom** regenerates the automatic zooms; zooms you edited by hand are kept.
+- **Zoom transition** in the general settings: gentle, normal or quick camera motion.
 
 ### The timeline and editing tools
 
@@ -200,9 +201,9 @@ The bar above the timeline has three tools (the right side of the bar always exp
 
 | Tool | Key | What it does |
 |---|---|---|
-| **↖ Seç** (*Select*) | `V` | Click a clip to select it, drag to reorder, drag its edges to trim. **Shift+drag** selects a time range. |
-| **↔ Aralık** (*Range*) | `R` | Drag across the clips to select any part of the video. Drag the range's ends to adjust it. |
-| **✂ Makas** (*Scissors*) | `C` | Click on a clip to cut it exactly there. A dashed line shows the cut; it snaps to the playhead. |
+| **↖ Select** | `V` | Click a clip to select it, drag to reorder, drag its edges to trim. **Shift+drag** selects a time range. |
+| **↔ Range** | `R` | Drag across the clips to select any part of the video. Drag the range's ends to adjust it. |
+| **✂ Blade** (scissors) | `C` | Click on a clip to cut it exactly there. A dashed line shows the cut; it snaps to the playhead. |
 
 Moving around:
 - Drag the **red playhead** by its head (or anywhere on the ruler). While you drag, Odak shows the nearest key frame instantly; the exact frame appears as soon as you stop.
@@ -212,56 +213,56 @@ Editing:
 
 | Action | How |
 |---|---|
-| **Split** | Put the playhead there and press **┆ Böl** or `S` (with a range selected, it splits at both ends). Zooms are split too. |
+| **Split** | Put the playhead there and press **┆ Split** or `S` (with a range selected, it splits at both ends). Zooms are split too. |
 | **Trim** | Drag a clip's left/right edge. Trimmed parts are not deleted — drag the edge back to restore them. |
 | **Reorder** | Drag a clip; a yellow line shows where it will land. |
-| **Delete** | Select a clip, zoom, camera layout or range and press **⌫ Sil** or `Delete`. Later clips move up; no gaps. |
-| **Part of the video** | Select a range, then use the bar under it: **Sil** (delete), **Ayır** (make it its own clip), **×2 / ×4** (speed up), **📷 Kamera** (camera layout), **🔍 Büyüteç** (magnifier). Works across several clips at once. |
-| **Duplicate, speed, volume** | Select a clip; the right panel has **Çoğalt** (duplicate), speed ×0.5–×8, source start/end and per-clip volumes. |
+| **Delete** | Select a clip, zoom, camera layout or range and press **⌫ Delete** or the `Delete` key. Later clips move up; no gaps. |
+| **Part of the video** | Select a range, then use the bar under it: **Delete**, **Split out** (make it its own clip), **×2 / ×4** (speed up), **📷 Camera** (camera layout), **🔍 Magnifier**. Works across several clips at once. |
+| **Duplicate, speed, volume** | Select a clip; the right panel has **Duplicate**, speed ×0.5–×8, source start/end and per-clip volumes. |
 | **Import a video** | **＋ Video** — MP4, MOV, M4V, WebM or MKV. It is copied into the project and inserted after the selected clip. |
-| **Quiet moments** | **⏩ Durgun anlar** — set the minimum length, choose *speed up ×2/×4/×8* or *cut*, and see the new duration before applying. |
+| **Quiet moments** | **⏩ Quiet moments** — set the minimum length, choose *speed up ×2/×4/×8* or *cut*, and see the new duration before applying. |
 | **Undo / redo** | **⌘Z / ⇧⌘Z** (macOS), **Ctrl+Z / Ctrl+Shift+Z** (Windows). Every edit is undoable. |
 
-To get back to the general style settings from a clip, zoom or camera layout panel, click **‹ Genel ayarlara dön** (*back to general settings*) at the top of the panel or press **Esc**.
+To get back to the general style settings from a clip, zoom or camera layout panel, click **‹ Back to general settings** at the top of the panel or press **Esc**.
 
 ### Camera
 
-General settings (right panel, **Kamera** section): show/hide, **9 positions** (corners, edge centres, centre), size, shape (**Daire** circle, **Yuvarlak köşe** rounded, **Kare** square), mirror, white border.
+General settings (right panel, **Camera** section): show/hide, **9 positions** (corners, edge centres, centre), size, shape (circle, rounded, square), mirror, white border.
 
 **Camera layouts for a part of the video:**
-1. Select the part with **↔ Aralık** (or put the playhead where it should start).
-2. Click **📷 Kamera** or press `K` (in the bar under the range, or in the toolbar — then it covers the next 3 seconds).
-3. A pink block appears in the **KAMERA** lane and its settings open on the right:
-   - **Balon** (*bubble*): one of 9 positions and its own size.
-   - **Tam ekran** (*full frame*): the camera fills the whole video — great for intros and outros.
-   - **Gizle** (*hide*): the camera fades away and comes back afterwards.
+1. Select the part with **↔ Range** (or put the playhead where it should start).
+2. Click **📷 Camera** or press `K` (in the bar under the range, or in the toolbar — then it covers the next 3 seconds).
+3. A pink block appears in the **CAMERA** lane and its settings open on the right:
+   - **Bubble**: one of 9 positions and its own size.
+   - **Full frame**: the camera fills the whole video — great for intros and outros.
+   - **Hide**: the camera fades away and comes back afterwards.
 4. Drag the block to move it, drag its edges to change its length.
 
 The camera eases into the new layout at the start of the block and back at its end (0.5 s). Two blocks next to each other hand over directly, without visiting the default position in between.
 
 ### Magnifier
 
-1. Select the part with **↔ Aralık** (or put the playhead where it should start).
-2. Click **🔍 Büyüteç** or press `B` (in the bar under the range, or in the toolbar — then it covers the next 3 seconds).
-3. A yellow block appears in the **BÜYÜTEÇ** lane and its settings open on the right:
-   - **Boyut** (*size*): the lens diameter, 12–70 % of the frame's short side (presets *Küçük / Orta / Büyük*).
-   - **Büyütme** (*magnification*): ×1.25 to ×5 (presets ×1.5 / ×2 / ×3).
-   - **Daire / Yuvarlak kare** (*circle / rounded square*).
+1. Select the part with **↔ Range** (or put the playhead where it should start).
+2. Click **🔍 Magnifier** or press `B` (in the bar under the range, or in the toolbar — then it covers the next 3 seconds).
+3. A yellow block appears in the **MAGNIFIER** lane and its settings open on the right:
+   - **Size**: the lens diameter, 12–70 % of the frame's short side (presets *Small / Medium / Large*).
+   - **Magnification**: ×1.25 to ×5 (presets ×1.5 / ×2 / ×3).
+   - **Circle / Rounded square**.
 4. Drag the block to move it, drag its edges to change its length.
 
 The lens follows the (smoothed) cursor, pops open at the start of the block and closes at its end. It works together with zooms and camera layouts, and a cut inside a lens block doesn't make it close and reopen.
 
 ### Looks
 
-- **Görüntü oranı** (*aspect ratio*): 16:9, **9:16 vertical**, 1:1 square or the recording's own. The preview changes immediately; the camera bubble keeps a consistent size in every shape.
-- **Arka plan** (*background*): **Renk** (gradient presets or your own two colours), **Tema** (22 themes drawn in code, in two groups: *Profesyonel* and *Eğlenceli & mevsimsel*) or **Görsel** (your own image — PNG, JPG or WEBP, copied into the project — with optional blur).
+- **Aspect ratio**: 16:9, **9:16 vertical**, 1:1 square or the recording's own. The preview changes immediately; the camera bubble keeps a consistent size in every shape.
+- **Background**: **Color** (gradient presets or your own two colours), **Theme** (22 themes drawn in code, in two groups: *Professional* and *Fun & seasonal*) or **Image** (your own image — PNG, JPG or WEBP, copied into the project — with optional blur).
 - Padding, rounded corners and shadow.
-- **İmleç** (*cursor*): style (white / black / coloured arrow, dot), colour, size, highlight ring, hide when idle, smoothing, click effect (ring or pulse).
-- **Ses** (*audio*): separate volume for system audio and microphone.
+- **Cursor**: style (white / black / coloured arrow, dot), colour, size, highlight ring, hide when idle, smoothing, click effect (ring or pulse).
+- **Audio**: separate volume for system audio and microphone.
 
 ### Export
 
-Click **Dışa Aktar** (*Export*) at the top right or press **⌘E / Ctrl+E**.
+Click **Export** at the top right or press **⌘E / Ctrl+E**.
 
 | Format | Best for | Options |
 |---|---|---|
@@ -269,13 +270,13 @@ Click **Dışa Aktar** (*Export*) at the top right or press **⌘E / Ctrl+E**.
 | **MOV** | Final Cut, iMovie, Premiere | H.264, HEVC |
 | **WebM** | Websites | VP9, AV1 · Opus audio |
 | **GIF** | READMEs, chats (silent) | 480–1280 px wide, 10–25 fps; identical frames are merged, so still moments cost almost nothing |
-| **Ses · M4A** | Podcasts, captions | AAC audio only |
-| **Ses · WAV** | Audio editing | Lossless PCM |
-| **Kare · PNG** | YouTube thumbnail | The frame under the playhead, at the chosen resolution |
+| **Audio · M4A** | Podcasts, captions | AAC audio only |
+| **Audio · WAV** | Audio editing | Lossless PCM |
+| **Frame · PNG** | YouTube thumbnail | The frame under the playhead, at the chosen resolution |
 
-- Video options: resolution 720p / 1080p / 1440p / 4K, 24 / 30 / 60 fps, quality *Yüksek* (high) / *Orta* (medium) / *Küçük dosya* (small file). Codecs your computer can't encode are greyed out.
-- **Yalnızca seçili aralık** (*only the selected range*): if a range is selected on the timeline, export just that part — handy for GIFs.
-- A progress bar shows the time left; you can cancel. When it's done, **Klasörde Göster** (*show in folder*) or **Aç** (*open*).
+- Video options: resolution 720p / 1080p / 1440p / 4K, 24 / 30 / 60 fps, quality *High* / *Medium* / *Small file*. Codecs your computer can't encode are greyed out.
+- **Only the selected range**: if a range is selected on the timeline, export just that part — handy for GIFs.
+- A progress bar shows the time left; you can cancel. When it's done, **Show in Folder** or **Open**.
 
 ### Keyboard shortcuts
 
@@ -283,7 +284,7 @@ Click **Dışa Aktar** (*Export*) at the top right or press **⌘E / Ctrl+E**.
 |---|---|
 | `Space` | Play / pause |
 | `←` / `→` | Previous / next frame (`Shift`: 10 frames) |
-| `V` / `R` / `C` | Select / Range / Scissors tool |
+| `V` / `R` / `C` | Select / Range / Blade tool |
 | `S` | Split at the playhead (or at both ends of the selected range) |
 | `Z` | Add a zoom at the playhead |
 | `K` | Add a camera layout at the playhead (or for the selected range) |
@@ -295,36 +296,18 @@ Click **Dışa Aktar** (*Export*) at the top right or press **⌘E / Ctrl+E**.
 | `⌘E` / `Ctrl+E` | Export |
 | `⌘⇧2` / `Ctrl+Shift+2` | Stop recording |
 | `⌘` / `Ctrl` + mouse wheel | Zoom the timeline |
+| `⌘,` / `Ctrl+,` | Settings (language) |
 
-## Interface glossary (Turkish → English)
+## Language
 
-| Turkish | English |
-|---|---|
-| Kaydı Başlat | Start recording |
-| Ekran · Sistem sesini kaydet | Display · Record system audio |
-| Mikrofon · Kamera · Gürültü azaltma | Microphone · Camera · Noise suppression |
-| Projeler · Aç… · Klasör | Projects · Open… · Folder |
-| Dışa Aktar | Export |
-| Seç · Aralık · Makas | Select · Range · Scissors |
-| Böl · Sil · Ayır | Split · Delete · Separate (make its own clip) |
-| ＋ Video · ● Kayıt | Import video · Add recording |
-| Durgun anlar | Quiet moments |
-| ＋ Zoom · Oto zoom | Add zoom · Auto zoom |
-| Miktar · İmleci takip et · Sabit nokta | Amount · Follow cursor · Fixed point |
-| Kamera bölümü · Balon · Tam ekran · Gizle | Camera layout · Bubble · Full frame · Hide |
-| Büyüteç · Boyut · Büyütme · Daire · Yuvarlak kare | Magnifier · Size · Magnification · Circle · Rounded square |
-| Konum · Boyut | Position · Size |
-| Görüntü oranı | Aspect ratio |
-| Arka plan · Renk · Tema · Görsel | Background · Colour · Theme · Image |
-| Profesyonel · Eğlenceli & mevsimsel | Professional · Fun & seasonal |
-| İmleç · Vurgu halkası | Cursor · Highlight ring |
-| Ses · Sistem sesi | Audio · System audio |
-| Çoğalt · Hız | Duplicate · Speed |
-| Genel ayarlara dön | Back to general settings |
-| Kalite: Yüksek · Orta · Küçük dosya | Quality: High · Medium · Small file |
-| Yalnızca seçili aralık | Only the selected range |
-| İzinleri Sıfırla · Tanılama Kaydı | Reset permissions · Diagnostics log |
-| Geri Al · Yinele | Undo · Redo |
+Odak speaks **English** and **Turkish**.
+
+- **Automatic:** Odak uses your computer's language — Turkish when your system's first language is Turkish, English for every other language.
+- **Change it any time:** click **⚙ Settings** (top right of the home screen, or the ⚙ button in the editor's toolbar; also *Odak › Settings…* on macOS, *File › Settings…* on Windows, or `⌘,` / `Ctrl+,`) and pick **System language**, **Türkçe** or **English**. The whole interface switches immediately; an open project stays open and nothing is lost.
+- The menu bar has a **Dil · Language** submenu too, labelled in both languages so it's easy to find whichever language is on.
+- Your choice is remembered. Projects don't depend on the language: a project made in Turkish opens in English and vice versa.
+
+![The Settings window with System language, Türkçe and English](docs/images/settings.png)
 
 ## Projects, files and privacy
 
@@ -344,7 +327,7 @@ Recording 2026-10-15 10.12.30.odak/
 ```
 
 - Raw recordings are never modified — every edit is just data in `project.json`.
-- A diagnostics log (no screen content) helps with bug reports: *Yardım › Tanılama Kaydını Göster* (*Help › Show diagnostics log*), or `~/Library/Logs/Odak/odak.log` on macOS and `%APPDATA%\Odak\logs\odak.log` on Windows.
+- A diagnostics log (no screen content) helps with bug reports: *Help › Show Diagnostics Log* (also in **⚙ Settings**), or `~/Library/Logs/Odak/odak.log` on macOS and `%APPDATA%\Odak\logs\odak.log` on Windows.
 
 ## Performance
 
@@ -368,7 +351,7 @@ Windows performance has not been measured on real hardware yet; the CI workflow 
 
 ## Troubleshooting
 
-**Recording fails although Odak has permission (macOS).** After an update, macOS sometimes keeps a stale permission. Click **İzinleri Sıfırla** (*Reset permissions*) in the error message, start recording again and allow access. You may need to quit and reopen Odak.
+**Recording fails although Odak has permission (macOS).** After an update, macOS sometimes keeps a stale permission. Click **Reset Permissions** in the error message, start recording again and allow access. You may need to quit and reopen Odak.
 
 **"Odak can't be opened" / "damaged" (macOS).** See [macOS install](#macos): *System Settings › Privacy & Security › Open Anyway*, or run the `xattr` command shown there.
 
@@ -378,9 +361,9 @@ Windows performance has not been measured on real hardware yet; the CI workflow 
 
 **A recording made on a very large Windows display won't play.** Displays larger than 4096×2304 are recorded with HEVC on Windows; editing them requires a computer that can decode HEVC (on Windows: the *HEVC Video Extensions* from the Microsoft Store).
 
-**The GIF is huge.** GIFs are uncompressed by nature. Select a range on the timeline and tick *Yalnızca seçili aralık*, use 480–800 px and 10–15 fps.
+**The GIF is huge.** GIFs are uncompressed by nature. Select a range on the timeline and tick *Only the selected range*, use 480–800 px and 10–15 fps.
 
-**Something else.** Open an issue and attach the diagnostics log (*Yardım › Tanılama Kaydını Göster*).
+**Something else.** Open an issue and attach the diagnostics log (*Help › Show Diagnostics Log*).
 
 ## Build from source
 
@@ -440,7 +423,8 @@ git push origin v0.1.0
 
 ```bash
 npm test               # core: zoom/camera algorithm vs reference values; split/trim/reorder/speed/range/quiet moments;
-                       #   camera layouts (transitions, cuts, hand-over, overlaps)
+                       #   camera layouts (transitions, cuts, hand-over, overlaps); translations (every text has
+                       #   English with the same placeholders, nothing Turkish left outside the translation calls)
 npm run selftest       # in the app: synthetic recording → zoom → save/open → export → preview = export (PSNR),
                        #   audio sync to the millisecond, camera bubble, themes, cursor styles, recording with fake devices,
                        #   an edited multi-clip export, camera layouts, and every export format (MP4/MOV/WebM/
@@ -448,10 +432,13 @@ npm run selftest       # in the app: synthetic recording → zoom → save/open 
 npm run uitest -- "examples/Örnek Proje.odak"   # the real UI driven by DOM events: zooms, split/trim/drag/delete,
                                                #   playhead dragging, scissors, ranges, camera layouts, import,
                                                #   quiet moments, export dialog, undo, autosave, Z/K/B keys,
-                                               #   no clipped labels in the side panels, real mouse input
+                                               #   no clipped labels in the side panels, real mouse input,
+                                               #   Settings: switching language in place, no Turkish left in English
+                                               #   (add `--lang en` to run every flow in English; CI runs both)
 npm run perftest       # performance (see above)
 npm run docshots       # regenerates docs/images from a demo project: screenshots, frames, theme galleries,
-                       #   the demo GIF and the editor-in-action GIF
+                       #   the demo GIF and the editor-in-action GIF (English interface)
+npm run docshots:tr    # the editor screenshots with the Turkish interface → docs/images/tr (README.tr.md)
 zsh native/mac/test.sh # macOS helper: WAV alignment, key frames at most ~1 s apart
 cargo test --manifest-path native/win/Cargo.toml   # Windows helper: WAV alignment
 node scripts/helper-smoke.mjs                      # records 3 s of this screen with the helper (needs permission)
@@ -461,7 +448,6 @@ node scripts/helper-smoke.mjs                      # records 3 s of this screen 
 
 ## Known limitations
 
-- The interface is in Turkish for now (see the [glossary](#interface-glossary-turkish--english)).
 - The apps are not signed/notarized with Apple/Microsoft certificates yet, so the first launch shows a warning (see [Download and install](#download-and-install)).
 - Intel Mac builds pass the in-app self-test under Rosetta but haven't been tried on a real Intel Mac yet.
 - Displays larger than 4096×2304: on macOS the recording is scaled to fit; on Windows HEVC is used, which needs HEVC decoding to edit.

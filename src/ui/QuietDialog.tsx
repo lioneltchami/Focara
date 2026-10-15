@@ -4,6 +4,7 @@ import { applyQuietRanges, findQuietRanges, quietDefaults } from '../core/edit.t
 import { MediaLibrary } from '../media/media.ts';
 import { timecode } from './Editor.tsx';
 import type { EditorStore } from './store.ts';
+import { t } from '../i18n/index.ts';
 
 type Found = { mediaID: string; ranges: { start: number; end: number }[] };
 
@@ -52,17 +53,16 @@ export function QuietDialog({ store, lib, onClose }: { store: EditorStore; lib: 
   return (
     <div className="modal-backdrop">
       <div className="modal">
-        <h2>Durgun anlar</h2>
+        <h2>{t('Durgun anlar')}</h2>
         <p className="muted small">
-          Ekranın değişmediği, imlecin kıpırdamadığı ve ses olmayan anları bulur. Her anın başında ve sonunda
-          kısa bir pay bırakılır, böylece hiçbir hareketin ucu kesilmez.
+          {t('Ekranın değişmediği, imlecin kıpırdamadığı ve ses olmayan anları bulur. Her anın başında ve sonunda kısa bir pay bırakılır, böylece hiçbir hareketin ucu kesilmez.')}
         </p>
-        <label className="field">En kısa durgun an: {minLength.toFixed(1)} sn
+        <label className="field">{t('En kısa durgun an: {s} sn', { s: minLength.toFixed(1) })}
           <input type="range" min={1} max={8} step={0.5} value={minLength} onChange={(e) => setMinLength(Number(e.target.value))} />
         </label>
         <div className="segmented">
-          <button className={mode === 'speed' ? 'on' : ''} onClick={() => setMode('speed')}>Hızlandır</button>
-          <button className={mode === 'cut' ? 'on' : ''} onClick={() => setMode('cut')}>Kes</button>
+          <button className={mode === 'speed' ? 'on' : ''} onClick={() => setMode('speed')}>{t('Hızlandır')}</button>
+          <button className={mode === 'cut' ? 'on' : ''} onClick={() => setMode('cut')}>{t('Kes')}</button>
         </div>
         {mode === 'speed' && (
           <div className="segmented">
@@ -70,21 +70,21 @@ export function QuietDialog({ store, lib, onClose }: { store: EditorStore; lib: 
           </div>
         )}
         {found === null
-          ? <p className="muted">Kayıt inceleniyor…</p>
+          ? <p className="muted">{t('Kayıt inceleniyor…')}</p>
           : all.length === 0
-            ? <p className="muted">Bu ayarla durgun an bulunamadı.</p>
+            ? <p className="muted">{t('Bu ayarla durgun an bulunamadı.')}</p>
             : <>
-                <p><b>{all.length}</b> yer bulundu · toplam <b>{total.toFixed(1)} sn</b> → video {timecode(before, false)}'den
-                  {' '}<b>{timecode(Math.max(0, before - saved), false)}</b>'e iner.</p>
+                <p>{t('Bulunan yer: {n} · toplam {s} sn', { n: all.length, s: total.toFixed(1) })}<br />
+                  {t('Video süresi: {before} → {after}', { before: timecode(before, false), after: timecode(Math.max(0, before - saved), false) })}</p>
                 <ul className="quiet-list">
-                  {all.slice(0, 8).map((r, i) => <li key={i} className="mono">{timecode(r.start)} – {timecode(r.end)} ({(r.end - r.start).toFixed(1)} sn)</li>)}
-                  {all.length > 8 && <li className="muted">… ve {all.length - 8} yer daha</li>}
+                  {all.slice(0, 8).map((r, i) => <li key={i} className="mono">{timecode(r.start)} – {timecode(r.end)} ({t('{s} sn', { s: (r.end - r.start).toFixed(1) })})</li>)}
+                  {all.length > 8 && <li className="muted">{t('… ve {n} yer daha', { n: all.length - 8 })}</li>}
                 </ul>
               </>}
-        <p className="muted small">Hızlandırılan yerlerde ses kapatılır. İstemediğin bir yeri sonradan klibi seçip hızını 1× yaparak geri alabilirsin.</p>
+        <p className="muted small">{t('Hızlandırılan yerlerde ses kapatılır. İstemediğin bir yeri sonradan klibi seçip hızını 1× yaparak geri alabilirsin.')}</p>
         <div className="row end">
-          <button onClick={onClose}>Vazgeç</button>
-          <button className="primary" disabled={!all.length} onClick={apply}>{mode === 'cut' ? 'Kes' : `×${speed} Hızlandır`}</button>
+          <button onClick={onClose}>{t('Vazgeç')}</button>
+          <button className="primary" disabled={!all.length} onClick={apply}>{mode === 'cut' ? t('Kes') : t('×{n} Hızlandır', { n: speed })}</button>
         </div>
       </div>
     </div>

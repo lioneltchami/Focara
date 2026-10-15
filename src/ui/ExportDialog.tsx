@@ -9,10 +9,11 @@ import { codecIds, exportProject, outputSize } from '../media/exporter.ts';
 import type { MediaLibrary } from '../media/media.ts';
 import { timecode } from './Editor.tsx';
 import type { EditorStore } from './store.ts';
+import { N, t } from '../i18n/index.ts';
 
 export const aspects: { id: Aspect; title: string }[] = [
-  { id: 'wide', title: '16:9 yatay' }, { id: 'vertical', title: '9:16 dikey (Shorts, Reels)' },
-  { id: 'square', title: '1:1 kare' }, { id: 'recording', title: 'Kayıtla aynı' },
+  { id: 'wide', title: N('16:9 yatay') }, { id: 'vertical', title: N('9:16 dikey (Shorts, Reels)') },
+  { id: 'square', title: N('1:1 kare') }, { id: 'recording', title: N('Kayıtla aynı') },
 ];
 
 export function ExportDialog({ store, lib, onClose, range, time }: {
@@ -51,7 +52,7 @@ export function ExportDialog({ store, lib, onClose, range, time }: {
   });
 
   const start = async () => {
-    const path = await odak().saveExportDialog(store.project.name, fmt.ext, fmt.title);
+    const path = await odak().saveExportDialog(store.project.name, fmt.ext, t(fmt.title));
     if (!path) return;
     store.update((p) => ({ ...p, export: settings }));
     await store.flush();
@@ -62,76 +63,76 @@ export function ExportDialog({ store, lib, onClose, range, time }: {
         { range: onlyRange && range ? span : undefined, frameTime: time });
       setResult(path);
     } catch (e) {
-      setError((e as Error).name === 'AbortError' ? 'Dışa aktarma iptal edildi.' : (e as Error).message);
+      setError((e as Error).name === 'AbortError' ? t('Dışa aktarma iptal edildi.') : (e as Error).message);
     }
     setProgress(null);
   };
 
   const remaining = () => {
-    if (progress === null || progress < 0.02) return 'Hazırlanıyor…';
+    if (progress === null || progress < 0.02) return t('Hazırlanıyor…');
     const el = (performance.now() - started.current) / 1000;
-    return `%${Math.round(progress * 100)} · yaklaşık ${Math.round((el / progress) * (1 - progress))} sn kaldı`;
+    return t('%{p} · yaklaşık {s} sn kaldı', { p: Math.round(progress * 100), s: Math.round((el / progress) * (1 - progress)) });
   };
   const length = timecode(span.to - span.from, false);
-  const summary = fmt.kind === 'image' ? `${size.width}×${size.height} PNG · ${timecode(time)} anındaki kare`
-    : fmt.kind === 'audio' ? `${fmt.title} · ${length}`
-    : fmt.kind === 'gif' ? `${size.width}×${size.height} GIF · ${settings.gifFps} fps · ${length} · sessiz`
-    : `${size.width}×${size.height} ${fmt.title} · ${settings.fps} fps · ${length}`;
+  const summary = fmt.kind === 'image' ? `${size.width}×${size.height} PNG · ${t('{time} anındaki kare', { time: timecode(time) })}`
+    : fmt.kind === 'audio' ? `${t(fmt.title)} · ${length}`
+    : fmt.kind === 'gif' ? `${size.width}×${size.height} GIF · ${settings.gifFps} fps · ${length} · ${t('sessiz')}`
+    : `${size.width}×${size.height} ${t(fmt.title)} · ${settings.fps} fps · ${length}`;
 
   return (
     <div className="modal-backdrop">
       <div className="modal export">
-        <h2>Dışa Aktar</h2>
+        <h2>{t('Dışa Aktar')}</h2>
         <fieldset disabled={progress !== null} className="form">
           <div className="formats">
             {exportFormats.map((f) => (
               <button key={f.id} className={`format ${settings.format === f.id ? 'on' : ''}`} onClick={() => pickFormat(f.id)}>
-                <b>{f.title}</b><span>{f.note}</span>
+                <b>{t(f.title)}</b><span>{t(f.note)}</span>
               </button>
             ))}
           </div>
           {(fmt.kind === 'video' || fmt.kind === 'image') && (
-            <label>Çözünürlük<select value={settings.resolution} onChange={(e) => set('resolution', e.target.value as ExportSettings['resolution'])}>
+            <label>{t('Çözünürlük')}<select value={settings.resolution} onChange={(e) => set('resolution', e.target.value as ExportSettings['resolution'])}>
               {resolutions.map((r) => <option key={r.id} value={r.id}>{r.title}</option>)}</select></label>
           )}
           {fmt.kind !== 'audio' && (
-            <label>En-boy<select value={settings.aspect} onChange={(e) => set('aspect', e.target.value as Aspect)}>
-              {aspects.map((a) => <option key={a.id} value={a.id}>{a.title}</option>)}</select></label>
+            <label>{t('En-boy')}<select value={settings.aspect} onChange={(e) => set('aspect', e.target.value as Aspect)}>
+              {aspects.map((a) => <option key={a.id} value={a.id}>{t(a.title)}</option>)}</select></label>
           )}
           {fmt.kind === 'video' && <>
-            <label>Kare hızı<select value={settings.fps} onChange={(e) => set('fps', Number(e.target.value))}>
+            <label>{t('Kare hızı')}<select value={settings.fps} onChange={(e) => set('fps', Number(e.target.value))}>
               {[24, 30, 60].map((f) => <option key={f} value={f}>{f} fps</option>)}</select></label>
-            <label>Kodek<select value={settings.codec} onChange={(e) => set('codec', e.target.value as VideoCodecChoice)}>
-              {fmt.codecs!.map((c) => <option key={c} value={c} disabled={usable[c] === false}>{codecTitles[c]}{usable[c] === false ? ' — bu bilgisayarda yok' : ''}</option>)}
+            <label>{t('Kodek')}<select value={settings.codec} onChange={(e) => set('codec', e.target.value as VideoCodecChoice)}>
+              {fmt.codecs!.map((c) => <option key={c} value={c} disabled={usable[c] === false}>{t(codecTitles[c])}{usable[c] === false ? ` — ${t('bu bilgisayarda yok')}` : ''}</option>)}
             </select></label>
-            <label>Kalite<select value={settings.quality} onChange={(e) => set('quality', e.target.value as ExportSettings['quality'])}>
-              <option value="high">Yüksek</option><option value="medium">Orta</option><option value="small">Küçük dosya</option></select></label>
+            <label>{t('Kalite')}<select value={settings.quality} onChange={(e) => set('quality', e.target.value as ExportSettings['quality'])}>
+              <option value="high">{t('Yüksek')}</option><option value="medium">{t('Orta')}</option><option value="small">{t('Küçük dosya')}</option></select></label>
           </>}
           {fmt.kind === 'gif' && <>
-            <label>Genişlik<select value={settings.gifWidth} onChange={(e) => set('gifWidth', Number(e.target.value))}>
+            <label>{t('Genişlik')}<select value={settings.gifWidth} onChange={(e) => set('gifWidth', Number(e.target.value))}>
               {[480, 640, 800, 960, 1280].map((w) => <option key={w} value={w}>{w} px</option>)}</select></label>
-            <label>Kare hızı<select value={settings.gifFps} onChange={(e) => set('gifFps', Number(e.target.value))}>
+            <label>{t('Kare hızı')}<select value={settings.gifFps} onChange={(e) => set('gifFps', Number(e.target.value))}>
               {[10, 15, 20, 25].map((f) => <option key={f} value={f}>{f} fps</option>)}</select></label>
-            {span.to - span.from > 30 && <p className="muted small">Uzun GIF'ler çok büyük olur. Zaman çizelgesinde bir aralık seçip yalnızca onu aktarabilirsin.</p>}
+            {span.to - span.from > 30 && <p className="muted small">{t('Uzun GIF\'ler çok büyük olur. Zaman çizelgesinde bir aralık seçip yalnızca onu aktarabilirsin.')}</p>}
           </>}
-          {fmt.kind === 'image' && <p className="muted small">Oynatma çizgisinin olduğu kare kaydedilir; YouTube kapak görseli için iyi bir başlangıç.</p>}
+          {fmt.kind === 'image' && <p className="muted small">{t('Oynatma çizgisinin olduğu kare kaydedilir; YouTube kapak görseli için iyi bir başlangıç.')}</p>}
           {range && fmt.kind !== 'image' && (
             <label className="check"><input type="checkbox" checked={onlyRange} onChange={(e) => setOnlyRange(e.target.checked)} />
-              Yalnızca seçili aralık ({timecode(range.a)} – {timecode(range.b)})</label>
+              {t('Yalnızca seçili aralık ({from} – {to})', { from: timecode(range.a), to: timecode(range.b) })}</label>
           )}
-          <div className="row between"><span>Çıktı</span><span className="mono">{summary}</span></div>
+          <div className="row between"><span>{t('Çıktı')}</span><span className="mono">{summary}</span></div>
         </fieldset>
         {progress !== null && <div className="progress"><div style={{ width: `${progress * 100}%` }} /><span>{remaining()}</span></div>}
-        {result && <p className="ok">✓ Hazır: {result.replace(/^.*[\\/]/, '')}</p>}
+        {result && <p className="ok">✓ {t('Hazır: {file}', { file: result.replace(/^.*[\\/]/, '') })}</p>}
         {error && <p className="err">{error}</p>}
         <div className="row between">
           <span className="row">
-            {result && <><button onClick={() => void odak().reveal(result)}>Klasörde Göster</button><button onClick={() => void odak().openPath(result)}>Aç</button></>}
+            {result && <><button onClick={() => void odak().reveal(result)}>{t('Klasörde Göster')}</button><button onClick={() => void odak().openPath(result)}>{t('Aç')}</button></>}
           </span>
           <span className="row">
             {progress !== null
-              ? <button onClick={() => abort.current?.abort()}>İptal</button>
-              : <><button onClick={onClose}>Kapat</button><button className="primary" onClick={() => void start()}>Dışa Aktar…</button></>}
+              ? <button onClick={() => abort.current?.abort()}>{t('İptal')}</button>
+              : <><button onClick={onClose}>{t('Kapat')}</button><button className="primary" onClick={() => void start()}>{t('Dışa Aktar…')}</button></>}
           </span>
         </div>
       </div>

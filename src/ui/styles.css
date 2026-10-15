@@ -390,3 +390,14 @@ kbd { display: inline-block; min-width: 20px; text-align: center; font: 600 10.5
 .formats .format.on { border-color: transparent; background: var(--grad-soft), #171826; box-shadow: 0 0 0 2px #a78bfa, 0 8px 24px -12px rgba(168, 85, 247, .9); }
 .progress { background: #101119; border: 1px solid var(--line); }
 .progress div { background: var(--grad); }
+
+/* Settings: language and diagnostics */
+.modal.settings { width: 470px; }
+.modal.settings .setting { background: rgba(255,255,255,.025); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px;
+  display: flex; flex-direction: column; gap: 10px; }
+.modal.settings .setting h3 { font-size: 13px; font-weight: 650; }
+.modal.settings .setting p { margin: 0; line-height: 1.45; }
+.modal.settings .setting > button { align-self: flex-start; }
+.settings-btn { white-space: nowrap; }
+.toolbar .settings-btn { font-size: 15px; line-height: 1; padding-left: 10px; padding-right: 10px; }
+.settings-btn .gear { font-size: 15px; line-height: 0; vertical-align: -1px; }

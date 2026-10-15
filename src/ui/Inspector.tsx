@@ -11,6 +11,7 @@ import { cameraPositions } from '../core/cameraLayout.ts';
 import type { MediaLibrary } from '../media/media.ts';
 import { type EditActions, timecode } from './Editor.tsx';
 import type { EditorStore } from './store.ts';
+import { N, t } from '../i18n/index.ts';
 
 export function Inspector({ store, lib, seek, onDelete, actions }: {
   store: EditorStore; lib: MediaLibrary; seek: (t: number) => void; onDelete: () => void; actions: EditActions;
@@ -39,8 +40,8 @@ export function Inspector({ store, lib, seek, onDelete, actions }: {
 function BackBar({ store }: { store: EditorStore }) {
   return (
     <div className="inspector-back">
-      <button onClick={() => store.select(null)} title="Seçimi bırak ve genel ayarlara (arka plan, imleç, kamera, ses) dön">‹ Genel ayarlara dön</button>
-      <kbd title="Klavyeden de dönebilirsin">Esc</kbd>
+      <button onClick={() => store.select(null)} title={t('Seçimi bırak ve genel ayarlara (arka plan, imleç, kamera, ses) dön')}>‹ {t('Genel ayarlara dön')}</button>
+      <kbd title={t('Klavyeden de dönebilirsin')}>Esc</kbd>
     </div>
   );
 }
@@ -48,20 +49,20 @@ function BackBar({ store }: { store: EditorStore }) {
 /** ⌘ on macOS, Ctrl elsewhere. */
 const MOD = typeof navigator !== 'undefined' && /Mac/.test(navigator.platform) ? '⌘' : 'Ctrl';
 
-/** The most useful keys for what the panel shows. */
+/** The most useful keys for what the panel shows (keys and texts are translated when drawn). */
 function Shortcuts({ items }: { items: [string, string][] }) {
   return (
     <section className="shortcuts">
-      <h3>Kısayollar</h3>
+      <h3>{t('Kısayollar')}</h3>
       <ul>
         {items.map(([keys, what]) => (
-          <li key={what}><span>{what}</span><span className="keys">{keys.split(' ').map((k) => <kbd key={k}>{k}</kbd>)}</span></li>
+          <li key={what}><span>{t(what)}</span><span className="keys">{keys.split(' ').map((k) => <kbd key={k}>{t(k)}</kbd>)}</span></li>
         ))}
       </ul>
     </section>
   );
 }
-const commonKeys: [string, string][] = [['Space', 'Oynat / duraklat'], ['← →', 'Kare kare'], [`${MOD} Z`, 'Geri al'], ['Esc', 'Genel ayarlara dön']];
+const commonKeys: [string, string][] = [['Space', N('Oynat / duraklat')], ['← →', N('Kare kare')], [`${MOD} Z`, N('Geri al')], ['Esc', N('Genel ayarlara dön')]];
 
 /** Quick values next to a slider. */
 function Chips({ values, value, format, onPick }: { values: number[]; value: number; format: (v: number) => string; onPick: (v: number) => void }) {
@@ -99,9 +100,9 @@ function ZoomInspector({ store, lib, clip, zoom, seek, onDelete }: {
   return (
     <>
       <section>
-        <h3>Zoom</h3>
-        <span className={`badge ${zoom.isGenerated ? 'auto' : 'manual'}`}>{zoom.isGenerated ? 'Otomatik oluşturuldu' : 'Elle düzenlendi'}</span>
-        <label className="field">Miktar
+        <h3>{t('Zoom')}</h3>
+        <span className={`badge ${zoom.isGenerated ? 'auto' : 'manual'}`}>{zoom.isGenerated ? t('Otomatik oluşturuldu') : t('Elle düzenlendi')}</span>
+        <label className="field">{t('Miktar')}
           <div className="row">
             <input type="range" min={1.1} max={4} step={0.01} value={zoom.scale}
                    onChange={(e) => set('scale', (z) => ({ ...z, scale: Number(e.target.value) }))} />
@@ -110,46 +111,46 @@ function ZoomInspector({ store, lib, clip, zoom, seek, onDelete }: {
         </label>
         <Chips values={[1.25, 1.5, 2, 2.5, 3]} value={zoom.scale} format={(v) => `×${v}`} onPick={(v) => set('scale', (z) => ({ ...z, scale: v }))} />
         <div className="segmented">
-          <button className={!fixed ? 'on' : ''} onClick={() => void switchFocus(false)}>İmleci takip et</button>
-          <button className={fixed ? 'on' : ''} onClick={() => void switchFocus(true)}>Sabit nokta</button>
+          <button className={!fixed ? 'on' : ''} onClick={() => void switchFocus(false)}>{t('İmleci takip et')}</button>
+          <button className={fixed ? 'on' : ''} onClick={() => void switchFocus(true)}>{t('Sabit nokta')}</button>
         </div>
         {'fixed' in zoom.focus
           ? <>
-              <p className="muted small">Görüntüde odaklanılacak yere tıkla ya da sürükle.</p>
+              <p className="muted small">{t('Görüntüde odaklanılacak yere tıkla ya da sürükle.')}</p>
               <FocusPicker lib={lib} store={store} clip={clip} zoom={zoom}
                            onChange={(x, y) => set('point', (z) => ({ ...z, focus: fixedFocus(x, y) }))} />
             </>
-          : <p className="muted small">Kamera, imlecin bu aralıkta en çok vakit geçirdiği bölgelere yumuşakça kayar.</p>}
+          : <p className="muted small">{t('Kamera, imlecin bu aralıkta en çok vakit geçirdiği bölgelere yumuşakça kayar.')}</p>}
       </section>
       <section>
-        <h3>Zamanlama</h3>
-        <TimeField label="Başlangıç" value={zoom.start - clip.sourceStart} onCommit={(v) => set('start', (z) => ({ ...z, start: clip.sourceStart + v }))} />
-        <TimeField label="Bitiş" value={zoom.end - clip.sourceStart} onCommit={(v) => set('end', (z) => ({ ...z, end: clip.sourceStart + v }))} />
-        <div className="field row between"><span>Süre</span><span className="mono">{(zoom.end - zoom.start).toFixed(2)} sn</span></div>
+        <h3>{t('Zamanlama')}</h3>
+        <TimeField label={t('Başlangıç')} value={zoom.start - clip.sourceStart} onCommit={(v) => set('start', (z) => ({ ...z, start: clip.sourceStart + v }))} />
+        <TimeField label={t('Bitiş')} value={zoom.end - clip.sourceStart} onCommit={(v) => set('end', (z) => ({ ...z, end: clip.sourceStart + v }))} />
+        <div className="field row between"><span>{t('Süre')}</span><span className="mono">{t('{s} sn', { s: (zoom.end - zoom.start).toFixed(2) })}</span></div>
         <div className="row between">
-          <button onClick={() => seek(clipStart + Math.max(0, toLocal(clip, zoom.start) - 0.5))}>Başına Git</button>
-          <button className="danger" onClick={onDelete}>Sil</button>
+          <button onClick={() => seek(clipStart + Math.max(0, toLocal(clip, zoom.start) - 0.5))}>{t('Başına Git')}</button>
+          <button className="danger" onClick={onDelete}>{t('Sil')}</button>
         </div>
       </section>
       <section>
-        <h3>Geçiş</h3>
+        <h3>{t('Geçiş')}</h3>
         <div className="segmented">
           {zoomSpeeds.map((z) => (
             <button key={z.id} className={store.project.style.zoomSpeed === z.id ? 'on' : ''}
-                    onClick={() => store.update((q) => ({ ...q, style: { ...q.style, zoomSpeed: z.id } }), 'style-zoomSpeed')}>{z.title}</button>
+                    onClick={() => store.update((q) => ({ ...q, style: { ...q.style, zoomSpeed: z.id } }), 'style-zoomSpeed')}>{t(z.title)}</button>
           ))}
         </div>
-        <p className="muted small">Zoom'a giriş ve çıkışın ne kadar yumuşak olacağı (bütün zoom'lar için).</p>
+        <p className="muted small">{t('Zoom\'a giriş ve çıkışın ne kadar yumuşak olacağı (bütün zoom\'lar için).')}</p>
       </section>
       <section>
-        <h3>Zoom'lar arasında</h3>
+        <h3>{t('Zoom\'lar arasında')}</h3>
         <div className="row between">
-          <button disabled={at <= 0} onClick={() => go(at - 1)}>‹ Önceki</button>
+          <button disabled={at <= 0} onClick={() => go(at - 1)}>‹ {t('Önceki')}</button>
           <span className="mono muted">{at + 1} / {all.length}</span>
-          <button disabled={at >= all.length - 1} onClick={() => go(at + 1)}>Sonraki ›</button>
+          <button disabled={at >= all.length - 1} onClick={() => go(at + 1)}>{t('Sonraki')} ›</button>
         </div>
       </section>
-      <Shortcuts items={[['Z', 'Oynatma çizgisine zoom ekle'], ['Sil', "Bu zoom'u sil"], ...commonKeys]} />
+      <Shortcuts items={[['Z', N('Oynatma çizgisine zoom ekle')], [N('Sil'), N('Bu zoom\'u sil')], ...commonKeys]} />
     </>
   );
 }
@@ -159,7 +160,7 @@ function PositionPicker({ value, onChange }: { value: CameraPosition; onChange: 
   return (
     <div className="positions">
       {cameraPositions.map((p) => (
-        <button key={p.id} className={value === p.id ? 'on' : ''} title={p.title} onClick={() => onChange(p.id)}>{p.icon}</button>
+        <button key={p.id} className={value === p.id ? 'on' : ''} title={t(p.title)} onClick={() => onChange(p.id)}>{p.icon}</button>
       ))}
     </div>
   );
@@ -174,37 +175,37 @@ function CameraSegmentInspector({ store, clip, seg, seek, onDelete }: {
   return (
     <>
       <section>
-        <h3>Kamera bölümü</h3>
-        <p className="muted small">Bu aralıkta kamera burada durur. Başında yerine yumuşakça kayar, sonunda genel ayara geri döner.</p>
+        <h3>{t('Kamera bölümü')}</h3>
+        <p className="muted small">{t('Bu aralıkta kamera burada durur. Başında yerine yumuşakça kayar, sonunda genel ayara geri döner.')}</p>
         <div className="segmented">
-          {([['bubble', 'Balon'], ['full', 'Tam ekran'], ['hidden', 'Gizle']] as const).map(([k, t]) => (
-            <button key={k} className={seg.mode === k ? 'on' : ''} onClick={() => set('mode', (x) => ({ ...x, mode: k }))}>{t}</button>
+          {([['bubble', N('Balon')], ['full', N('Tam ekran')], ['hidden', N('Gizle')]] as const).map(([k, name]) => (
+            <button key={k} className={seg.mode === k ? 'on' : ''} onClick={() => set('mode', (x) => ({ ...x, mode: k }))}>{t(name)}</button>
           ))}
         </div>
         {seg.mode === 'bubble' && <>
-          <div className="field">Konum</div>
+          <div className="field">{t('Konum')}</div>
           <PositionPicker value={seg.position} onChange={(v) => set('position', (x) => ({ ...x, position: v }))} />
-          <label className="field">Boyut
+          <label className="field">{t('Boyut')}
             <div className="row">
               <input type="range" min={0.12} max={0.6} step={0.005} value={seg.size} onChange={(e) => set('size', (x) => ({ ...x, size: Number(e.target.value) }))} />
               <span className="mono value">{Math.round(seg.size * 100)}%</span>
             </div>
           </label>
         </>}
-        {seg.mode === 'full' && <p className="muted small">Kamera tüm görüntüyü kaplar; örneğin girişte ya da konuşurken.</p>}
-        {seg.mode === 'hidden' && <p className="muted small">Kamera bu aralıkta görünmez (yavaşça kaybolur ve geri gelir).</p>}
+        {seg.mode === 'full' && <p className="muted small">{t('Kamera tüm görüntüyü kaplar; örneğin girişte ya da konuşurken.')}</p>}
+        {seg.mode === 'hidden' && <p className="muted small">{t('Kamera bu aralıkta görünmez (yavaşça kaybolur ve geri gelir).')}</p>}
       </section>
       <section>
-        <h3>Zamanlama</h3>
-        <TimeField label="Başlangıç" value={seg.start - clip.sourceStart} onCommit={(v) => set('start', (x) => ({ ...x, start: clip.sourceStart + v }))} />
-        <TimeField label="Bitiş" value={seg.end - clip.sourceStart} onCommit={(v) => set('end', (x) => ({ ...x, end: clip.sourceStart + v }))} />
-        <div className="field row between"><span>Süre</span><span className="mono">{(toLocal(clip, seg.end) - toLocal(clip, seg.start)).toFixed(2)} sn</span></div>
+        <h3>{t('Zamanlama')}</h3>
+        <TimeField label={t('Başlangıç')} value={seg.start - clip.sourceStart} onCommit={(v) => set('start', (x) => ({ ...x, start: clip.sourceStart + v }))} />
+        <TimeField label={t('Bitiş')} value={seg.end - clip.sourceStart} onCommit={(v) => set('end', (x) => ({ ...x, end: clip.sourceStart + v }))} />
+        <div className="field row between"><span>{t('Süre')}</span><span className="mono">{t('{s} sn', { s: (toLocal(clip, seg.end) - toLocal(clip, seg.start)).toFixed(2) })}</span></div>
         <div className="row between">
-          <button onClick={() => seek(clipStart + Math.max(0, toLocal(clip, seg.start) - 0.7))}>Başına Git</button>
-          <button className="danger" onClick={onDelete}>Sil</button>
+          <button onClick={() => seek(clipStart + Math.max(0, toLocal(clip, seg.start) - 0.7))}>{t('Başına Git')}</button>
+          <button className="danger" onClick={onDelete}>{t('Sil')}</button>
         </div>
       </section>
-      <Shortcuts items={[['K', 'Kamera bölümü ekle'], ['Sil', 'Bu bölümü sil'], ...commonKeys]} />
+      <Shortcuts items={[['K', N('Kamera bölümü ekle')], [N('Sil'), N('Bu bölümü sil')], ...commonKeys]} />
     </>
   );
 }
@@ -218,16 +219,16 @@ function MagnifierInspector({ store, clip, seg, seek, onDelete }: {
   return (
     <>
       <section>
-        <h3>Büyüteç</h3>
-        <p className="muted small">Bu aralıkta imlecin etrafında bir büyüteç açılır ve imleci takip eder. Başında açılır, sonunda kapanır.</p>
-        <label className="field">Boyut
+        <h3>{t('Büyüteç')}</h3>
+        <p className="muted small">{t('Bu aralıkta imlecin etrafında bir büyüteç açılır ve imleci takip eder. Başında açılır, sonunda kapanır.')}</p>
+        <label className="field">{t('Boyut')}
           <div className="row">
             <input type="range" min={0.12} max={0.7} step={0.01} value={seg.size} onChange={(e) => set('size', (x) => ({ ...x, size: Number(e.target.value) }))} />
             <span className="mono value">{Math.round(seg.size * 100)}%</span>
           </div>
         </label>
-        <Chips values={[0.22, 0.32, 0.45]} value={seg.size} format={(v) => (v < 0.3 ? 'Küçük' : v < 0.4 ? 'Orta' : 'Büyük')} onPick={(v) => set('size', (x) => ({ ...x, size: v }))} />
-        <label className="field">Büyütme
+        <Chips values={[0.22, 0.32, 0.45]} value={seg.size} format={(v) => (v < 0.3 ? t('Küçük') : v < 0.4 ? t('Orta') : t('Büyük'))} onPick={(v) => set('size', (x) => ({ ...x, size: v }))} />
+        <label className="field">{t('Büyütme')}
           <div className="row">
             <input type="range" min={1.25} max={5} step={0.05} value={seg.zoom} onChange={(e) => set('zoom', (x) => ({ ...x, zoom: Number(e.target.value) }))} />
             <span className="mono value">×{seg.zoom.toFixed(2)}</span>
@@ -235,22 +236,22 @@ function MagnifierInspector({ store, clip, seg, seek, onDelete }: {
         </label>
         <Chips values={[1.5, 2, 3]} value={seg.zoom} format={(v) => `×${v}`} onPick={(v) => set('zoom', (x) => ({ ...x, zoom: v }))} />
         <div className="segmented">
-          {([['circle', 'Daire'], ['rounded', 'Yuvarlak kare']] as const).map(([k, t]) => (
-            <button key={k} className={seg.shape === k ? 'on' : ''} onClick={() => set('shape', (x) => ({ ...x, shape: k }))}>{t}</button>
+          {([['circle', N('Daire')], ['rounded', N('Yuvarlak kare')]] as const).map(([k, name]) => (
+            <button key={k} className={seg.shape === k ? 'on' : ''} onClick={() => set('shape', (x) => ({ ...x, shape: k }))}>{t(name)}</button>
           ))}
         </div>
       </section>
       <section>
-        <h3>Zamanlama</h3>
-        <TimeField label="Başlangıç" value={seg.start - clip.sourceStart} onCommit={(v) => set('start', (x) => ({ ...x, start: clip.sourceStart + v }))} />
-        <TimeField label="Bitiş" value={seg.end - clip.sourceStart} onCommit={(v) => set('end', (x) => ({ ...x, end: clip.sourceStart + v }))} />
-        <div className="field row between"><span>Süre</span><span className="mono">{(toLocal(clip, seg.end) - toLocal(clip, seg.start)).toFixed(2)} sn</span></div>
+        <h3>{t('Zamanlama')}</h3>
+        <TimeField label={t('Başlangıç')} value={seg.start - clip.sourceStart} onCommit={(v) => set('start', (x) => ({ ...x, start: clip.sourceStart + v }))} />
+        <TimeField label={t('Bitiş')} value={seg.end - clip.sourceStart} onCommit={(v) => set('end', (x) => ({ ...x, end: clip.sourceStart + v }))} />
+        <div className="field row between"><span>{t('Süre')}</span><span className="mono">{t('{s} sn', { s: (toLocal(clip, seg.end) - toLocal(clip, seg.start)).toFixed(2) })}</span></div>
         <div className="row between">
-          <button onClick={() => seek(clipStart + Math.max(0, toLocal(clip, seg.start) - 0.5))}>Başına Git</button>
-          <button className="danger" onClick={onDelete}>Sil</button>
+          <button onClick={() => seek(clipStart + Math.max(0, toLocal(clip, seg.start) - 0.5))}>{t('Başına Git')}</button>
+          <button className="danger" onClick={onDelete}>{t('Sil')}</button>
         </div>
       </section>
-      <Shortcuts items={[['B', 'Büyüteç ekle'], ['Sil', 'Bu büyüteci sil'], ...commonKeys]} />
+      <Shortcuts items={[['B', N('Büyüteç ekle')], [N('Sil'), N('Bu büyüteci sil')], ...commonKeys]} />
     </>
   );
 }
@@ -264,7 +265,7 @@ function TimeField({ label, value, onCommit }: { label: string; value: number; o
       <span className="row">
         <input className="num" value={text} onChange={(e) => setText(e.target.value)} onBlur={commit}
                onKeyDown={(e) => { if (e.key === 'Enter') commit(); }} />
-        <span className="muted">sn</span>
+        <span className="muted">{t('sn')}</span>
         <button className="ghost tiny" onClick={() => onCommit(value - 0.1)}>−</button>
         <button className="ghost tiny" onClick={() => onCommit(value + 0.1)}>+</button>
       </span>
@@ -338,7 +339,7 @@ function StyleInspector({ store, lib }: { store: EditorStore; lib: MediaLibrary 
     if (!src) return;
     try {
       const rel = await odak().importAsset(store.pkg, src);
-      if (!(await lib.image(rel))) { setImageError('Bu görsel açılamadı. PNG, JPG ya da WEBP dene.'); return; }
+      if (!(await lib.image(rel))) { setImageError(t('Bu görsel açılamadı. PNG, JPG ya da WEBP dene.')); return; }
       setImageError(null);
       setMany({ backgroundKind: 'image', backgroundImage: rel, padding: Math.max(st.padding, 0.08) }, 'image');
     } catch (e) { setImageError((e as Error).message); }
@@ -347,44 +348,44 @@ function StyleInspector({ store, lib }: { store: EditorStore; lib: MediaLibrary 
   return (
     <>
       <section>
-        <h3>Görüntü oranı</h3>
+        <h3>{t('Görüntü oranı')}</h3>
         <div className="segmented">
-          {([['wide', '16:9'], ['vertical', '9:16'], ['square', '1:1'], ['recording', 'Kayıt']] as const).map(([k, t]) => (
-            <button key={k} className={p.export.aspect === k ? 'on' : ''} title={k === 'vertical' ? 'Dikey: Shorts, Reels, TikTok' : k === 'recording' ? 'Kaydın kendi oranı' : undefined}
-                    onClick={() => store.update((q) => ({ ...q, export: { ...q.export, aspect: k } }), 'export-aspect')}>{t}</button>
+          {([['wide', '16:9'], ['vertical', '9:16'], ['square', '1:1'], ['recording', N('Kayıt')]] as const).map(([k, name]) => (
+            <button key={k} className={p.export.aspect === k ? 'on' : ''} title={k === 'vertical' ? t('Dikey: Shorts, Reels, TikTok') : k === 'recording' ? t('Kaydın kendi oranı') : undefined}
+                    onClick={() => store.update((q) => ({ ...q, export: { ...q.export, aspect: k } }), 'export-aspect')}>{t(name)}</button>
           ))}
         </div>
       </section>
       <section>
-        <h3>Arka plan</h3>
+        <h3>{t('Arka plan')}</h3>
         <div className="segmented">
-          {([['gradient', 'Renk'], ['theme', 'Tema'], ['image', 'Görsel']] as const).map(([k, t]) => (
-            <button key={k} className={st.backgroundKind === k ? 'on' : ''} onClick={() => set('backgroundKind', k)}>{t}</button>
+          {([['gradient', N('Renk')], ['theme', N('Tema')], ['image', N('Görsel')]] as const).map(([k, name]) => (
+            <button key={k} className={st.backgroundKind === k ? 'on' : ''} onClick={() => set('backgroundKind', k)}>{t(name)}</button>
           ))}
         </div>
         {st.backgroundKind === 'gradient' && <>
           <div className="swatches">
             {gradientPresets.map((g) => (
-              <button key={g.title} title={g.title} className="swatch" style={{ background: `linear-gradient(135deg, ${g.top}, ${g.bottom})` }}
+              <button key={g.title} title={t(g.title)} className="swatch" style={{ background: `linear-gradient(135deg, ${g.top}, ${g.bottom})` }}
                       onClick={() => setMany({ backgroundTop: fromHex(g.top), backgroundBottom: fromHex(g.bottom) }, 'preset')} />
             ))}
           </div>
-          <div className="field row between">Özel renkler
+          <div className="field row between">{t('Özel renkler')}
             <span className="row">
               <input type="color" value={toHex(st.backgroundTop)} onChange={(e) => set('backgroundTop', fromHex(e.target.value))} />
               <input type="color" value={toHex(st.backgroundBottom)} onChange={(e) => set('backgroundBottom', fromHex(e.target.value))} />
             </span>
           </div>
         </>}
-        {st.backgroundKind === 'theme' && ([['pro', 'Profesyonel'], ['fun', 'Eğlenceli & mevsimsel']] as const).map(([group, title]) => (
+        {st.backgroundKind === 'theme' && ([['pro', N('Profesyonel')], ['fun', N('Eğlenceli & mevsimsel')]] as const).map(([group, title]) => (
           <div key={group} className="theme-group">
-            <div className="theme-group-title">{title}</div>
+            <div className="theme-group-title">{t(title)}</div>
             <div className="themes">
-              {themesOf(group).map((t) => (
-                <button key={t.id} className={`theme ${st.backgroundTheme === t.id ? 'on' : ''}`} title={t.title}
-                        onClick={() => setMany({ backgroundTheme: t.id, padding: Math.max(st.padding, 0.1) }, 'theme')}>
-                  <ThemeThumb id={t.id} />
-                  <span>{t.emoji} {t.title}</span>
+              {themesOf(group).map((th) => (
+                <button key={th.id} className={`theme ${st.backgroundTheme === th.id ? 'on' : ''}`} title={t(th.title)}
+                        onClick={() => setMany({ backgroundTheme: th.id, padding: Math.max(st.padding, 0.1) }, 'theme')}>
+                  <ThemeThumb id={th.id} />
+                  <span>{th.emoji} {t(th.title)}</span>
                 </button>
               ))}
             </div>
@@ -392,92 +393,92 @@ function StyleInspector({ store, lib }: { store: EditorStore; lib: MediaLibrary 
         ))}
         {st.backgroundKind === 'image' && <>
           <div className="row">
-            <button className="primary" onClick={() => void pickImage()}>Görsel Seç…</button>
-            {st.backgroundImage && <span className="muted small">Projeye kopyalandı</span>}
+            <button className="primary" onClick={() => void pickImage()}>{t('Görsel Seç…')}</button>
+            {st.backgroundImage && <span className="muted small">{t('Projeye kopyalandı')}</span>}
           </div>
           {imageError && <p className="err small">{imageError}</p>}
-          {!st.backgroundImage && <p className="muted small">Bilgisayarından bir görsel seç; projeye kopyalanır, ekranın arkasını kaplar.</p>}
-          {st.backgroundImage && <label className="field">Bulanıklık<input type="range" min={0} max={1} step={0.01} value={st.backgroundBlur} onChange={(e) => set('backgroundBlur', Number(e.target.value))} /></label>}
+          {!st.backgroundImage && <p className="muted small">{t('Bilgisayarından bir görsel seç; projeye kopyalanır, ekranın arkasını kaplar.')}</p>}
+          {st.backgroundImage && <label className="field">{t('Bulanıklık')}<input type="range" min={0} max={1} step={0.01} value={st.backgroundBlur} onChange={(e) => set('backgroundBlur', Number(e.target.value))} /></label>}
         </>}
-        <label className="field">Kenar boşluğu<input type="range" min={0} max={0.2} step={0.001} value={st.padding} onChange={(e) => set('padding', Number(e.target.value))} /></label>
-        <label className="field">Köşe<input type="range" min={0} max={0.06} step={0.001} value={st.cornerRadius} onChange={(e) => set('cornerRadius', Number(e.target.value))} /></label>
-        <label className="check"><input type="checkbox" checked={st.shadow} onChange={(e) => set('shadow', e.target.checked)} /> Gölge</label>
+        <label className="field">{t('Kenar boşluğu')}<input type="range" min={0} max={0.2} step={0.001} value={st.padding} onChange={(e) => set('padding', Number(e.target.value))} /></label>
+        <label className="field">{t('Köşe')}<input type="range" min={0} max={0.06} step={0.001} value={st.cornerRadius} onChange={(e) => set('cornerRadius', Number(e.target.value))} /></label>
+        <label className="check"><input type="checkbox" checked={st.shadow} onChange={(e) => set('shadow', e.target.checked)} /> {t('Gölge')}</label>
       </section>
       <section>
-        <h3>İmleç</h3>
-        <label className="check"><input type="checkbox" checked={st.showCursor} onChange={(e) => set('showCursor', e.target.checked)} /> İmleci göster</label>
+        <h3>{t('İmleç')}</h3>
+        <label className="check"><input type="checkbox" checked={st.showCursor} onChange={(e) => set('showCursor', e.target.checked)} /> {t('İmleci göster')}</label>
         <div className="cursors">
-          {([['arrow', 'Beyaz ok'], ['arrow-dark', 'Siyah ok'], ['arrow-color', 'Renkli ok'], ['dot', 'Nokta']] as const).map(([k, t]) => (
-            <button key={k} className={`cursor-opt ${st.cursorStyle === k ? 'on' : ''}`} title={t} onClick={() => set('cursorStyle', k)}>
-              <CursorThumb style={k} color={st.cursorColor} /><span>{t}</span>
+          {([['arrow', N('Beyaz ok')], ['arrow-dark', N('Siyah ok')], ['arrow-color', N('Renkli ok')], ['dot', N('Nokta')]] as const).map(([k, name]) => (
+            <button key={k} className={`cursor-opt ${st.cursorStyle === k ? 'on' : ''}`} title={t(name)} onClick={() => set('cursorStyle', k)}>
+              <CursorThumb style={k} color={st.cursorColor} /><span>{t(name)}</span>
             </button>
           ))}
         </div>
-        <div className="field row between">Renk (nokta, renkli ok, vurgu, tıklama)
+        <div className="field row between">{t('Renk (nokta, renkli ok, vurgu, tıklama)')}
           <input type="color" value={toHex(st.cursorColor)} onChange={(e) => set('cursorColor', fromHex(e.target.value))} />
         </div>
-        <label className="field">Boyut<input type="range" min={0.6} max={3} step={0.01} value={st.cursorScale} onChange={(e) => set('cursorScale', Number(e.target.value))} /></label>
-        <label className="check"><input type="checkbox" checked={st.cursorHighlight} onChange={(e) => set('cursorHighlight', e.target.checked)} /> Vurgu halkası</label>
-        <label className="check"><input type="checkbox" checked={st.smoothCursor} onChange={(e) => set('smoothCursor', e.target.checked)} /> Hareketi yumuşat</label>
-        <label className="check"><input type="checkbox" checked={st.hideIdleCursor} onChange={(e) => set('hideIdleCursor', e.target.checked)} /> Hareketsizken gizle</label>
-        <label className="check"><input type="checkbox" checked={st.clickRipple} onChange={(e) => set('clickRipple', e.target.checked)} /> Tıklama efekti</label>
+        <label className="field">{t('Boyut')}<input type="range" min={0.6} max={3} step={0.01} value={st.cursorScale} onChange={(e) => set('cursorScale', Number(e.target.value))} /></label>
+        <label className="check"><input type="checkbox" checked={st.cursorHighlight} onChange={(e) => set('cursorHighlight', e.target.checked)} /> {t('Vurgu halkası')}</label>
+        <label className="check"><input type="checkbox" checked={st.smoothCursor} onChange={(e) => set('smoothCursor', e.target.checked)} /> {t('Hareketi yumuşat')}</label>
+        <label className="check"><input type="checkbox" checked={st.hideIdleCursor} onChange={(e) => set('hideIdleCursor', e.target.checked)} /> {t('Hareketsizken gizle')}</label>
+        <label className="check"><input type="checkbox" checked={st.clickRipple} onChange={(e) => set('clickRipple', e.target.checked)} /> {t('Tıklama efekti')}</label>
         {st.clickRipple && (
           <div className="segmented">
-            <button className={st.clickStyle === 'ring' ? 'on' : ''} onClick={() => set('clickStyle', 'ring')}>Halka</button>
-            <button className={st.clickStyle === 'pulse' ? 'on' : ''} onClick={() => set('clickStyle', 'pulse')}>Dolgu</button>
+            <button className={st.clickStyle === 'ring' ? 'on' : ''} onClick={() => set('clickStyle', 'ring')}>{t('Halka')}</button>
+            <button className={st.clickStyle === 'pulse' ? 'on' : ''} onClick={() => set('clickStyle', 'pulse')}>{t('Dolgu')}</button>
           </div>
         )}
       </section>
       {hasCamera && (
         <section>
-          <h3>Kamera</h3>
-          <label className="check"><input type="checkbox" checked={st.camera.show} onChange={(e) => setCam('show', e.target.checked)} /> Kamerayı göster</label>
+          <h3>{t('Kamera')}</h3>
+          <label className="check"><input type="checkbox" checked={st.camera.show} onChange={(e) => setCam('show', e.target.checked)} /> {t('Kamerayı göster')}</label>
           {st.camera.show && <>
             <PositionPicker value={st.camera.position} onChange={(v) => setCam('position', v)} />
-            <label className="field">Boyut<input type="range" min={0.12} max={0.5} step={0.005} value={st.camera.size} onChange={(e) => setCam('size', Number(e.target.value))} /></label>
+            <label className="field">{t('Boyut')}<input type="range" min={0.12} max={0.5} step={0.005} value={st.camera.size} onChange={(e) => setCam('size', Number(e.target.value))} /></label>
             <div className="segmented">
-              {([['circle', 'Daire'], ['rounded', 'Yuvarlak köşe'], ['square', 'Kare']] as const).map(([k, t]) => (
-                <button key={k} className={st.camera.shape === k ? 'on' : ''} onClick={() => setCam('shape', k)}>{t}</button>
+              {([['circle', N('Daire')], ['rounded', N('Yuvarlak köşe')], ['square', N('Kare')]] as const).map(([k, name]) => (
+                <button key={k} className={st.camera.shape === k ? 'on' : ''} onClick={() => setCam('shape', k)}>{t(name)}</button>
               ))}
             </div>
-            <label className="check"><input type="checkbox" checked={st.camera.mirror} onChange={(e) => setCam('mirror', e.target.checked)} /> Ayna görüntüsü</label>
-            <label className="check"><input type="checkbox" checked={st.camera.border} onChange={(e) => setCam('border', e.target.checked)} /> Beyaz çerçeve</label>
+            <label className="check"><input type="checkbox" checked={st.camera.mirror} onChange={(e) => setCam('mirror', e.target.checked)} /> {t('Ayna görüntüsü')}</label>
+            <label className="check"><input type="checkbox" checked={st.camera.border} onChange={(e) => setCam('border', e.target.checked)} /> {t('Beyaz çerçeve')}</label>
           </>}
-          <p className="muted small">Belli bir aralıkta kamerayı başka yere taşımak, tam ekran yapmak ya da gizlemek için: aralığı seç, <b>📷 Kamera</b>.</p>
+          <p className="muted small">{t('Belli bir aralıkta kamerayı başka yere taşımak, tam ekran yapmak ya da gizlemek için: aralığı seç, sonra 📷 Kamera.')}</p>
         </section>
       )}
       {hasAudio && (
         <section>
-          <h3>Ses</h3>
+          <h3>{t('Ses')}</h3>
           {p.media.some((m) => m.systemAudioFile) && (
-            <label className="field">Sistem sesi<input type="range" min={0} max={2} step={0.01} value={p.clips[0]?.systemAudioVolume ?? 1}
+            <label className="field">{t('Sistem sesi')}<input type="range" min={0} max={2} step={0.01} value={p.clips[0]?.systemAudioVolume ?? 1}
               onChange={(e) => store.update((q) => ({ ...q, clips: q.clips.map((c) => ({ ...c, systemAudioVolume: Number(e.target.value) })) }), 'vol-system')} /></label>
           )}
           {p.media.some((m) => m.microphoneFile) && (
-            <label className="field">Mikrofon<input type="range" min={0} max={2} step={0.01} value={p.clips[0]?.microphoneVolume ?? 1}
+            <label className="field">{t('Mikrofon')}<input type="range" min={0} max={2} step={0.01} value={p.clips[0]?.microphoneVolume ?? 1}
               onChange={(e) => store.update((q) => ({ ...q, clips: q.clips.map((c) => ({ ...c, microphoneVolume: Number(e.target.value) })) }), 'vol-mic')} /></label>
           )}
         </section>
       )}
       <section>
-        <h3>Zoom geçişi</h3>
+        <h3>{t('Zoom geçişi')}</h3>
         <div className="segmented">
-          {zoomSpeeds.map((z) => <button key={z.id} className={st.zoomSpeed === z.id ? 'on' : ''} onClick={() => set('zoomSpeed', z.id)}>{z.title}</button>)}
+          {zoomSpeeds.map((z) => <button key={z.id} className={st.zoomSpeed === z.id ? 'on' : ''} onClick={() => set('zoomSpeed', z.id)}>{t(z.title)}</button>)}
         </div>
-        <p className="muted small">Bir zoom'u düzenlemek için zaman çizelgesinde üzerine tıkla.</p>
+        <p className="muted small">{t('Bir zoom\'u düzenlemek için zaman çizelgesinde üzerine tıkla.')}</p>
       </section>
       <section>
-        <h3>Kayıt</h3>
+        <h3>{t('Kayıt')}</h3>
         {p.media.map((m) => (
           <div key={m.id} className="media-info">
-            <b>{m.displayName}</b>
+            <b data-raw>{m.displayName}</b>
             <span className="muted small">{m.pixelWidth}×{m.pixelHeight} · {timecode(m.duration, false)}</span>
-            <span className="muted small">{[m.systemAudioFile && 'sistem sesi', m.microphoneFile && 'mikrofon', m.cameraFile && 'kamera'].filter(Boolean).join(' · ') || 'yalnızca ekran'}</span>
+            <span className="muted small">{[m.systemAudioFile && t('sistem sesi'), m.microphoneFile && t('mikrofon'), m.cameraFile && t('kamera')].filter(Boolean).join(' · ') || t('yalnızca ekran')}</span>
           </div>
         ))}
       </section>
-      <Shortcuts items={[['Space', 'Oynat / duraklat'], ['S', 'Böl'], ['Z', 'Zoom ekle'], ['K', 'Kamera bölümü'], ['B', 'Büyüteç'],
-                          ['V R C', 'Seç · Aralık · Makas'], [`${MOD} Z`, 'Geri al'], [`${MOD} E`, 'Dışa aktar']]} />
+      <Shortcuts items={[['Space', N('Oynat / duraklat')], ['S', N('Böl')], ['Z', N('Zoom ekle')], ['K', N('Kamera bölümü')], ['B', N('Büyüteç')],
+                          ['V R C', N('Seç · Aralık · Makas')], [`${MOD} Z`, N('Geri al')], [`${MOD} E`, N('Dışa aktar')]]} />
     </>
   );
 }
@@ -535,41 +536,41 @@ function ClipInspector({ store, clip, actions, seek }: { store: EditorStore; cli
   return (
     <>
       <section>
-        <h3>Klip {index + 1} / {p.clips.length}</h3>
+        <h3>{t('Klip {n} / {total}', { n: index + 1, total: p.clips.length })}</h3>
         <span className={`badge ${media?.kind === 'externalVideo' ? 'manual' : 'auto'}`}>
-          {media?.kind === 'externalVideo' ? 'Eklenen video' : 'Ekran kaydı'} · {media?.displayName}
+          {media?.kind === 'externalVideo' ? t('Eklenen video') : t('Ekran kaydı')} · <span data-raw>{media?.displayName}</span>
         </span>
-        <TimeField label="Kaynakta başlangıç" value={clip.sourceStart} onCommit={(v) => store.update((q) => trimClip(q, clip.id, 'start', v))} />
-        <TimeField label="Kaynakta bitiş" value={clip.sourceEnd} onCommit={(v) => store.update((q) => trimClip(q, clip.id, 'end', v))} />
-        <div className="field row between"><span>Videodaki süre</span><span className="mono">{clipDuration(clip).toFixed(2)} sn</span></div>
-        <p className="muted small">İpucu: zaman çizelgesinde klibin kenarlarını sürükleyerek de kırpabilirsin; bitiş kenarı oynatma çizgisine yapışır.</p>
+        <TimeField label={t('Kaynakta başlangıç')} value={clip.sourceStart} onCommit={(v) => store.update((q) => trimClip(q, clip.id, 'start', v))} />
+        <TimeField label={t('Kaynakta bitiş')} value={clip.sourceEnd} onCommit={(v) => store.update((q) => trimClip(q, clip.id, 'end', v))} />
+        <div className="field row between"><span>{t('Videodaki süre')}</span><span className="mono">{t('{s} sn', { s: clipDuration(clip).toFixed(2) })}</span></div>
+        <p className="muted small">{t('İpucu: zaman çizelgesinde klibin kenarlarını sürükleyerek de kırpabilirsin; bitiş kenarı oynatma çizgisine yapışır.')}</p>
       </section>
       <section>
-        <h3>Hız</h3>
+        <h3>{t('Hız')}</h3>
         <div className="segmented">
           {SPEEDS.map((sp) => <button key={sp} className={(clip.speed || 1) === sp ? 'on' : ''} onClick={() => store.update((q) => setClipSpeed(q, clip.id, sp))}>×{sp}</button>)}
         </div>
-        {(clip.speed || 1) !== 1 && <p className="muted small">Bu klip ×{clip.speed} oynuyor; sesi kapalı.</p>}
+        {(clip.speed || 1) !== 1 && <p className="muted small">{t('Bu klip ×{n} oynuyor; sesi kapalı.', { n: clip.speed })}</p>}
       </section>
       {media && (media.systemAudioFile || media.microphoneFile || media.kind === 'externalVideo') && (
         <section>
-          <h3>Bu klibin sesi</h3>
-          {media.systemAudioFile && <label className="field">Sistem sesi<input type="range" min={0} max={2} step={0.01} value={clip.systemAudioVolume} onChange={(e) => vol('systemAudioVolume', Number(e.target.value))} /></label>}
-          {media.microphoneFile && <label className="field">Mikrofon<input type="range" min={0} max={2} step={0.01} value={clip.microphoneVolume} onChange={(e) => vol('microphoneVolume', Number(e.target.value))} /></label>}
-          {media.kind === 'externalVideo' && <label className="field">Video sesi<input type="range" min={0} max={2} step={0.01} value={clip.videoVolume} onChange={(e) => vol('videoVolume', Number(e.target.value))} /></label>}
+          <h3>{t('Bu klibin sesi')}</h3>
+          {media.systemAudioFile && <label className="field">{t('Sistem sesi')}<input type="range" min={0} max={2} step={0.01} value={clip.systemAudioVolume} onChange={(e) => vol('systemAudioVolume', Number(e.target.value))} /></label>}
+          {media.microphoneFile && <label className="field">{t('Mikrofon')}<input type="range" min={0} max={2} step={0.01} value={clip.microphoneVolume} onChange={(e) => vol('microphoneVolume', Number(e.target.value))} /></label>}
+          {media.kind === 'externalVideo' && <label className="field">{t('Video sesi')}<input type="range" min={0} max={2} step={0.01} value={clip.videoVolume} onChange={(e) => vol('videoVolume', Number(e.target.value))} /></label>}
         </section>
       )}
       <section>
-        <h3>İşlemler</h3>
+        <h3>{t('İşlemler')}</h3>
         <div className="row wrap">
-          <button onClick={actions.split} title="S">✂ Oynatma çizgisinden böl</button>
-          <button onClick={() => actions.duplicate(clip.id)}>⧉ Çoğalt</button>
-          <button onClick={() => seek(start)}>Başına git</button>
-          <button className="danger" onClick={() => actions.deleteClip(clip.id)}>Sil</button>
+          <button onClick={actions.split} title="S">✂ {t('Oynatma çizgisinden böl')}</button>
+          <button onClick={() => actions.duplicate(clip.id)}>⧉ {t('Çoğalt')}</button>
+          <button onClick={() => seek(start)}>{t('Başına Git')}</button>
+          <button className="danger" onClick={() => actions.deleteClip(clip.id)}>{t('Sil')}</button>
         </div>
-        <p className="muted small">Sıralamak için klibi zaman çizelgesinde sürükle.</p>
+        <p className="muted small">{t('Sıralamak için klibi zaman çizelgesinde sürükle.')}</p>
       </section>
-      <Shortcuts items={[['S', 'Oynatma çizgisinden böl'], ['Sil', 'Bu klibi sil'], ['V R C', 'Seç · Aralık · Makas'], ...commonKeys]} />
+      <Shortcuts items={[['S', N('Oynatma çizgisinden böl')], [N('Sil'), N('Bu klibi sil')], ['V R C', N('Seç · Aralık · Makas')], ...commonKeys]} />
     </>
   );
 }

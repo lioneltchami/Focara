@@ -1,6 +1,11 @@
 import { useSyncExternalStore } from 'react';
 import { type Project, now } from '../core/model.ts';
 import { odak } from '../bridge.ts';
+import { t } from '../i18n/index.ts';
+
+export type SaveStatus = 'saved' | 'saving' | 'failed';
+/** The autosave state as shown under the project name. */
+export const saveStatusText = (s: SaveStatus) => (s === 'saved' ? t('Kaydedildi') : s === 'saving' ? t('Kaydediliyor…') : t('Kaydedilemedi'));
 
 export type Selection =
   | { kind: 'zoom'; clipID: string; zoomID: string }
@@ -13,7 +18,7 @@ export type Selection =
 export class EditorStore {
   project: Project;
   selection: Selection = null;
-  saveStatus = 'Kaydedildi';
+  saveStatus: SaveStatus = 'saved';
   error: string | null = null;
   private undoStack: Project[] = [];
   private redoStack: Project[] = [];
@@ -62,7 +67,7 @@ export class EditorStore {
   }
 
   private scheduleSave() {
-    this.saveStatus = 'Kaydediliyor…';
+    this.saveStatus = 'saving';
     if (this.saveTimer) clearTimeout(this.saveTimer);
     this.saveTimer = setTimeout(() => void this.flush(), 400);
   }
@@ -71,10 +76,10 @@ export class EditorStore {
     if (this.saveTimer) { clearTimeout(this.saveTimer); this.saveTimer = null; }
     try {
       await odak().saveProject(this.pkg, this.project);
-      this.saveStatus = 'Kaydedildi';
+      this.saveStatus = 'saved';
     } catch (e) {
-      this.saveStatus = 'Kaydedilemedi';
-      this.error = `Proje kaydedilemedi: ${(e as Error).message}`;
+      this.saveStatus = 'failed';
+      this.error = t('Proje kaydedilemedi: {detail}', { detail: (e as Error).message });
     }
     this.emit();
   }

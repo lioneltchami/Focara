@@ -10,6 +10,7 @@ import {
   clipStarts, formatOf, locate, projectDuration,
 } from '../core/model.ts';
 import { odak } from '../bridge.ts';
+import { t } from '../i18n/index.ts';
 import type { ClipRenderData } from '../render/renderer.ts';
 import { type MediaLibrary, frameTime } from './media.ts';
 import { renderSample } from './player.ts';
@@ -63,7 +64,7 @@ export async function exportProject(p: Project, lib: MediaLibrary, path: string,
   const total = projectDuration(p);
   const from = Math.max(0, Math.min(total, opts.range?.from ?? 0));
   const to = Math.max(from, Math.min(total, opts.range?.to ?? total));
-  if (to - from < 1e-3 && format !== 'png') throw new Error('Dışa aktarılacak bir şey yok (süre 0).');
+  if (to - from < 1e-3 && format !== 'png') throw new Error(t('Dışa aktarılacak bir şey yok (süre 0).'));
 
   const handle = await odak().fileOpen(path);
   let failed = true;
@@ -97,7 +98,7 @@ async function writeMedia(p: Project, lib: MediaLibrary, settings: ExportSetting
     const supported = container.getSupportedVideoCodecs();
     videoCodec = await getFirstEncodableVideoCodec(videoCodecsFor(format, settings.codec).filter((c) => supported.includes(c)),
       { width: size.width, height: size.height });
-    if (!videoCodec) throw new Error(`Bu bilgisayarda ${formatOf(format).title} için uygun bir video kodlayıcı bulunamadı. Başka bir biçim ya da kodek dene.`);
+    if (!videoCodec) throw new Error(t('Bu bilgisayarda {format} için uygun bir video kodlayıcı bulunamadı. Başka bir biçim ya da kodek dene.', { format: t(formatOf(format).title) }));
   }
   const audioSources = await Promise.all(p.clips.map((c) => lib.audioOf(p, c)));
   const hasAudio = audioSources.some((a) => a.length > 0);
@@ -105,7 +106,7 @@ async function writeMedia(p: Project, lib: MediaLibrary, settings: ExportSetting
   const audioCodec = hasAudio || !withVideo
     ? await getFirstEncodableAudioCodec(audioCodecsFor(format).filter((c) => supportedAudio.includes(c)), { numberOfChannels: 2, sampleRate: SAMPLE_RATE })
     : null;
-  if (!withVideo && !audioCodec) throw new Error('Bu bilgisayarda bu ses biçimi için kodlayıcı bulunamadı.');
+  if (!withVideo && !audioCodec) throw new Error(t('Bu bilgisayarda bu ses biçimi için kodlayıcı bulunamadı.'));
 
   const target = new StreamTarget(new WritableStream({ write: (chunk) => write(chunk.data, chunk.position) }),
     { chunked: true, chunkSize: 4 * 1024 * 1024 });
@@ -127,7 +128,7 @@ async function writeMedia(p: Project, lib: MediaLibrary, settings: ExportSetting
   let frame = 0;
   try {
     for (let chunkStart = 0; chunkStart < duration - 1e-9; chunkStart += CHUNK) {
-      if (signal?.aborted) throw new DOMException('İptal edildi', 'AbortError');
+      if (signal?.aborted) throw new DOMException(t('İptal edildi'), 'AbortError');
       const chunkEnd = Math.min(duration, chunkStart + CHUNK);
       if (audio) {
         const a = Math.min(duration, chunkStart + delay), b = Math.min(duration, chunkEnd + delay);
@@ -160,7 +161,7 @@ export async function* renderFrames(p: Project, lib: MediaLibrary, data: ClipRen
   let camReader: AsyncGenerator<VideoSample | null, void, unknown> | null = null;
   try {
     for (let k = 0; k < count; k++) {
-      if (signal?.aborted) throw new DOMException('İptal edildi', 'AbortError');
+      if (signal?.aborted) throw new DOMException(t('İptal edildi'), 'AbortError');
       const loc = at(k);
       if (loc.index !== readerClip) {
         await reader?.return(undefined); await camReader?.return(undefined);
@@ -251,7 +252,7 @@ async function writeFrame(p: Project, lib: MediaLibrary, settings: ExportSetting
   const canvas = new OffscreenCanvas(size.width, size.height);
   const ctx = canvas.getContext('2d', { alpha: false })!;
   const loc = locate(p, Math.min(Math.max(0, time), projectDuration(p) - 1e-6));
-  if (!loc) throw new Error('Zaman çizelgesi boş.');
+  if (!loc) throw new Error(t('Zaman çizelgesi boş.'));
   const clip = p.clips[loc.index];
   const data = await lib.allRenderData(p);
   const media = await lib.open(assetOf(p, clip.mediaID)!.videoFile);

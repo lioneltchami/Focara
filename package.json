@@ -17,6 +17,7 @@
     "uitest": "node scripts/build.mjs && electron . --uitest",
     "perftest": "node scripts/build.mjs && electron . --perftest",
     "docshots": "node scripts/build.mjs && electron . --docshots docs/images",
+    "docshots:tr": "node scripts/build.mjs && electron . --docshots docs/images/tr --lang tr",
     "dist:mac": "node scripts/build.mjs && electron-builder --mac",
     "dist:win": "node scripts/build.mjs && electron-builder --win"
   },

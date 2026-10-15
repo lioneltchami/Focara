@@ -4,6 +4,8 @@
 // Times stored on clips and zooms are *source* times (seconds into the media file), so
 // trimming or reordering clips never moves a zoom relative to the content it frames.
 
+import { N } from '../i18n/index.ts';
+
 export type Focus = { followCursor: Record<string, never> } | { fixed: { x: number; y: number } };
 
 export interface ZoomSegment {
@@ -84,9 +86,9 @@ export interface RGBA { r: number; g: number; b: number; a: number }
 
 export type ZoomSpeed = 'gentle' | 'normal' | 'quick';
 export const zoomSpeeds: { id: ZoomSpeed; title: string; stiffness: number }[] = [
-  { id: 'gentle', title: 'Yumuşak', stiffness: 70 },
-  { id: 'normal', title: 'Normal', stiffness: 140 },
-  { id: 'quick', title: 'Hızlı', stiffness: 260 },
+  { id: 'gentle', title: N('Yumuşak'), stiffness: 70 },
+  { id: 'normal', title: N('Normal'), stiffness: 140 },
+  { id: 'quick', title: N('Hızlı'), stiffness: 260 },
 ];
 export const stiffnessOf = (s: ZoomSpeed) => zoomSpeeds.find((z) => z.id === s)?.stiffness ?? 140;
 
@@ -170,17 +172,17 @@ export interface ExportSettings {
 }
 
 export const exportFormats: { id: ExportFormat; title: string; ext: string; kind: 'video' | 'gif' | 'audio' | 'image'; note: string; codecs?: VideoCodecChoice[] }[] = [
-  { id: 'mp4', title: 'MP4', ext: 'mp4', kind: 'video', note: 'YouTube ve her yer', codecs: ['h264', 'hevc', 'av1'] },
+  { id: 'mp4', title: 'MP4', ext: 'mp4', kind: 'video', note: N('YouTube ve her yer'), codecs: ['h264', 'hevc', 'av1'] },
   { id: 'mov', title: 'MOV', ext: 'mov', kind: 'video', note: 'Final Cut, iMovie, Premiere', codecs: ['h264', 'hevc'] },
-  { id: 'webm', title: 'WebM', ext: 'webm', kind: 'video', note: 'Web siteleri, küçük dosya', codecs: ['vp9', 'av1'] },
-  { id: 'gif', title: 'GIF', ext: 'gif', kind: 'gif', note: 'README, sohbet · sessiz' },
-  { id: 'm4a', title: 'Ses · M4A', ext: 'm4a', kind: 'audio', note: 'Yalnızca ses (AAC)' },
-  { id: 'wav', title: 'Ses · WAV', ext: 'wav', kind: 'audio', note: 'Kayıpsız ses' },
-  { id: 'png', title: 'Kare · PNG', ext: 'png', kind: 'image', note: 'Kapak görseli için tek kare' },
+  { id: 'webm', title: 'WebM', ext: 'webm', kind: 'video', note: N('Web siteleri, küçük dosya'), codecs: ['vp9', 'av1'] },
+  { id: 'gif', title: 'GIF', ext: 'gif', kind: 'gif', note: N('README, sohbet · sessiz') },
+  { id: 'm4a', title: N('Ses · M4A'), ext: 'm4a', kind: 'audio', note: N('Yalnızca ses (AAC)') },
+  { id: 'wav', title: N('Ses · WAV'), ext: 'wav', kind: 'audio', note: N('Kayıpsız ses') },
+  { id: 'png', title: N('Kare · PNG'), ext: 'png', kind: 'image', note: N('Kapak görseli için tek kare') },
 ];
 export const formatOf = (id: ExportFormat) => exportFormats.find((f) => f.id === id) ?? exportFormats[0];
 export const codecTitles: Record<VideoCodecChoice, string> = {
-  h264: 'H.264 (en uyumlu)', hevc: 'HEVC (daha küçük)', av1: 'AV1 (en küçük, yavaş)', vp9: 'VP9',
+  h264: N('H.264 (en uyumlu)'), hevc: N('HEVC (daha küçük)'), av1: N('AV1 (en küçük, yavaş)'), vp9: 'VP9',
 };
 
 export interface Project {

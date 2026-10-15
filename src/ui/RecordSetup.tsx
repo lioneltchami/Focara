@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { type DisplayInfo, odak } from '../bridge.ts';
 import type { SideDevices } from '../media/sideRecorder.ts';
+import { t } from '../i18n/index.ts';
 
 const mod = odak().platform === 'darwin' ? '⌘' : 'Ctrl+';
 
 /** Display, system audio, microphone and camera choices + start button (home screen and “Kayıt Ekle”). */
-export function RecordSetup({ busy, onStart, startLabel = '● Kaydı Başlat' }: {
+export function RecordSetup({ busy, onStart, startLabel = `● ${t('Kaydı Başlat')}` }: {
   busy: boolean;
   onStart: (displayId: number, systemAudio: boolean, devices: SideDevices) => Promise<boolean>;
   startLabel?: string;
@@ -86,42 +87,41 @@ export function RecordSetup({ busy, onStart, startLabel = '● Kaydı Başlat' }
     {!available.ok && <div className="notice warn">{available.reason}</div>}
     {needsPermission && (
       <div className="notice warn">
-        <b>Ekran kaydı izni gerekiyor.</b> Sistem Ayarları › Gizlilik ve Güvenlik › Ekran ve Sistem Sesi Kaydı'nda
-        Odak'ı aç. macOS izin verildikten sonra uygulamanın yeniden başlatılmasını isteyebilir.
+        <b>{t('Ekran kaydı izni gerekiyor.')}</b> {t('Sistem Ayarları › Gizlilik ve Güvenlik › Ekran ve Sistem Sesi Kaydı\'nda Odak\'ı aç. macOS izin verildikten sonra uygulamanın yeniden başlatılmasını isteyebilir.')}
         <div className="row"><button className="primary" onClick={async () => {
             if (!(await odak().requestScreenPermission())) await odak().openPermissionSettings();
             void refresh();
-          }}>İzin İste / Ayarları Aç</button>
-          <button onClick={async () => { await odak().resetPermissions(); void refresh(); }} title="Odak güncellendiyse eski izinleri temizler">İzinleri Sıfırla</button>
-          <button onClick={() => void refresh()}>Yeniden Denetle</button></div>
+          }}>{t('İzin İste / Ayarları Aç')}</button>
+          <button onClick={async () => { await odak().resetPermissions(); void refresh(); }} title={t('Odak güncellendiyse eski izinleri temizler')}>{t('İzinleri Sıfırla')}</button>
+          <button onClick={() => void refresh()}>{t('Yeniden Denetle')}</button></div>
       </div>
     )}
     <div className="form">
-      <label>Ekran
+      <label>{t('Ekran')}
         <select value={display ?? ''} onChange={(e) => setDisplay(Number(e.target.value))}>
-          {displays.map((d) => <option key={d.id} value={d.id}>{d.name} — {d.width}×{d.height}</option>)}
+          {displays.map((d) => <option key={d.id} value={d.id} data-raw>{d.name} — {d.width}×{d.height}</option>)}
         </select>
       </label>
-      <label className="check"><input type="checkbox" checked={systemAudio} onChange={(e) => setSystemAudio(e.target.checked)} /> Sistem sesini kaydet</label>
-      <label>Mikrofon
+      <label className="check"><input type="checkbox" checked={systemAudio} onChange={(e) => setSystemAudio(e.target.checked)} /> {t('Sistem sesini kaydet')}</label>
+      <label>{t('Mikrofon')}
         <select value={micId} onChange={(e) => setMicId(e.target.value)} onFocus={() => { if (!mics.some((m) => m.label)) void askFor('microphone'); }}>
-          <option value="">Kapalı</option>
-          {mics.map((d, i) => <option key={d.deviceId} value={d.deviceId}>{label(d, i, 'Mikrofon')}</option>)}
+          <option value="">{t('Kapalı')}</option>
+          {mics.map((d, i) => <option key={d.deviceId} value={d.deviceId} data-raw>{label(d, i, t('Mikrofon'))}</option>)}
         </select>
       </label>
-      {micId && <label className="check"><input type="checkbox" checked={noiseSuppression} onChange={(e) => setNoiseSuppression(e.target.checked)} /> Gürültü azaltma</label>}
-      <label>Kamera
+      {micId && <label className="check"><input type="checkbox" checked={noiseSuppression} onChange={(e) => setNoiseSuppression(e.target.checked)} /> {t('Gürültü azaltma')}</label>}
+      <label>{t('Kamera')}
         <select value={camId} onChange={(e) => setCamId(e.target.value)} onFocus={() => { if (!cams.some((c) => c.label)) void askFor('camera'); }}>
-          <option value="">Kapalı</option>
-          {cams.map((d, i) => <option key={d.deviceId} value={d.deviceId}>{label(d, i, 'Kamera')}</option>)}
+          <option value="">{t('Kapalı')}</option>
+          {cams.map((d, i) => <option key={d.deviceId} value={d.deviceId} data-raw>{label(d, i, t('Kamera'))}</option>)}
         </select>
       </label>
       {camId && <video ref={preview} className="cam-preview" autoPlay muted playsInline />}
     </div>
     <button className="record-btn" disabled={busy || display === null || !available.ok} onClick={() => void start()}>
-      {busy ? 'Başlatılıyor…' : startLabel}
+      {busy ? t('Başlatılıyor…') : startLabel}
     </button>
-    <p className="muted small">Durdurmak için ekranın üstündeki paneli ya da {mod}Shift+2'yi kullan.</p>
+    <p className="muted small">{t('Durdurmak için ekranın üstündeki paneli ya da {key} kısayolunu kullan.', { key: `${mod}Shift+2` })}</p>
     </>
   );
 }

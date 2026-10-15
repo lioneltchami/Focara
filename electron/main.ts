@@ -5,6 +5,7 @@ import fs from 'node:fs';
 import fsp from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import { type LangPref, helperMessage, isLangPref, lang, resolveLang, setLang, systemLang, t } from '../src/i18n/index.ts';
 
 const isSelftest = process.argv.includes('--selftest');
 const uiTestIndex = process.argv.indexOf('--uitest');
@@ -15,6 +16,8 @@ const isPerftest = process.argv.includes('--perftest');
 const docIndex = process.argv.indexOf('--docshots');
 const docshotsDir = docIndex >= 0 ? path.resolve(process.argv[docIndex + 1] ?? 'docs/images') : null;
 const isTest = isSelftest || !!uiTestProject || isPerftest || !!docshotsDir;
+// `--lang tr|en` fixes the interface language for this run (tests use it; it's never saved).
+const langArg = ((v) => (v === 'tr' || v === 'en' ? v : null))(process.argv[process.argv.indexOf('--lang') + 1]);
 const devUrl = process.env.ODAK_DEV_URL;
 const isMac = process.platform === 'darwin';
 const isWin = process.platform === 'win32';
@@ -25,6 +28,8 @@ let hudWindow: BrowserWindow | null = null;
 
 app.setName('Odak');
 if (isTest) {
+  // Tests keep their own app data (recent projects, settings), away from the user's.
+  app.setPath('userData', path.join(os.tmpdir(), 'odak-test-data'));
   // Tests use Chromium's built-in fake camera and microphone (no real devices or permissions).
   app.commandLine.appendSwitch('use-fake-device-for-media-stream');
   app.commandLine.appendSwitch('use-fake-ui-for-media-stream');
@@ -59,7 +64,7 @@ let selftestDir: string | null = null;
 function inPackage(pkg: string, rel: string): string {
   const root = path.resolve(pkg);
   const full = path.resolve(root, rel);
-  if (full !== root && !full.startsWith(root + path.sep)) throw new Error(`Geçersiz yol: ${rel}`);
+  if (full !== root && !full.startsWith(root + path.sep)) throw new Error(t('Geçersiz yol: {path}', { path: rel }));
   return full;
 }
 
@@ -103,7 +108,7 @@ ipcMain.handle('project:create', (_e, name: string) => createPackage(name));
 
 ipcMain.handle('project:load', async (_e, pkg: string) => {
   const file = path.join(pkg, 'project.json');
-  if (!fs.existsSync(file)) return { error: `“${path.basename(pkg)}” bir Odak projesi değil (project.json yok).` };
+  if (!fs.existsSync(file)) return { error: t('“{name}” bir Odak projesi değil (project.json yok).', { name: path.basename(pkg) }) };
   try {
     const project = JSON.parse(await fsp.readFile(file, 'utf8'));
     const missing: string[] = [];
@@ -112,10 +117,10 @@ ipcMain.handle('project:load', async (_e, pkg: string) => {
         if (rel && !fs.existsSync(inPackage(pkg, rel))) missing.push(rel);
       }
     }
-    if (missing.length) return { error: `Projedeki medya dosyaları bulunamadı: ${missing.join(', ')}` };
+    if (missing.length) return { error: t('Projedeki medya dosyaları bulunamadı: {files}', { files: missing.join(', ') }) };
     return { project };
   } catch (err) {
-    return { error: `Proje okunamadı: ${(err as Error).message}` };
+    return { error: t('Proje okunamadı: {detail}', { detail: (err as Error).message }) };
   }
 });
 
@@ -151,7 +156,7 @@ ipcMain.handle('file:open', async (_e, file: string) => {
 
 ipcMain.handle('file:writeAt', async (_e, id: number, data: Uint8Array, position: number) => {
   const h = writeHandles.get(id);
-  if (!h) throw new Error('Dosya açık değil');
+  if (!h) throw new Error(t('Dosya açık değil.'));
   await h.fh.write(data, 0, data.length, position);
 });
 
@@ -167,11 +172,11 @@ ipcMain.handle('file:close', async (_e, id: number, remove: boolean, truncateTo?
 
 ipcMain.handle('dialog:openProject', async () => {
   const r = await dialog.showOpenDialog(mainWindow!, {
-    title: 'Proje Aç',
+    title: t('Proje Aç'),
     defaultPath: defaultFolder(),
     // Project packages are folders; macOS also accepts Kadraj projects (same format).
     properties: isMac ? ['openFile', 'openDirectory', 'treatPackageAsDirectory'] : ['openDirectory'],
-    filters: isMac ? [{ name: 'Odak Projesi', extensions: ['odak', 'kadraj'] }] : undefined,
+    filters: isMac ? [{ name: t('Odak Projesi'), extensions: ['odak', 'kadraj'] }] : undefined,
   });
   return r.canceled ? null : r.filePaths[0] ?? null;
 });
@@ -179,7 +184,7 @@ ipcMain.handle('dialog:openProject', async () => {
 ipcMain.handle('dialog:saveExport', async (_e, name: string, ext: string, label: string) => {
   const safeExt = /^[a-z0-9]{2,5}$/.test(ext) ? ext : 'mp4';
   const r = await dialog.showSaveDialog(mainWindow!, {
-    title: 'Dışa Aktar',
+    title: t('Dışa Aktar'),
     defaultPath: path.join(app.getPath(safeExt === 'png' ? 'pictures' : safeExt === 'm4a' || safeExt === 'wav' ? 'music' : 'videos'), `${name}.${safeExt}`),
     filters: [{ name: label, extensions: [safeExt] }],
   });
@@ -190,8 +195,8 @@ ipcMain.handle('dialog:saveExport', async (_e, name: string, ext: string, label:
 
 ipcMain.handle('dialog:importVideo', async () => {
   const r = await dialog.showOpenDialog(mainWindow!, {
-    title: 'Video Ekle', properties: ['openFile', 'multiSelections'],
-    filters: [{ name: 'Videolar', extensions: ['mp4', 'mov', 'm4v', 'webm', 'mkv'] }],
+    title: t('Video Ekle'), properties: ['openFile', 'multiSelections'],
+    filters: [{ name: t('Videolar'), extensions: ['mp4', 'mov', 'm4v', 'webm', 'mkv'] }],
   });
   return r.canceled ? [] : r.filePaths;
 });
@@ -213,8 +218,8 @@ ipcMain.handle('project:removeMedia', async (_e, pkg: string, id: string) => {
 
 ipcMain.handle('dialog:pickImage', async () => {
   const r = await dialog.showOpenDialog(mainWindow!, {
-    title: 'Arka Plan Görseli Seç', properties: ['openFile'],
-    filters: [{ name: 'Görseller', extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp'] }],
+    title: t('Arka Plan Görseli Seç'), properties: ['openFile'],
+    filters: [{ name: t('Görseller'), extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp'] }],
   });
   return r.canceled ? null : r.filePaths[0] ?? null;
 });
@@ -242,7 +247,7 @@ ipcMain.handle('recents:add', async (_e, pkg: string) => {
 ipcMain.handle('capture:displays', () => {
   const primary = screen.getPrimaryDisplay().id;
   return screen.getAllDisplays().map((d, i) => ({
-    id: d.id, name: d.label || `Ekran ${i + 1}`,
+    id: d.id, name: d.label || t('Ekran {n}', { n: i + 1 }),
     width: Math.round(d.size.width * d.scaleFactor), height: Math.round(d.size.height * d.scaleFactor),
     scaleFactor: d.scaleFactor, primary: d.id === primary,
   }));
@@ -269,7 +274,7 @@ ipcMain.handle('capture:resetPermissions', async () => {
   const results: string[] = [];
   for (const service of ['ScreenCapture', 'Camera', 'Microphone']) {
     results.push(await new Promise<string>((resolve) => execFile('tccutil', ['reset', service, id], (err, out, errOut) =>
-      resolve(`${service}: ${err ? `hata ${errOut || err.message}` : (out.trim() || 'ok')}`))));
+      resolve(`${service}: ${err ? `error ${errOut || err.message}` : (out.trim() || 'ok')}`))));
   }
   log('permissions reset by user', results);
   return true;
@@ -288,9 +293,9 @@ function helperPath(): string {
 }
 
 ipcMain.handle('capture:available', () => {
-  if (!isMac && !isWin) return { ok: false, reason: 'Kayıt şimdilik yalnızca macOS ve Windows\'ta destekleniyor.' };
+  if (!isMac && !isWin) return { ok: false, reason: t('Kayıt şimdilik yalnızca macOS ve Windows\'ta destekleniyor.') };
   const h = helperPath();
-  return fs.existsSync(h) ? { ok: true } : { ok: false, reason: `Kayıt yardımcısı bulunamadı: ${h}. README'deki derleme adımını çalıştırın.` };
+  return fs.existsSync(h) ? { ok: true } : { ok: false, reason: t('Kayıt yardımcısı bulunamadı: {path}. README\'deki derleme adımını çalıştırın.', { path: h }) };
 });
 
 interface Recording {
@@ -307,7 +312,7 @@ function nextEvent(r: Recording, names: string[], timeoutMs: number): Promise<{ 
   return new Promise((resolve) => {
     const found = r.events.find((e) => names.includes(e.event) || e.event === 'error' || e.event === 'exit');
     if (found) return resolve(found);
-    const timer = setTimeout(() => resolve({ event: 'error', message: 'Kayıt yardımcısı yanıt vermedi.' }), timeoutMs);
+    const timer = setTimeout(() => resolve({ event: 'error', message: t('Kayıt yardımcısı yanıt vermedi.') }), timeoutMs);
     r.waiters.push((e) => {
       if (!(names.includes(e.event) || e.event === 'error' || e.event === 'exit')) return false;
       clearTimeout(timer); resolve(e); return true;
@@ -322,14 +327,14 @@ ipcMain.handle('media:ask', async (_e, kind: 'camera' | 'microphone') => {
 });
 
 ipcMain.handle('capture:start', async (_e, o: { displayId: number; systemAudio: boolean; pkg?: string }) => {
-  if (recording) return { ok: false, error: 'Zaten kayıt yapılıyor.' };
+  if (recording) return { ok: false, error: t('Zaten kayıt yapılıyor.') };
   const display = screen.getAllDisplays().find((d) => d.id === o.displayId) ?? screen.getPrimaryDisplay();
   // Local time, as the user reads the clock (toISOString would be UTC).
   const now = new Date(), two = (n: number) => String(n).padStart(2, '0');
   const stamp = `${now.getFullYear()}-${two(now.getMonth() + 1)}-${two(now.getDate())} ${two(now.getHours())}.${two(now.getMinutes())}.${two(now.getSeconds())}`;
   // Adding a recording to an open project writes into that project's package.
   const appending = !!o.pkg && fs.existsSync(path.join(o.pkg, 'project.json'));
-  const pkg = appending ? o.pkg! : await createPackage(`Kayıt ${stamp}`);
+  const pkg = appending ? o.pkg! : await createPackage(t('Kayıt {stamp}', { stamp }));
   const mediaID = randomUUID().toUpperCase();
   const out = path.join(pkg, 'media', mediaID);
   await fsp.mkdir(out, { recursive: true });
@@ -350,7 +355,7 @@ ipcMain.handle('capture:start', async (_e, o: { displayId: number; systemAudio: 
     log('helper', ev);
     r.events.push(ev);
     r.waiters = r.waiters.filter((w) => !w(ev));
-    if (ev.event === 'error' && recording === r && !r.stopping) void stopRecording(String(ev.message ?? 'Kayıt hatası'));
+    if (ev.event === 'error' && recording === r && !r.stopping) void stopRecording(helperMessage(String(ev.message ?? t('Kayıt hatası'))));
   };
   let buf = '';
   proc.stdout.on('data', (d: Buffer) => {
@@ -372,8 +377,8 @@ ipcMain.handle('capture:start', async (_e, o: { displayId: number; systemAudio: 
     proc.kill();
     await fsp.rm(appending ? out : pkg, { recursive: true, force: true });
     const msg = first.code === 'permission'
-      ? 'macOS ekran kaydına izin vermedi.\n\nSistem Ayarları › Gizlilik ve Güvenlik › Ekran ve Sistem Sesi Kaydı\'nda Odak açık görünüyorsa bile, uygulama güncellendiyse macOS eski izni geçersiz sayar: Odak\'ı listeden “–” ile kaldırın, sonra Odak\'ta kaydı yeniden başlatıp izin verin ve Odak\'ı yeniden açın.'
-      : String(first.message ?? (r.stderr.trim() || 'Kayıt başlatılamadı.'));
+      ? t('macOS ekran kaydına izin vermedi.\n\nSistem Ayarları › Gizlilik ve Güvenlik › Ekran ve Sistem Sesi Kaydı\'nda Odak açık görünüyorsa bile, uygulama güncellendiyse macOS eski izni geçersiz sayar: Odak\'ı listeden “–” ile kaldırın, sonra Odak\'ta kaydı yeniden başlatıp izin verin ve Odak\'ı yeniden açın.')
+      : first.message ? helperMessage(String(first.message)) : (r.stderr.trim() || t('Kayıt başlatılamadı.'));
     return { ok: false, error: msg, code: first.code === 'permission' ? 'permission' : 'error' };
   }
   recording = r;
@@ -409,7 +414,7 @@ async function stopRecording(failure?: string) {
   } else {
     if (r.proc.exitCode === null) r.proc.kill();
     mainWindow?.webContents.send('recording:finished', {
-      ok: false, error: failure ?? String(fin.message ?? (r.stderr.trim() || 'Kayıt tamamlanamadı.')),
+      ok: false, error: failure ?? (fin.message ? helperMessage(String(fin.message)) : (r.stderr.trim() || t('Kayıt tamamlanamadı.'))),
     });
   }
 }
@@ -428,20 +433,21 @@ function showHud(display: Electron.Display) {
   hudWindow.setAlwaysOnTop(true, 'screen-saver');
   hudWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   hudWindow.setContentProtection(true); // keep the panel out of the recording
-  void hudWindow.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(HUD_HTML));
+  void hudWindow.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(hudHtml()));
   hudWindow.once('ready-to-show', () => hudWindow?.showInactive());
 }
 
-const HUD_HTML = `<!doctype html><html><head><meta charset="utf-8"><style>
+const hudHtml = () => `<!doctype html><html><head><meta charset="utf-8"><style>
 html,body{margin:0;background:transparent;font:13px -apple-system,'Segoe UI',sans-serif;overflow:hidden}
 .p{display:flex;align-items:center;gap:12px;height:56px;padding:0 14px;box-sizing:border-box;border-radius:14px;background:rgba(0,0,0,.84);color:#fff;-webkit-app-region:drag}
 .d{width:10px;height:10px;border-radius:50%;background:#ff3b30}.t{font-family:ui-monospace,Consolas,monospace;flex:1}
 button{-webkit-app-region:no-drag;border:0;border-radius:8px;background:#ff3b30;color:#fff;font-weight:600;padding:7px 12px;cursor:pointer}
 button:disabled{opacity:.6}</style></head><body><div class="p"><div class="d"></div><div class="t" id="t">00:00</div>
-<button id="b">Durdur · ${isMac ? '⌘⇧2' : 'Ctrl+Shift+2'}</button></div><script>
+<button id="b">${t('Durdur')} · ${isMac ? '⌘⇧2' : 'Ctrl+Shift+2'}</button></div><script>
 const s=Date.now();setInterval(()=>{const e=Math.floor((Date.now()-s)/1000);document.getElementById('t').textContent=String(Math.floor(e/60)).padStart(2,'0')+':'+String(e%60).padStart(2,'0')},500);
-const b=document.getElementById('b');b.onclick=()=>{b.disabled=true;b.textContent='Kaydediliyor…';window.odak.stopRecording()};
-window.odak.onHudFinishing&&window.odak.onHudFinishing(()=>{b.disabled=true;b.textContent='Kaydediliyor…'});
+const b=document.getElementById('b');const saving=${JSON.stringify(t('Kaydediliyor…'))};
+b.onclick=()=>{b.disabled=true;b.textContent=saving;window.odak.stopRecording()};
+window.odak.onHudFinishing&&window.odak.onHudFinishing(()=>{b.disabled=true;b.textContent=saving});
 </script></body></html>`;
 
 // ---------------------------------------------------------------- selftest
@@ -478,40 +484,96 @@ ipcMain.on('selftest:done', (_e, result: { ok: boolean; log: string[] }) => {
   app.exit(result.ok ? 0 : 1);
 });
 
+// ---------------------------------------------------------------- settings: interface language
+
+const settingsFile = () => path.join(app.getPath('userData'), 'settings.json');
+/** Saved choice; tests and `--lang` runs keep theirs in memory only. */
+let langPref: LangPref = 'auto';
+const keepLanguage = !isTest && !langArg;
+function systemLanguages(): string[] {
+  try { const l = app.getPreferredSystemLanguages(); if (l.length) return l; } catch { /* older systems */ }
+  return [app.getLocale()];
+}
+function loadLanguage() {
+  let saved: unknown = null;
+  if (keepLanguage) { try { saved = JSON.parse(fs.readFileSync(settingsFile(), 'utf8')).language; } catch { /* first start */ } }
+  // Tests run in Turkish unless told otherwise; the docs screenshots are for the English README.
+  langPref = langArg ?? (docshotsDir ? 'en' : isTest ? 'tr' : isLangPref(saved) ? saved : 'auto');
+  setLang(resolveLang(langPref, systemLanguages()));
+}
+async function setLanguage(pref: LangPref) {
+  langPref = pref;
+  setLang(resolveLang(pref, systemLanguages()));
+  buildMenu();
+  mainWindow?.webContents.send('settings:language', { pref, lang: lang() });
+  log('language', { pref, lang: lang(), system: systemLanguages() });
+  if (keepLanguage) {
+    try {
+      await fsp.mkdir(app.getPath('userData'), { recursive: true });
+      await writeAtomic(settingsFile(), JSON.stringify({ language: pref }));
+    } catch (e) { log('settings save failed', String(e)); }
+  }
+  return { pref, lang: lang() };
+}
+ipcMain.on('settings:get', (e) => { e.returnValue = { pref: langPref, lang: lang(), system: systemLang(systemLanguages()) }; });
+ipcMain.handle('settings:setLanguage', (_e, pref: unknown) => (isLangPref(pref) ? setLanguage(pref) : { pref: langPref, lang: lang() }));
+
 // ---------------------------------------------------------------- windows & menu
 
 function send(cmd: string) { mainWindow?.webContents.send('menu', cmd); }
 
 function buildMenu() {
+  const settings: Electron.MenuItemConstructorOptions = { label: t('Ayarlar…'), accelerator: 'CmdOrCtrl+,', click: () => send('settings') };
+  // Always in both languages, so it can be found whatever the current one is.
+  const language: Electron.MenuItemConstructorOptions = {
+    label: 'Dil · Language',
+    submenu: ([['auto', t('Sistem dili')], ['tr', 'Türkçe'], ['en', 'English']] as const).map(([pref, label]) => (
+      { label, type: 'radio' as const, checked: langPref === pref, click: () => void setLanguage(pref) })),
+  };
   const template: Electron.MenuItemConstructorOptions[] = [
-    ...(isMac ? [{ role: 'appMenu' as const }] : []),
-    {
-      label: 'Dosya',
+    ...(isMac ? [{
+      label: 'Odak',
       submenu: [
-        { label: 'Yeni Kayıt', accelerator: 'CmdOrCtrl+N', click: () => send('new') },
-        { label: 'Proje Aç…', accelerator: 'CmdOrCtrl+O', click: () => send('open') },
+        { role: 'about' as const, label: t('Odak Hakkında') },
+        { type: 'separator' as const },
+        settings, language,
+        { type: 'separator' as const },
+        { role: 'services' as const, label: t('Servisler') },
+        { type: 'separator' as const },
+        { role: 'hide' as const, label: t('Odak\'ı Gizle') },
+        { role: 'hideOthers' as const, label: t('Diğerlerini Gizle') },
+        { role: 'unhide' as const, label: t('Tümünü Göster') },
+        { type: 'separator' as const },
+        { role: 'quit' as const, label: t('Odak\'tan Çık') },
+      ],
+    }] : []),
+    {
+      label: t('Dosya'),
+      submenu: [
+        { label: t('Yeni Kayıt'), accelerator: 'CmdOrCtrl+N', click: () => send('new') },
+        { label: t('Proje Aç…'), accelerator: 'CmdOrCtrl+O', click: () => send('open') },
         { type: 'separator' },
-        { label: 'Video Dışa Aktar…', accelerator: 'CmdOrCtrl+E', click: () => send('export') },
-        ...(isMac ? [] : [{ type: 'separator' as const }, { role: 'quit' as const, label: 'Çıkış' }]),
+        { label: t('Video Dışa Aktar…'), accelerator: 'CmdOrCtrl+E', click: () => send('export') },
+        ...(isMac ? [] : [{ type: 'separator' as const }, settings, language, { type: 'separator' as const }, { role: 'quit' as const, label: t('Çıkış') }]),
       ],
     },
     {
-      label: 'Düzen',
+      label: t('Düzen'),
       submenu: [
-        { label: 'Geri Al', accelerator: 'CmdOrCtrl+Z', click: () => send('undo') },
-        { label: 'Yinele', accelerator: 'Shift+CmdOrCtrl+Z', click: () => send('redo') },
+        { label: t('Geri Al'), accelerator: 'CmdOrCtrl+Z', click: () => send('undo') },
+        { label: t('Yinele'), accelerator: 'Shift+CmdOrCtrl+Z', click: () => send('redo') },
         { type: 'separator' },
-        { role: 'cut', label: 'Kes' }, { role: 'copy', label: 'Kopyala' }, { role: 'paste', label: 'Yapıştır' },
-        { role: 'selectAll', label: 'Tümünü Seç' },
+        { role: 'cut', label: t('Kes') }, { role: 'copy', label: t('Kopyala') }, { role: 'paste', label: t('Yapıştır') },
+        { role: 'selectAll', label: t('Tümünü Seç') },
       ],
     },
     {
-      label: 'Yardım',
-      submenu: [{ label: 'Tanılama Kaydını Göster', click: () => { shell.showItemInFolder(logFile()); } }],
+      label: t('Görünüm'),
+      submenu: [{ role: 'togglefullscreen', label: t('Tam Ekran') }, { role: 'toggleDevTools', label: t('Geliştirici Araçları') }],
     },
     {
-      label: 'Görünüm',
-      submenu: [{ role: 'togglefullscreen', label: 'Tam Ekran' }, { role: 'toggleDevTools', label: 'Geliştirici Araçları' }],
+      label: t('Yardım'),
+      submenu: [{ label: t('Tanılama Kaydını Göster'), click: () => { shell.showItemInFolder(logFile()); } }],
     },
   ];
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
@@ -548,7 +610,9 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
-  log('app start', { version: app.getVersion(), platform: process.platform, arch: process.arch, packaged: app.isPackaged, permissions: permissions() });
+  loadLanguage();
+  log('app start', { version: app.getVersion(), platform: process.platform, arch: process.arch, packaged: app.isPackaged, permissions: permissions(),
+                     language: { pref: langPref, lang: lang(), system: systemLanguages() } });
   buildMenu();
   createWindow();
   app.on('activate', () => { if (!mainWindow) createWindow(); else mainWindow.show(); });

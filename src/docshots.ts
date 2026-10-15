@@ -1,6 +1,7 @@
 // Documentation screenshots (npm run docshots): builds a demo project — a made-up analytics web
 // app, an illustrated webcam avatar and a painted sunset background, all drawn in code — opens it
 // in the real editor and saves screenshots, rendered frames and a GIF into docs/images.
+import { lang, t } from './i18n/index.ts';
 import { CanvasSource, Mp4OutputFormat, Output, StreamTarget, getFirstEncodableVideoCodec } from 'mediabunny';
 import { odak } from './bridge.ts';
 import { type CursorTrack, type ExportSettings, type MediaAsset, type Project, newClip, newProject, normalizeProject, projectDuration, uuid } from './core/model.ts';
@@ -323,86 +324,91 @@ export async function runDocshots() {
     p = normalizeProject(p);
     await odak().saveProject(pkg, p);
     log.push(`zooms: ${clip.zooms.map((z) => `${z.start.toFixed(1)}–${z.end.toFixed(1)}`).join(', ')}`);
+    // In Turkish (`--lang tr`, for README.tr.md) only the editor screenshots are made: the rendered
+    // frames, galleries and GIFs don't depend on the interface language.
+    const uiOnly = lang() === 'tr';
 
-    // Rendered frames (exactly what an export contains)
-    const lib = new MediaLibrary(pkg);
-    const tmp = await odak().selftestTempDir();
-    const frame = async (name: string, proj: Project, t: number, o: Partial<ExportSettings> = {}) => {
-      const file = `${tmp}/${name}`;
-      await exportProject(proj, lib, file, { ...proj.export, format: 'png', resolution: 'p1080', ...o }, () => {}, undefined, { frameTime: t });
-      await save(name, await odak().readFile(dirOf(file), baseOf(file), 0, await odak().fileSize(dirOf(file), baseOf(file))));
-    };
-    await frame('frame-intro-camera.png', p, 0.6);
-    await frame('frame-zoom.png', p, 3.9);
-    await frame('frame-camera-moved.png', p, 9.6);
-    const withImage: Project = { ...p, style: { ...p.style, backgroundKind: 'image', backgroundImage: 'assets/sunset.png', backgroundBlur: 0, padding: 0.09 } };
-    await frame('frame-background-image.png', withImage, 9.6);
-    await frame('frame-vertical.png', { ...p, export: { ...p.export, aspect: 'vertical' } }, 4.2, { resolution: 'p1080', aspect: 'vertical' });
-    await frame('frame-chart.png', withImage, 12.4);
+    if (!uiOnly) {
+      // Rendered frames (exactly what an export contains)
+      const lib = new MediaLibrary(pkg);
+      const tmp = await odak().selftestTempDir();
+      const frame = async (name: string, proj: Project, t: number, o: Partial<ExportSettings> = {}) => {
+        const file = `${tmp}/${name}`;
+        await exportProject(proj, lib, file, { ...proj.export, format: 'png', resolution: 'p1080', ...o }, () => {}, undefined, { frameTime: t });
+        await save(name, await odak().readFile(dirOf(file), baseOf(file), 0, await odak().fileSize(dirOf(file), baseOf(file))));
+      };
+      await frame('frame-intro-camera.png', p, 0.6);
+      await frame('frame-zoom.png', p, 3.9);
+      await frame('frame-camera-moved.png', p, 9.6);
+      const withImage: Project = { ...p, style: { ...p.style, backgroundKind: 'image', backgroundImage: 'assets/sunset.png', backgroundBlur: 0, padding: 0.09 } };
+      await frame('frame-background-image.png', withImage, 9.6);
+      await frame('frame-vertical.png', { ...p, export: { ...p.export, aspect: 'vertical' } }, 4.2, { resolution: 'p1080', aspect: 'vertical' });
+      await frame('frame-chart.png', withImage, 12.4);
 
-    // Theme galleries
-    const english: Record<string, string> = {
-      eglenceli: 'Fun', yilbasi: 'New Year', sonbahar: 'Autumn', kutlama: 'Celebration', bahar: 'Spring', uzay: 'Space', okyanus: 'Ocean',
-      minimal: 'Minimal light', gece: 'Minimal dark', kurumsal: 'Corporate', grafit: 'Graphite', mermer: 'Marble', blueprint: 'Blueprint',
-      aurora: 'Aurora', pastel: 'Pastel', topografya: 'Topographic', kagit: 'Paper', 'siyah-altin': 'Black & Gold', bokeh: 'Office lights',
-      finans: 'Finance', cam: 'Glass', geometrik: 'Geometric',
-    };
-    const gallery = async (name: string, ids: string[], cols: number) => {
-      const tw = 600, th = 338, gap = 24, label = 46, rows = Math.ceil(ids.length / cols);
-      const g = new OffscreenCanvas(cols * tw + (cols + 1) * gap, rows * (th + label) + (rows + 1) * gap), ctx = g.getContext('2d')!;
-      ctx.fillStyle = '#16161a'; ctx.fillRect(0, 0, g.width, g.height);
-      ids.forEach((id, i) => {
-        const x = gap + (i % cols) * (tw + gap), y = gap + Math.floor(i / cols) * (th + label + gap);
-        ctx.save(); ctx.beginPath(); ctx.roundRect(x, y, tw, th, 14); ctx.clip();
-        ctx.drawImage(themeCanvas(id, tw, th), x, y); ctx.restore();
-        ctx.fillStyle = '#ececf1'; ctx.font = '600 24px -apple-system, "Segoe UI", sans-serif';
-        ctx.fillText(english[id] ?? id, x + 4, y + th + 33);
-      });
-      await save(name, await png(g));
-    };
-    await gallery('themes-business.png', themesOf('pro').map((t) => t.id), 3);
-    await gallery('themes-fun.png', themesOf('fun').map((t) => t.id), 4);
-    {
-      // The editor with a business theme, for the README.
-      const biz: Project = { ...p, style: { ...p.style, backgroundKind: 'theme', backgroundTheme: 'kurumsal', padding: 0.08 } };
-      await frame('frame-business-theme.png', biz, 9.6);
-      const lensProject = addMagnifier({ ...p, clips: p.clips.map((c) => ({ ...c, zooms: c.zooms.slice(0, 1) })) }, 10.9, 13.5, { size: 0.36, zoom: 2.2, shape: 'circle' }).project;
-      await frame('frame-magnifier.png', lensProject, 11.6);
-    }
-
-    // Hero GIF: the output itself. Pastel; auto zoom on the clicks; a pause is cut out; then the
-    // same recording on other themes while the camera moves aside; the zoom follows the cursor.
-    {
-      const fps = 12, size = { width: 720, height: 405 };
-      const gif = new Gif(size.width, size.height, fps);
-      const ctx = new OffscreenCanvas(size.width, size.height).getContext('2d', { willReadFrequently: true })!;
-      // Shorter zooms leave a wide view in the middle, where the background can be seen.
-      // The end shows the magnifier instead of a second zoom.
-      const shorter: Project = { ...p, clips: p.clips.map((c) => ({ ...c, zooms: c.zooms.slice(0, 1).map((z) => ({ ...z, end: 5.8 })) })) };
-      const hero = addMagnifier(shorter, 10.9, 13.5, { size: 0.36, zoom: 2.2, shape: 'circle' }).project;
-      const segments: { from: number; to: number; theme: string; captions: [number, number, string][] }[] = [
-        { from: 0, to: 6.4, theme: 'pastel', captions: [[0, 1.6, '🎥 Camera full frame for the intro'], [1.7, 5.6, '🔍 Auto zoom on every click']] },
-        { from: 7.4, to: 8.2, theme: 'pastel', captions: [[7.4, 8.2, '✂ Cut: the pause is gone']] },
-        { from: 8.2, to: 9.0, theme: 'topografya', captions: [[8.2, 9.0, '🎨 Theme: Topographic']] },
-        { from: 9.0, to: 9.8, theme: 'aurora', captions: [[9.0, 9.8, '🎨 Theme: Aurora']] },
-        { from: 9.8, to: 10.6, theme: 'kurumsal', captions: [[9.8, 10.6, '🎨 Theme: Corporate']] },
-        { from: 10.6, to: 13.6, theme: 'pastel', captions: [[11.0, 13.6, '🔍 A magnifier follows your cursor']] },
-      ];
-      for (const seg of segments) {
-        const ps: Project = { ...hero, style: { ...hero.style, backgroundKind: 'theme', backgroundTheme: seg.theme, padding: 0.07 } };
-        const data = await lib.allRenderData(ps);
-        const count = Math.round((seg.to - seg.from) * fps);
-        for await (const k of renderFrames(ps, lib, data, ctx, size, fps, seg.from, count)) {
-          const t = seg.from + k / fps;
-          for (const [a, b, text] of seg.captions) {
-            if (t >= a && t < b) caption(ctx, size.width, size.height, text, Math.min(1, (t - a) / 0.2 + 0.4, (b - t) / 0.2 + 0.4));
-          }
-          gif.add(ctx.getImageData(0, 0, size.width, size.height).data);
-        }
+      // Theme galleries
+      const english: Record<string, string> = {
+        eglenceli: 'Fun', yilbasi: 'New Year', sonbahar: 'Autumn', kutlama: 'Celebration', bahar: 'Spring', uzay: 'Space', okyanus: 'Ocean',
+        minimal: 'Minimal light', gece: 'Minimal dark', kurumsal: 'Corporate', grafit: 'Graphite', mermer: 'Marble', blueprint: 'Blueprint',
+        aurora: 'Aurora', pastel: 'Pastel', topografya: 'Topographic', kagit: 'Paper', 'siyah-altin': 'Black & Gold', bokeh: 'Office lights',
+        finans: 'Finance', cam: 'Glass', geometrik: 'Geometric',
+      };
+      const gallery = async (name: string, ids: string[], cols: number) => {
+        const tw = 600, th = 338, gap = 24, label = 46, rows = Math.ceil(ids.length / cols);
+        const g = new OffscreenCanvas(cols * tw + (cols + 1) * gap, rows * (th + label) + (rows + 1) * gap), ctx = g.getContext('2d')!;
+        ctx.fillStyle = '#16161a'; ctx.fillRect(0, 0, g.width, g.height);
+        ids.forEach((id, i) => {
+          const x = gap + (i % cols) * (tw + gap), y = gap + Math.floor(i / cols) * (th + label + gap);
+          ctx.save(); ctx.beginPath(); ctx.roundRect(x, y, tw, th, 14); ctx.clip();
+          ctx.drawImage(themeCanvas(id, tw, th), x, y); ctx.restore();
+          ctx.fillStyle = '#ececf1'; ctx.font = '600 24px -apple-system, "Segoe UI", sans-serif';
+          ctx.fillText(english[id] ?? id, x + 4, y + th + 33);
+        });
+        await save(name, await png(g));
+      };
+      await gallery('themes-business.png', themesOf('pro').map((t) => t.id), 3);
+      await gallery('themes-fun.png', themesOf('fun').map((t) => t.id), 4);
+      {
+        // The editor with a business theme, for the README.
+        const biz: Project = { ...p, style: { ...p.style, backgroundKind: 'theme', backgroundTheme: 'kurumsal', padding: 0.08 } };
+        await frame('frame-business-theme.png', biz, 9.6);
+        const lensProject = addMagnifier({ ...p, clips: p.clips.map((c) => ({ ...c, zooms: c.zooms.slice(0, 1) })) }, 10.9, 13.5, { size: 0.36, zoom: 2.2, shape: 'circle' }).project;
+        await frame('frame-magnifier.png', lensProject, 11.6);
       }
-      await save('demo.gif', gif.bytes());
+
+      // Hero GIF: the output itself. Pastel; auto zoom on the clicks; a pause is cut out; then the
+      // same recording on other themes while the camera moves aside; the zoom follows the cursor.
+      {
+        const fps = 12, size = { width: 720, height: 405 };
+        const gif = new Gif(size.width, size.height, fps);
+        const ctx = new OffscreenCanvas(size.width, size.height).getContext('2d', { willReadFrequently: true })!;
+        // Shorter zooms leave a wide view in the middle, where the background can be seen.
+        // The end shows the magnifier instead of a second zoom.
+        const shorter: Project = { ...p, clips: p.clips.map((c) => ({ ...c, zooms: c.zooms.slice(0, 1).map((z) => ({ ...z, end: 5.8 })) })) };
+        const hero = addMagnifier(shorter, 10.9, 13.5, { size: 0.36, zoom: 2.2, shape: 'circle' }).project;
+        const segments: { from: number; to: number; theme: string; captions: [number, number, string][] }[] = [
+          { from: 0, to: 6.4, theme: 'pastel', captions: [[0, 1.6, '🎥 Camera full frame for the intro'], [1.7, 5.6, '🔍 Auto zoom on every click']] },
+          { from: 7.4, to: 8.2, theme: 'pastel', captions: [[7.4, 8.2, '✂ Cut: the pause is gone']] },
+          { from: 8.2, to: 9.0, theme: 'topografya', captions: [[8.2, 9.0, '🎨 Theme: Topographic']] },
+          { from: 9.0, to: 9.8, theme: 'aurora', captions: [[9.0, 9.8, '🎨 Theme: Aurora']] },
+          { from: 9.8, to: 10.6, theme: 'kurumsal', captions: [[9.8, 10.6, '🎨 Theme: Corporate']] },
+          { from: 10.6, to: 13.6, theme: 'pastel', captions: [[11.0, 13.6, '🔍 A magnifier follows your cursor']] },
+        ];
+        for (const seg of segments) {
+          const ps: Project = { ...hero, style: { ...hero.style, backgroundKind: 'theme', backgroundTheme: seg.theme, padding: 0.07 } };
+          const data = await lib.allRenderData(ps);
+          const count = Math.round((seg.to - seg.from) * fps);
+          for await (const k of renderFrames(ps, lib, data, ctx, size, fps, seg.from, count)) {
+            const t = seg.from + k / fps;
+            for (const [a, b, text] of seg.captions) {
+              if (t >= a && t < b) caption(ctx, size.width, size.height, text, Math.min(1, (t - a) / 0.2 + 0.4, (b - t) / 0.2 + 0.4));
+            }
+            gif.add(ctx.getImageData(0, 0, size.width, size.height).data);
+          }
+        }
+        await save('demo.gif', gif.bytes());
+      }
+      lib.dispose();
     }
-    lib.dispose();
 
     // The editor itself
     const hooks = () => (window as unknown as { __odak: { openProject: (p: string) => Promise<void>; store: EditorStore | null } }).__odak;
@@ -442,14 +448,20 @@ export async function runDocshots() {
     await shot('vertical.png');
     store().update((q) => ({ ...q, export: { ...q.export, aspect: 'wide' }, style: { ...q.style, backgroundKind: 'theme', backgroundTheme: 'okyanus' } }));
 
-    click(byText('.toolbar button', 'Dışa Aktar'));
-    while (!byText('.modal h2', 'Dışa Aktar')) await sleep(30);
+    click(byText('.toolbar button', t('Dışa Aktar')));
+    while (!byText('.modal h2', t('Dışa Aktar'))) await sleep(30);
     await shot('export-dialog.png');
-    click(byText('.modal button', 'Kapat'));
+    click(byText('.modal button', t('Kapat')));
     await sleep(200);
 
+    click($('.toolbar .settings-btn'));
+    while (!$('.modal.settings')) await sleep(30);
+    await shot('settings.png');
+    document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    while ($('.modal.settings')) await sleep(30);
+
     // Editor GIF: the real editor, step by step, with a drawn mouse pointer.
-    {
+    if (!uiOnly) {
       const fps = 8, W2 = 960, H2 = 600;
       const gif = new Gif(W2, H2, fps);
       const ctx = new OffscreenCanvas(W2, H2).getContext('2d', { willReadFrequently: true })!;
@@ -494,13 +506,13 @@ export async function runDocshots() {
       clock = 8.1; await player.seek(clock);
       step = 0.03;
       await hold(4);
-      await tap(byText('.theme', 'Topoğrafya'), 6); await hold(5);
-      await tap(byText('.theme', 'Aurora'), 4); await hold(5);
-      await tap(byText('.theme', 'Geometrik'), 4); await hold(4);
-      await tap(byText('.theme', 'Pastel'), 4); await hold(3);
+      await tap(byText('.theme', t('Topoğrafya')), 6); await hold(5);
+      await tap(byText('.theme', t('Aurora')), 4); await hold(5);
+      await tap(byText('.theme', t('Geometrik')), 4); await hold(4);
+      await tap(byText('.theme', t('Pastel')), 4); await hold(3);
       step = 1 / fps;
       // Scissors: cut where you click
-      await tap(byText('.timeline-bar button', 'Makas'), 7);
+      await tap(byText('.timeline-bar button', t('Makas')), 7);
       const cutT = 5.4;
       await glide({ x: xAt(cutT), y: clipY() }, 6, (pt) => pe(inner(), 'pointermove', pt.x, pt.y));
       await hold(2);
@@ -508,7 +520,7 @@ export async function runDocshots() {
       clock = cutT;
       await hold(5);
       // Range: select a slow part and play it four times faster
-      await tap(byText('.timeline-bar button', 'Aralık'), 6);
+      await tap(byText('.timeline-bar button', t('Aralık')), 6);
       await glide({ x: xAt(6.6), y: clipY() }, 5);
       const clipAt = () => $$('.clip').find((c) => { const r = c.getBoundingClientRect(); return r.left <= pointerAt.x && r.right >= pointerAt.x; }) ?? $('.clip')!;
       pressed = 1; pe(clipAt(), 'pointerdown', pointerAt.x, pointerAt.y);
@@ -518,9 +530,9 @@ export async function runDocshots() {
       await tap(byText('.range-bar button', '×4'), 5); await hold(5);
       // Camera: full frame for a moment
       clock = 2.0; await player.seek(clock);
-      await tap(byText('.timeline-bar button', 'Kamera'), 7); await hold(2);
-      await tap(byText('.inspector .segmented button', 'Tam ekran'), 7); await hold(10);
-      await tap(byText('.inspector-back button', 'Genel ayarlara dön'), 6); await hold(4);
+      await tap(byText('.timeline-bar button', t('Kamera')), 7); await hold(2);
+      await tap(byText('.inspector .segmented button', t('Tam ekran')), 7); await hold(10);
+      await tap(byText('.inspector-back button', t('Genel ayarlara dön')), 6); await hold(4);
       await save('editing.gif', gif.bytes());
     }
   } catch (e) {

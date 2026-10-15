@@ -5,6 +5,7 @@ import {
 import type { CameraLayout } from './cameraLayout.ts';
 import type { MagnifierSettings } from './magnifier.ts';
 import { generateAutoZooms } from './zoom.ts';
+import { t } from '../i18n/index.ts';
 
 // Pure editing operations used by the editor UI (and tested headlessly).
 
@@ -56,13 +57,13 @@ export type AddResult = { project: Project; clipID: string; zoomID: string } | {
 
 export function addZoomAt(p: Project, time: number): AddResult {
   const loc = locate(p, time);
-  if (!loc) return { error: 'Zaman çizelgesi boş.' };
-  const clip = p.clips[loc.index], t = loc.sourceTime;
-  const nextStart = Math.min(clip.sourceEnd, ...clip.zooms.filter((z) => z.start > t).map((z) => z.start));
-  if (clip.zooms.some((z) => z.start <= t && z.end > t) || nextStart - t < 0.3) {
-    return { error: 'Oynatma çizgisinin olduğu yerde zaten bir zoom var.' };
+  if (!loc) return { error: t('Zaman çizelgesi boş.') };
+  const clip = p.clips[loc.index], at = loc.sourceTime;
+  const nextStart = Math.min(clip.sourceEnd, ...clip.zooms.filter((z) => z.start > at).map((z) => z.start));
+  if (clip.zooms.some((z) => z.start <= at && z.end > at) || nextStart - at < 0.3) {
+    return { error: t('Oynatma çizgisinin olduğu yerde zaten bir zoom var.') };
   }
-  const z: ZoomSegment = { id: uuid(), start: t, end: Math.min(t + 2.5, nextStart), scale: 2, focus: followCursor(), isGenerated: false };
+  const z: ZoomSegment = { id: uuid(), start: at, end: Math.min(at + 2.5, nextStart), scale: 2, focus: followCursor(), isGenerated: false };
   return {
     project: { ...p, clips: p.clips.map((c, i) => (i === loc.index ? { ...c, zooms: sortZooms([...c.zooms, z]) } : c)) },
     clipID: clip.id, zoomID: z.id,
@@ -106,9 +107,9 @@ const MIN_CAMERA = 0.05;
 /** Splits a clip at a source time; the right part gets a new id. */
 export function splitClipAtSource(p: Project, clipID: string, source: number): { project: Project; rightID: string } | { error: string } {
   const i = p.clips.findIndex((c) => c.id === clipID);
-  if (i < 0) return { error: 'Klip bulunamadı.' };
+  if (i < 0) return { error: t('Klip bulunamadı.') };
   const c = p.clips[i];
-  if (source - c.sourceStart < MIN_CLIP || c.sourceEnd - source < MIN_CLIP) return { error: 'Bölmek için klibin kenarına çok yakınsın.' };
+  if (source - c.sourceStart < MIN_CLIP || c.sourceEnd - source < MIN_CLIP) return { error: t('Bölmek için klibin kenarına çok yakınsın.') };
   const cams = c.cameraSegments ?? [], mags = c.magnifiers ?? [];
   const left: Clip = { ...c, sourceEnd: source, zooms: zoomsWithin(c.zooms, c.sourceStart, source, false),
     cameraSegments: within(cams, c.sourceStart, source, false, MIN_CAMERA), magnifiers: within(mags, c.sourceStart, source, false, MIN_CAMERA) };
@@ -122,7 +123,7 @@ export function splitClipAtSource(p: Project, clipID: string, source: number): {
 /** Splits the clip under the playhead. */
 export function splitAt(p: Project, time: number) {
   const loc = locate(p, time);
-  if (!loc) return { error: 'Zaman çizelgesi boş.' } as const;
+  if (!loc) return { error: t('Zaman çizelgesi boş.') } as const;
   return splitClipAtSource(p, p.clips[loc.index].id, loc.sourceTime);
 }
 

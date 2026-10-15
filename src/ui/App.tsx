@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { type RecordingFinished, odak } from '../bridge.ts';
+import { type LanguageState, type RecordingFinished, odak } from '../bridge.ts';
+import { type LangPref, setLang, t } from '../i18n/index.ts';
 import { type MediaAsset, type Project, newClip, newProject, normalizeProject } from '../core/model.ts';
 import { generateAutoZooms } from '../core/zoom.ts';
 import { insertClip } from '../core/edit.ts';
 import { type SideDevices, type SideResult, SideRecorder } from '../media/sideRecorder.ts';
 import { Editor } from './Editor.tsx';
 import { RecordSetup } from './RecordSetup.tsx';
+import { SettingsDialog } from './SettingsDialog.tsx';
 import { EditorStore } from './store.ts';
 import './styles.css';
 
@@ -25,6 +27,16 @@ export function App() {
     return () => { window.removeEventListener('error', onError); window.removeEventListener('unhandledrejection', onReject); };
   }, []);
   const [busy, setBusy] = useState(false);
+  // Interface language: changing it redraws everything in place (an open project stays open).
+  const [language, setLanguageState] = useState<LanguageState>(() => odak().settings());
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const applyLanguage = useCallback((l: LanguageState) => {
+    setLang(l.lang);
+    document.documentElement.lang = l.lang;
+    setLanguageState((old) => ({ ...old, ...l }));
+  }, []);
+  useEffect(() => odak().onLanguage(applyLanguage), [applyLanguage]);
+  const pickLanguage = useCallback(async (pref: LangPref) => applyLanguage(await odak().setLanguage(pref)), [applyLanguage]);
   const storeRef = useRef(store);
   storeRef.current = store;
   // Camera + microphone recorder; lives here so it survives while the window is hidden.
@@ -44,8 +56,8 @@ export function App() {
       odak().log('camera/mic open failed', err.name, err.message, devices);
       const denied = err.name === 'NotAllowedError' || err.name === 'SecurityError';
       setAlert(denied
-        ? 'macOS kameraya/mikrofona erişime izin vermedi. Uygulama güncellendiyse eski izin geçersiz kalmış olabilir: “İzinleri Sıfırla”ya bas, sonra kaydı yeniden başlatıp izin ver.'
-        : `Kamera/mikrofon açılamadı: ${err.name}: ${err.message}`, denied);
+        ? t('macOS kameraya/mikrofona erişime izin vermedi. Uygulama güncellendiyse eski izin geçersiz kalmış olabilir: “İzinleri Sıfırla”ya bas, sonra kaydı yeniden başlatıp izin ver.')
+        : t('Kamera/mikrofon açılamadı: {detail}', { detail: `${err.name}: ${err.message}` }), denied);
       return false;
     }
     if (intoProject) await storeRef.current?.flush();
@@ -62,7 +74,7 @@ export function App() {
 
   const openProject = useCallback(async (pkg: string, project?: Project) => {
     const r = project ? { project } : await odak().loadProject(pkg);
-    if (!r.project) { setAlert(r.error ?? 'Proje açılamadı.'); return; }
+    if (!r.project) { setAlert(r.error ?? t('Proje açılamadı.')); return; }
     await storeRef.current?.flush();
     await odak().addRecent(pkg);
     setStore(new EditorStore(pkg, normalizeProject(r.project)));
@@ -88,11 +100,11 @@ export function App() {
     side.current = null;
     if (!r.ok) { await rec?.cancel(); setBusy(false); setAlert(r.error); return; }
     const { info } = r;
-    const extra: SideResult = rec ? await rec.stop(info.duration).catch((e): SideResult => { odak().log('camera/mic stop failed', String((e as Error).stack ?? e)); setAlert(`Kamera/mikrofon kaydı tamamlanamadı: ${(e as Error).message}`); return {}; }) : {};
+    const extra: SideResult = rec ? await rec.stop(info.duration).catch((e): SideResult => { odak().log('camera/mic stop failed', String((e as Error).stack ?? e)); setAlert(t('Kamera/mikrofon kaydı tamamlanamadı: {detail}', { detail: (e as Error).message })); return {}; }) : {};
     setBusy(false);
     const track = await odak().readCursor(r.pkg, info.cursor);
     const asset: MediaAsset = {
-      id: r.mediaID, kind: 'screenRecording', displayName: 'Ekran kaydı', videoFile: info.video,
+      id: r.mediaID, kind: 'screenRecording', displayName: t('Ekran kaydı'), videoFile: info.video,
       systemAudioFile: info.systemAudio ?? undefined, microphoneFile: extra.micFile ?? info.microphone ?? undefined,
       cameraFile: extra.cameraFile, cursorFile: info.cursor, duration: info.duration, pixelWidth: info.width, pixelHeight: info.height,
       pixelsPerPoint: info.pixelsPerPoint, recordedAt: r.startedAt,
@@ -104,7 +116,7 @@ export function App() {
     const open = storeRef.current;
     if (target && open && open.pkg === r.pkg) {
       // “Kayıt Ekle”: the new recording goes to the end of the open project.
-      open.update((p) => insertClip({ ...p, media: [...p.media, { ...asset, displayName: `Kayıt ${p.media.filter((m) => m.kind === 'screenRecording').length + 1}` }] }, clip));
+      open.update((p) => insertClip({ ...p, media: [...p.media, { ...asset, displayName: t('Kayıt {n}', { n: p.media.filter((m) => m.kind === 'screenRecording').length + 1 }) }] }, clip));
       open.select({ kind: 'clip', clipID: clip.id });
       window.dispatchEvent(new CustomEvent('odak:seekToClip', { detail: clip.id }));
       return;
@@ -124,29 +136,31 @@ export function App() {
     else if (cmd === 'export') window.dispatchEvent(new Event('odak:export'));
     else if (cmd === 'undo') { if (typing) document.execCommand('undo'); else s?.undo(); }
     else if (cmd === 'redo') { if (typing) document.execCommand('redo'); else s?.redo(); }
+    else if (cmd === 'settings') setSettingsOpen(true);
   }), [closeProject, showOpen]);
 
   return (
     <>
       {store
-        ? <Editor key={store.pkg} store={store} onClose={closeProject} busy={busy}
+        ? <Editor key={store.pkg} store={store} onClose={closeProject} busy={busy} onSettings={() => setSettingsOpen(true)}
                   onRecordInto={(d, a, dev) => startRecording(d, a, dev, store.pkg)} />
-        : <Home onOpen={openProject} onShowOpen={showOpen} busy={busy} onStart={startRecording} />}
+        : <Home onOpen={openProject} onShowOpen={showOpen} busy={busy} onStart={startRecording} onSettings={() => setSettingsOpen(true)} />}
+      {settingsOpen && <SettingsDialog state={language} onPick={(l) => void pickLanguage(l)} onClose={() => setSettingsOpen(false)} />}
       {alert && (
         <div className="modal-backdrop" onClick={() => setAlert(null)}>
           <div className="modal small" onClick={(e) => e.stopPropagation()}>
             <h3>Odak</h3>
             <p className="pre">{alert.text}</p>
             <div className="row between">
-              <button className="ghost" onClick={() => void odak().revealLog()}>Tanılama Kaydı</button>
+              <button className="ghost" onClick={() => void odak().revealLog()}>{t('Tanılama Kaydı')}</button>
               <span className="row">
                 {alert.permission && odak().platform === 'darwin' && (
                   <button onClick={async () => {
                     await odak().resetPermissions();
-                    setAlert('Odak\'ın izinleri sıfırlandı.\n\nŞimdi “Kaydı Başlat”a bas: macOS ekran kaydı (ve seçtiysen kamera/mikrofon) iznini yeniden soracak. Ekran kaydı iznini verdikten sonra macOS Odak\'ı kapatıp yeniden açmanı isteyebilir.');
-                  }}>İzinleri Sıfırla</button>
+                    setAlert(t('Odak\'ın izinleri sıfırlandı.\n\nŞimdi “Kaydı Başlat”a bas: macOS ekran kaydı (ve seçtiysen kamera/mikrofon) iznini yeniden soracak. Ekran kaydı iznini verdikten sonra macOS Odak\'ı kapatıp yeniden açmanı isteyebilir.'));
+                  }}>{t('İzinleri Sıfırla')}</button>
                 )}
-                <button className="primary" onClick={() => setAlert(null)}>Tamam</button>
+                <button className="primary" onClick={() => setAlert(null)}>{t('Tamam')}</button>
               </span>
             </div>
           </div>
@@ -156,8 +170,8 @@ export function App() {
   );
 }
 
-function Home({ onOpen, onShowOpen, busy, onStart }: {
-  onOpen: (pkg: string) => void; onShowOpen: () => void; busy: boolean;
+function Home({ onOpen, onShowOpen, busy, onStart, onSettings }: {
+  onOpen: (pkg: string) => void; onShowOpen: () => void; busy: boolean; onSettings: () => void;
   onStart: (displayId: number, systemAudio: boolean, devices: SideDevices) => Promise<boolean>;
 }) {
   const [recents, setRecents] = useState<string[]>([]);
@@ -172,21 +186,26 @@ function Home({ onOpen, onShowOpen, busy, onStart }: {
     <div className="home">
       <section className="record">
         <div className="hero-icon">◎</div>
-        <h1>Yeni kayıt</h1>
+        <h1>{t('Yeni kayıt')}</h1>
         <p className="muted center">
-          Ekranı imleç olmadan kaydeder; imleci ve tıklamaları ayrıca saklar.<br />
-          Zoom'lar tıklamalardan otomatik oluşur, sonra hepsini düzenleyebilirsin.
+          {t('Ekranı imleç olmadan kaydeder; imleci ve tıklamaları ayrıca saklar.')}<br />
+          {t('Zoom\'lar tıklamalardan otomatik oluşur, sonra hepsini düzenleyebilirsin.')}
         </p>
         <RecordSetup busy={busy} onStart={onStart} />
       </section>
       <aside className="projects">
-        <div className="row between"><h2>Projeler</h2><button onClick={onShowOpen}>Aç…</button></div>
+        <div className="row between"><h2>{t('Projeler')}</h2>
+          <span className="row">
+            <button className="settings-btn" onClick={onSettings} title={t('Ayarlar: dil ve tanılama')}><span className="gear">⚙</span> {t('Ayarlar')}</button>
+            <button onClick={onShowOpen}>{t('Aç…')}</button>
+          </span>
+        </div>
         {recents.length === 0
-          ? <p className="muted small">Henüz proje yok. Kayıtlar Filmler/Videolar klasöründeki “Odak” klasörüne kaydedilir.</p>
+          ? <p className="muted small">{t('Henüz proje yok. Kayıtlar Filmler/Videolar klasöründeki “Odak” klasörüne kaydedilir.')}</p>
           : <ul className="recent">{recents.map((p) => (
               <li key={p}><button className="link" onClick={() => onOpen(p)}>
-                <span className="name">{baseName(p)}</span><span className="path">{p}</span>
-              </button><button className="ghost" title="Klasörde göster" onClick={() => void odak().reveal(p)}>↗</button></li>
+                <span className="name" data-raw>{baseName(p)}</span><span className="path" data-raw>{p}</span>
+              </button><button className="ghost" title={t('Klasörde göster')} onClick={() => void odak().reveal(p)}>↗</button></li>
             ))}</ul>}
       </aside>
     </div>

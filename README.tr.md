@@ -26,6 +26,9 @@ Ekran kaydı, otomatik zoom ve zoom'ları elle düzenleme. **macOS ve Windows'ta
   ![Profesyonel temalar](docs/images/themes-business.png)
 - **İmleç:** Beyaz ok, siyah ok, renkli ok ya da nokta. Renk, boyut, vurgu halkası, hareketsizken gizleme, hareket yumuşatma ve tıklama efekti (halka ya da dolgu) ayarlanabilir.
 - Projeler `.odak` klasörlerinde saklanır: ham medya, imleç verisi ve düzenlemeler. Uygulamayı kapatıp açınca kaldığın yerden devam edersin.
+- **Dil:** Arayüz Türkçe ve İngilizce. Odak bilgisayarının diliyle açılır; **⚙ Ayarlar**'dan istediğin an değiştirebilirsin (aşağıda [Dil](#dil)).
+
+![Odak editörü, Türkçe arayüz](docs/images/tr/editor.png)
 
 ## İndir
 
@@ -38,6 +41,17 @@ Ekran kaydı, otomatik zoom ve zoom'ları elle düzenleme. **macOS ve Windows'ta
 | Windows 10 (2004+) / 11 | `Odak-Setup-x.y.z.exe` | İmzalı değil. SmartScreen uyarısında **Ek bilgi › Yine de çalıştır**. Kurulumsuz kullanım için `Odak-x.y.z-win-x64.zip`. |
 
 macOS'ta ilk kayıtta **Ekran ve Sistem Sesi Kaydı** izni istenir. Mikrofon kullanılacaksa mikrofon izni de istenir. İzinden sonra uygulamayı yeniden başlatmak gerekebilir.
+
+## Dil
+
+Odak **Türkçe** ve **İngilizce** konuşur.
+
+- **Otomatik:** Bilgisayarının ilk dili Türkçe ise Odak Türkçe açılır, başka bir dil ise İngilizce.
+- **İstediğin an değiştir:** **⚙ Ayarlar**'a tıkla (ana ekranın sağ üstünde ya da editörün araç çubuğundaki ⚙ düğmesi; macOS'ta *Odak › Ayarlar…*, Windows'ta *Dosya › Ayarlar…*, ya da `⌘,` / `Ctrl+,`) ve **Sistem dili**, **Türkçe** ya da **English** seç. Bütün arayüz hemen değişir; açık proje açık kalır, hiçbir şey kaybolmaz.
+- Menü çubuğunda iki dilde yazılmış bir **Dil · Language** menüsü de var; hangi dil açık olursa olsun kolayca bulunur.
+- Seçimin hatırlanır. Projeler dile bağlı değildir: Türkçe arayüzde yapılan proje İngilizcede de aynen açılır.
+
+![Ayarlar penceresi: Sistem dili, Türkçe, English](docs/images/tr/settings.png)
 
 ## Kaynaktan çalıştırma
 
@@ -105,7 +119,7 @@ Zaman çizelgesinin üstündeki çubukta üç araç var. Hangisinin seçili oldu
 
 Her işlem **geri alınabilir** (⌘/Ctrl+Z). Ham kayıtlar hiç değişmez; düzenlemeler yalnızca `project.json`'a yazılır.
 
-Kısayollar: boşluk (oynat/duraklat), ←/→ (kare kare, Shift ile 10 kare), V / R / C (Seç / Aralık / Makas), S (böl), Z (oynatma çizgisine zoom), K (kamera bölümü), B (büyüteç; K ve B seçili aralığa da uygulanır), Sil (seçili klip, zoom ya da aralık), Esc (seçimi bırak, Seç aracına dön), ⌘/Ctrl+Z ve ⇧⌘/Ctrl+Shift+Z (geri al/yinele), ⌘/Ctrl+E (dışa aktar).
+Kısayollar: boşluk (oynat/duraklat), ←/→ (kare kare, Shift ile 10 kare), V / R / C (Seç / Aralık / Makas), S (böl), Z (oynatma çizgisine zoom), K (kamera bölümü), B (büyüteç; K ve B seçili aralığa da uygulanır), Sil (seçili klip, zoom ya da aralık), Esc (seçimi bırak, Seç aracına dön), ⌘/Ctrl+Z ve ⇧⌘/Ctrl+Shift+Z (geri al/yinele), ⌘/Ctrl+E (dışa aktar), ⌘/Ctrl+, (ayarlar ve dil).
 
 ## Mimari
 
@@ -151,14 +165,19 @@ Kayıt 2026-10-15 10.12.30.odak/
 ## Testler
 
 ```bash
-npm test               # çekirdek: zoom/kamera algoritması referans sonuçlarla aynı mı; böl/kırp/sırala/hız/aralık sil/durgun anlar
+npm test               # çekirdek: zoom/kamera algoritması referans sonuçlarla aynı mı; böl/kırp/sırala/hız/aralık sil/durgun anlar;
+                       #   çeviriler: her metnin aynı yer tutucularla İngilizcesi var mı, çeviri dışında Türkçe metin kalmış mı
 npm run selftest       # uygulama içinde: sentetik kayıt → zoom → kaydet/aç → MP4 → önizleme=dışa aktarma, ses senkronu,
                        #   kamera balonu, görsel/tema arka planlar, imleç stilleri, sahte kamera+mikrofonla kayıt,
                        #   düzenlenmiş çok klipli dışa aktarma (kesik + ×2 + içe aktarılan video + kopya) ve ses senkronu,
                        #   kamera bölümleri (tam ekran, taşınan balon, geçiş kareleri dahil önizleme = dışa aktarma)
 npm run uitest -- "examples/Örnek Proje.odak"   # gerçek arayüz: zoom'lar, böl/kırp/sürükle/sil, oynatma çizgisini sürükleme,
                                                #   makas, aralık ×2/ayır/sil, kamera bölümleri, video ekle, durgun anlar, geri al,
-                                               #   oynat, otomatik kayıt
+                                               #   oynat, otomatik kayıt, Ayarlar'dan dil değiştirme ve İngilizce
+                                               #   arayüzde Türkçe metin kalmaması (`--lang en` ile her akış İngilizce;
+                                               #   CI ikisini de çalıştırır)
+npm run docshots       # docs/images: ekran görüntüleri, kareler, tema galerileri, GIF'ler (İngilizce arayüz)
+npm run docshots:tr    # editör ekran görüntüleri Türkçe arayüzle → docs/images/tr (bu README)
 npm run perftest       # performans: 40 sn 2560×1600@60 kayıt + kamera + 2 ses izi, 16 klip, zoom'lar ve kamera bölümleri;
                        #   gerçek editörde oynatma (kesimler dahil), sürükleme, düzenleme, zaman çizelgesi, dışa aktarma
 zsh native/mac/test.sh                         # macOS yardımcısı: WAV hizalaması, anahtar karelerin en fazla ~1 sn arayla olması

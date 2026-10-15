@@ -52,6 +52,9 @@ contextBridge.exposeInMainWorld('odak', {
   onRecordingFinished: (cb: (r: unknown) => void) => on('recording:finished', cb),
   onHudFinishing: (cb: () => void) => on('hud:finishing', cb),
   onMenu: (cb: (cmd: unknown) => void) => on('menu', cb),
+  settings: () => ipcRenderer.sendSync('settings:get'),
+  setLanguage: (pref: string) => ipcRenderer.invoke('settings:setLanguage', pref),
+  onLanguage: (cb: (l: unknown) => void) => on('settings:language', cb),
   selftestTempDir: () => ipcRenderer.invoke('selftest:dir'),
   selftestDone: (result: unknown) => ipcRenderer.send('selftest:done', result),
 });

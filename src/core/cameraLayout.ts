@@ -1,3 +1,4 @@
+import { N } from '../i18n/index.ts';
 import {
   type CameraMode, type CameraPosition, type CameraSettings, type CameraShape, type Project, type Size, clipStarts,
   projectDuration, toLocal,
@@ -27,9 +28,9 @@ export interface CameraSpan {
 export const CAMERA_TRANSITION = 0.5;
 
 export const cameraPositions: { id: CameraPosition; icon: string; title: string }[] = [
-  { id: 'top-left', icon: '↖', title: 'Sol üst' }, { id: 'top-center', icon: '↑', title: 'Üst orta' }, { id: 'top-right', icon: '↗', title: 'Sağ üst' },
-  { id: 'middle-left', icon: '←', title: 'Sol orta' }, { id: 'center', icon: '•', title: 'Orta' }, { id: 'middle-right', icon: '→', title: 'Sağ orta' },
-  { id: 'bottom-left', icon: '↙', title: 'Sol alt' }, { id: 'bottom-center', icon: '↓', title: 'Alt orta' }, { id: 'bottom-right', icon: '↘', title: 'Sağ alt' },
+  { id: 'top-left', icon: '↖', title: N('Sol üst') }, { id: 'top-center', icon: '↑', title: N('Üst orta') }, { id: 'top-right', icon: '↗', title: N('Sağ üst') },
+  { id: 'middle-left', icon: '←', title: N('Sol orta') }, { id: 'center', icon: '•', title: N('Merkez') }, { id: 'middle-right', icon: '→', title: N('Sağ orta') },
+  { id: 'bottom-left', icon: '↙', title: N('Sol alt') }, { id: 'bottom-center', icon: '↓', title: N('Alt orta') }, { id: 'bottom-right', icon: '↘', title: N('Sağ alt') },
 ];
 
 export const baseLayout = (c: CameraSettings): CameraLayout => ({ mode: c.show ? 'bubble' : 'hidden', position: c.position, size: c.size });

@@ -45,6 +45,11 @@ jobs:
         run: |
           cp -R "examples/Örnek Proje.odak" "$RUNNER_TEMP/ui.odak"
           npm run uitest -- "$RUNNER_TEMP/ui.odak"
+      - name: UI test in English (the same flows; no Turkish text may be left anywhere)
+        shell: bash
+        run: |
+          cp -R "examples/Örnek Proje.odak" "$RUNNER_TEMP/ui-en.odak"
+          npx electron . --uitest "$RUNNER_TEMP/ui-en.odak" --lang en
       - name: Performance test (heavy project in the real editor; CI machines have no GPU, so report only)
         run: npm run perftest -- --perf-report
       - name: Capture helper smoke test (records 3 s of this machine's screen)

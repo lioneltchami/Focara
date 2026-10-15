@@ -1,5 +1,6 @@
 // The API the Electron main process exposes to the UI (see electron/preload.ts).
 import type { CursorTrack, Project } from './core/model.ts';
+import type { Lang, LangPref } from './i18n/index.ts';
 
 export interface DisplayInfo { id: number; name: string; width: number; height: number; scaleFactor: number; primary: boolean }
 
@@ -21,7 +22,10 @@ export type RecordingFinished =
   | { ok: true; pkg: string; mediaID: string; info: RecordingInfo; startedAt: number }
   | { ok: false; error: string };
 
-export type MenuCommand = 'new' | 'open' | 'export' | 'undo' | 'redo';
+export type MenuCommand = 'new' | 'open' | 'export' | 'undo' | 'redo' | 'settings';
+
+/** The interface language: the user's choice, what it resolves to, and the system's language. */
+export interface LanguageState { pref: LangPref; lang: Lang; system?: Lang }
 
 export interface OdakAPI {
   platform: 'darwin' | 'win32' | 'linux';
@@ -68,6 +72,9 @@ export interface OdakAPI {
   stopRecording(): Promise<void>;
   onRecordingFinished(cb: (r: RecordingFinished) => void): () => void;
   onMenu(cb: (cmd: MenuCommand) => void): () => void;
+  settings(): LanguageState;
+  setLanguage(pref: LangPref): Promise<LanguageState>;
+  onLanguage(cb: (l: LanguageState) => void): () => void;
   selftestTempDir(): Promise<string>;
   selftestDone(result: { ok: boolean; log: string[] }): void;
 }

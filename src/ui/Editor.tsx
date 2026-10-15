@@ -14,7 +14,8 @@ import { ExportDialog } from './ExportDialog.tsx';
 import { Inspector } from './Inspector.tsx';
 import { QuietDialog } from './QuietDialog.tsx';
 import { RecordSetup } from './RecordSetup.tsx';
-import { type EditorStore, useStore } from './store.ts';
+import { type EditorStore, saveStatusText, useStore } from './store.ts';
+import { N, t } from '../i18n/index.ts';
 
 export function timecode(t: number, cs = true) {
   t = Math.max(0, t);
@@ -26,9 +27,9 @@ export function timecode(t: number, cs = true) {
 export type Tool = 'select' | 'range' | 'blade';
 
 const toolHints: Record<Tool, string> = {
-  select: 'Seç: tıkla → seç · sürükle → sırala · kenarı sürükle → kırp · Shift+sürükle → aralık',
-  range: 'Aralık: kliplerin üstünde sürükle → bir kısmı seç; sonra Sil, Ayır ya da hızlandır',
-  blade: 'Makas: klibe tıkla → tam oradan böler (oynatma çizgisine yapışır)',
+  select: N('Seç: tıkla → seç · sürükle → sırala · kenarı sürükle → kırp · Shift+sürükle → aralık'),
+  range: N('Aralık: kliplerin üstünde sürükle → bir kısmı seç; sonra Sil, Ayır ya da hızlandır'),
+  blade: N('Makas: klibe tıkla → tam oradan böler (oynatma çizgisine yapışır)'),
 };
 
 export interface EditActions {
@@ -38,8 +39,8 @@ export interface EditActions {
   time: () => number;
 }
 
-export function Editor({ store, onClose, busy, onRecordInto }: {
-  store: EditorStore; onClose: () => void; busy: boolean;
+export function Editor({ store, onClose, busy, onRecordInto, onSettings }: {
+  store: EditorStore; onClose: () => void; busy: boolean; onSettings: () => void;
   onRecordInto: (displayId: number, systemAudio: boolean, devices: SideDevices) => Promise<boolean>;
 }) {
   useStore(store);
@@ -72,7 +73,7 @@ export function Editor({ store, onClose, busy, onRecordInto }: {
   useEffect(() => {
     if (!player) return;
     void player.setProject(p).then(() => setAspect(player.canvasSize.width / player.canvasSize.height))
-      .catch((e) => store.setError(`Önizleme hazırlanamadı: ${(e as Error).message}`));
+      .catch((e) => store.setError(t('Önizleme hazırlanamadı: {detail}', { detail: (e as Error).message })));
   }, [player, p, store]);
 
   const seek = useCallback((t: number) => { player?.pause(); void player?.seek(t); }, [player]);
@@ -129,7 +130,7 @@ export function Editor({ store, onClose, busy, onRecordInto }: {
     const flip: CameraPosition = c.position.endsWith('right') ? c.position.replace('right', 'left') as CameraPosition
       : c.position.endsWith('left') ? c.position.replace('left', 'right') as CameraPosition : 'bottom-right';
     const r = addCameraSegment(store.project, a, b, { mode: 'bubble', position: flip, size: c.size });
-    if (!r.ids.length) { setFlash('Kamera bölümü için en az 0.1 sn seç.'); return; }
+    if (!r.ids.length) { setFlash(t('Kamera bölümü için en az 0.1 sn seç.')); return; }
     store.update(() => r.project);
     store.select({ kind: 'camera', clipID: r.ids[0].clipID, segID: r.ids[0].segID });
     setRange(null);
@@ -140,7 +141,7 @@ export function Editor({ store, onClose, busy, onRecordInto }: {
   const addLens = () => {
     const a = range ? range.a : now(), b = range ? range.b : Math.min(now() + 3, projectDuration(store.project));
     const r = addMagnifier(store.project, a, b, defaultMagnifier());
-    if (!r.ids.length) { setFlash('Büyüteç için en az 0.1 sn seç.'); return; }
+    if (!r.ids.length) { setFlash(t('Büyüteç için en az 0.1 sn seç.')); return; }
     store.update(() => r.project);
     store.select({ kind: 'magnifier', clipID: r.ids[0].clipID, segID: r.ids[0].segID });
     setRange(null);
@@ -162,7 +163,7 @@ export function Editor({ store, onClose, busy, onRecordInto }: {
     store.select({ kind: 'clip', clipID: r.rightID });
   };
   const removeClip = (clipID: string) => {
-    if (store.project.clips.length <= 1) { store.setError('Projede en az bir klip kalmalı.'); return; }
+    if (store.project.clips.length <= 1) { store.setError(t('Projede en az bir klip kalmalı.')); return; }
     store.update((q) => deleteClip(q, clipID));
     store.select(null);
   };
@@ -173,7 +174,7 @@ export function Editor({ store, onClose, busy, onRecordInto }: {
   const deleteSelected = () => {
     if (range) {
       const q = removeRange(store.project, range.a, range.b);
-      if (!q.clips.length) { store.setError('Tüm içerik silinemez; en az bir parça kalmalı.'); return; }
+      if (!q.clips.length) { store.setError(t('Tüm içerik silinemez; en az bir parça kalmalı.')); return; }
       store.update(() => q);
       setRange(null);
       seek(range.a);
@@ -194,8 +195,8 @@ export function Editor({ store, onClose, busy, onRecordInto }: {
     const { id, rel, name } = await odak().importMedia(store.pkg, src);
     try {
       const f = await lib.open(rel);
-      if (!f.video) throw new Error('Dosyada video bulunamadı.');
-      if (!f.videoSink) throw new Error('Bu videonun kodeği bu bilgisayarda çözülemiyor (H.264/HEVC/VP9/AV1 MP4 ya da MOV deneyin).');
+      if (!f.video) throw new Error(t('Dosyada video bulunamadı.'));
+      if (!f.videoSink) throw new Error(t('Bu videonun kodeği bu bilgisayarda çözülemiyor (H.264/HEVC/VP9/AV1 MP4 ya da MOV deneyin).'));
       const duration = await f.input.computeDuration();
       const asset: MediaAsset = {
         id, kind: 'externalVideo', displayName: name, videoFile: rel, duration,
@@ -218,7 +219,7 @@ export function Editor({ store, onClose, busy, onRecordInto }: {
     if (!files.length) return;
     setImporting(true);
     for (const f of files) {
-      try { await importFile(f); } catch (e) { store.setError(`“${f.replace(/^.*[\\/]/, '')}” eklenemedi: ${(e as Error).message}`); }
+      try { await importFile(f); } catch (e) { store.setError(t('“{name}” eklenemedi: {detail}', { name: f.replace(/^.*[\\/]/, ''), detail: (e as Error).message })); }
     }
     setImporting(false);
   };
@@ -227,8 +228,8 @@ export function Editor({ store, onClose, busy, onRecordInto }: {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      const t = e.target as HTMLElement | null;
-      if (t?.closest?.('input, textarea, select') || dialog) return;
+      const target = e.target as HTMLElement | null;
+      if (target?.closest?.('input, textarea, select') || dialog) return;
       if (e.key === ' ') { e.preventDefault(); player?.toggle(); }
       else if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); deleteSelected(); }
       else if (e.key === 'ArrowLeft') { e.preventDefault(); step(e.shiftKey ? -10 : -1); }
@@ -252,13 +253,14 @@ export function Editor({ store, onClose, busy, onRecordInto }: {
   return (
     <div className="editor">
       <header className="toolbar">
-        <button onClick={onClose} title="Ana ekrana dön (proje kaydedilir)">‹ Projeler</button>
-        <div className="title"><b>{p.name}</b><span>{store.saveStatus}</span></div>
+        <button onClick={onClose} title={t('Ana ekrana dön (proje kaydedilir)')}>‹ {t('Projeler')}</button>
+        <div className="title"><b data-raw>{p.name}</b><span>{saveStatusText(store.saveStatus)}</span></div>
         <div className="row">
-          <button disabled={!store.canUndo} onClick={() => store.undo()} title="Geri Al">↶</button>
-          <button disabled={!store.canRedo} onClick={() => store.redo()} title="Yinele">↷</button>
-          <button onClick={() => void odak().reveal(`${store.pkg}/project.json`)} title="Proje klasörünü göster">Klasör</button>
-          <button className="primary" onClick={() => setDialog('export')}>Dışa Aktar</button>
+          <button disabled={!store.canUndo} onClick={() => store.undo()} title={t('Geri Al')}>↶</button>
+          <button disabled={!store.canRedo} onClick={() => store.redo()} title={t('Yinele')}>↷</button>
+          <button className="settings-btn" onClick={onSettings} title={t('Ayarlar: dil ve tanılama')}>⚙</button>
+          <button onClick={() => void odak().reveal(`${store.pkg}/project.json`)} title={t('Proje klasörünü göster')}>{t('Klasör')}</button>
+          <button className="primary" onClick={() => setDialog('export')}>{t('Dışa Aktar')}</button>
         </div>
       </header>
       <div className="workspace">
@@ -267,39 +269,39 @@ export function Editor({ store, onClose, busy, onRecordInto }: {
             <canvas ref={canvasRef} style={{ aspectRatio: String(aspect) }} onClick={() => player?.toggle()} />
           </div>
           <div className="transport">
-            <button className="ghost" onClick={() => step(-1)} title="Bir kare geri (←, Shift+← 10 kare)">⏮</button>
-            <button className="ghost play" onClick={() => player?.toggle()} title="Oynat / Duraklat (boşluk)">{playing ? '❚❚' : '▶'}</button>
-            <button className="ghost" onClick={() => step(1)} title="Bir kare ileri (→)">⏭</button>
+            <button className="ghost" onClick={() => step(-1)} title={t('Bir kare geri (←, Shift+← 10 kare)')}>⏮</button>
+            <button className="ghost play" onClick={() => player?.toggle()} title={t('Oynat / Duraklat (boşluk)')}>{playing ? '❚❚' : '▶'}</button>
+            <button className="ghost" onClick={() => step(1)} title={t('Bir kare ileri (→)')}>⏭</button>
             <span className="mono muted">{timecode(time)} / {timecode(duration)}</span>
           </div>
         </div>
         <Inspector store={store} lib={lib} seek={seek} onDelete={deleteSelected} actions={actions} />
       </div>
       <Timeline store={store} lib={lib} time={time} playing={playing} seek={seek} scrubTo={scrubTo} range={range} setRange={setRange} tool={tool}
-                hint={flash ?? (range ? `${(range.b - range.a).toFixed(2)} sn seçili · Sil, Ayır ya da ×2 / ×4` : toolHints[tool])} warn={!!flash}
+                hint={flash ?? (range ? t('{s} sn seçili · Sil, Ayır ya da ×2 / ×4', { s: (range.b - range.a).toFixed(2) }) : t(toolHints[tool]))} warn={!!flash}
                 onDeleteRange={deleteSelected} onIsolate={isolate} onSpeed={speedUp} onCut={cutAt} onCamera={hasCamera ? addCamera : null} onLens={hasCursor ? addLens : null}
                 bar={<>
                   <div className="tool-group modes">
-                    <button className={tool === 'select' ? 'on' : ''} onClick={() => setTool('select')} title="Seç (V): tıkla seç, sürükle sırala, kenardan kırp">↖ Seç</button>
-                    <button className={tool === 'range' ? 'on' : ''} onClick={() => setTool('range')} title="Aralık (R): kliplerin üstünde sürükleyerek bir kısmı seç">↔ Aralık</button>
-                    <button className={tool === 'blade' ? 'on' : ''} onClick={() => setTool('blade')} title="Makas (C): klibe tıkladığın yerden böl">✂ Makas</button>
+                    <button className={tool === 'select' ? 'on' : ''} onClick={() => setTool('select')} title={t('Seç (V): tıkla seç, sürükle sırala, kenardan kırp')}>↖ {t('Seç')}</button>
+                    <button className={tool === 'range' ? 'on' : ''} onClick={() => setTool('range')} title={t('Aralık (R): kliplerin üstünde sürükleyerek bir kısmı seç')}>↔ {t('Aralık')}</button>
+                    <button className={tool === 'blade' ? 'on' : ''} onClick={() => setTool('blade')} title={t('Makas (C): klibe tıkladığın yerden böl')}>✂ {t('Makas')}</button>
                   </div>
                   <div className="tool-group">
-                    <button onClick={split} title="Oynatma çizgisinden böl (S); aralık seçiliyse iki ucundan böler">┆ Böl</button>
-                    <button onClick={deleteSelected} disabled={!range && !sel} title="Seçili klibi, zoom'u ya da aralığı sil (Sil)">⌫ Sil</button>
+                    <button onClick={split} title={t('Oynatma çizgisinden böl (S); aralık seçiliyse iki ucundan böler')}>┆ {t('Böl')}</button>
+                    <button onClick={deleteSelected} disabled={!range && !sel} title={t('Seçili klibi, zoom\'u ya da aralığı sil (Sil)')}>⌫ {t('Sil')}</button>
                   </div>
                   <div className="tool-group">
-                    <button onClick={() => void importVideos()} disabled={importing} title="Bilgisayardan video ekle">{importing ? 'Ekleniyor…' : '＋ Video'}</button>
-                    <button onClick={() => setDialog('record')} disabled={busy} title="Bu projeye yeni bir ekran kaydı ekle">● Kayıt</button>
-                    <button onClick={() => setDialog('quiet')} title="Ekranın değişmediği, imlecin durduğu ve sesin olmadığı anları bul">⏩ Durgun anlar</button>
+                    <button onClick={() => void importVideos()} disabled={importing} title={t('Bilgisayardan video ekle')}>{importing ? t('Ekleniyor…') : `＋ ${t('Video')}`}</button>
+                    <button onClick={() => setDialog('record')} disabled={busy} title={t('Bu projeye yeni bir ekran kaydı ekle')}>{t('● Kayıt')}</button>
+                    <button onClick={() => setDialog('quiet')} title={t('Ekranın değişmediği, imlecin durduğu ve sesin olmadığı anları bul')}>⏩ {t('Durgun anlar')}</button>
                   </div>
                   <div className="tool-group">
-                    <button onClick={addZoom} title="Oynatma çizgisinde yeni zoom (Z)">＋ Zoom</button>
-                    <button onClick={() => void regenerate()} title="Dokunulmamış otomatik zoom'ları tıklamalardan yeniden üret; elle düzenlenenler korunur">✦ Oto zoom</button>
+                    <button onClick={addZoom} title={t('Oynatma çizgisinde yeni zoom (Z)')}>＋ {t('Zoom')}</button>
+                    <button onClick={() => void regenerate()} title={t('Dokunulmamış otomatik zoom\'ları tıklamalardan yeniden üret; elle düzenlenenler korunur')}>✦ {t('Oto zoom')}</button>
                     <button onClick={addCamera} disabled={!hasCamera}
-                            title={hasCamera ? 'Seçili aralıkta (ya da oynatma çizgisinden 3 sn) kamerayı başka yere taşı, büyüt ya da gizle (K)' : 'Bu projede kamera kaydı yok'}>📷 Kamera</button>
+                            title={hasCamera ? t('Seçili aralıkta (ya da oynatma çizgisinden 3 sn) kamerayı başka yere taşı, büyüt ya da gizle (K)') : t('Bu projede kamera kaydı yok')}>📷 {t('Kamera')}</button>
                     <button onClick={addLens} disabled={!hasCursor}
-                            title={hasCursor ? 'Seçili aralıkta (ya da oynatma çizgisinden 3 sn) imlecin altını büyüteçle göster (B)' : 'Büyüteç ekran kayıtlarında imleci takip eder'}>🔍 Büyüteç</button>
+                            title={hasCursor ? t('Seçili aralıkta (ya da oynatma çizgisinden 3 sn) imlecin altını büyüteçle göster (B)') : t('Büyüteç ekran kayıtlarında imleci takip eder')}>🔍 {t('Büyüteç')}</button>
                   </div>
                 </>} />
       {dialog === 'export' && <ExportDialog store={store} lib={lib} onClose={() => setDialog(null)} range={range} time={now()} />}
@@ -307,14 +309,14 @@ export function Editor({ store, onClose, busy, onRecordInto }: {
       {dialog === 'record' && (
         <div className="modal-backdrop">
           <div className="modal">
-            <h2>Projeye kayıt ekle</h2>
-            <p className="muted small">Yeni kayıt bu projenin sonuna eklenir; otomatik zoom'ları da oluşturulur.</p>
-            <RecordSetup busy={busy} startLabel="● Kaydı Başlat ve Ekle" onStart={async (d, a, dev) => {
+            <h2>{t('Projeye kayıt ekle')}</h2>
+            <p className="muted small">{t('Yeni kayıt bu projenin sonuna eklenir; otomatik zoom\'ları da oluşturulur.')}</p>
+            <RecordSetup busy={busy} startLabel={`● ${t('Kaydı Başlat ve Ekle')}`} onStart={async (d, a, dev) => {
               const ok = await onRecordInto(d, a, dev);
               if (ok) setDialog(null);
               return ok;
             }} />
-            <div className="row end"><button onClick={() => setDialog(null)}>Vazgeç</button></div>
+            <div className="row end"><button onClick={() => setDialog(null)}>{t('Vazgeç')}</button></div>
           </div>
         </div>
       )}
@@ -322,7 +324,7 @@ export function Editor({ store, onClose, busy, onRecordInto }: {
         <div className="modal-backdrop" onClick={() => store.setError(null)}>
           <div className="modal small" onClick={(e) => e.stopPropagation()}>
             <h3>Odak</h3><p className="pre">{store.error}</p>
-            <div className="row end"><button className="primary" onClick={() => store.setError(null)}>Tamam</button></div>
+            <div className="row end"><button className="primary" onClick={() => store.setError(null)}>{t('Tamam')}</button></div>
           </div>
         </div>
       )}
@@ -497,9 +499,9 @@ function Timeline({ store, lib, time, playing, seek, scrubTo, range, setRange, t
         <div className="bar-tools">{bar}</div>
         <span className={`bar-hint ${warn ? 'warn' : ''}`} title={hint}>{hint}</span>
         <div className="bar-zoom">
-          <button className="ghost tiny" onClick={() => zoomBy(1 / 1.6)} title="Uzaklaştır">−</button>
-          <button className="ghost tiny" onClick={() => zoomBy(1.6)} title="Yakınlaştır (Ctrl/⌘ + tekerlek)">＋</button>
-          <button className="ghost tiny" onClick={() => setZoom(1)} title="Tümünü sığdır">⤢</button>
+          <button className="ghost tiny" onClick={() => zoomBy(1 / 1.6)} title={t('Uzaklaştır')}>−</button>
+          <button className="ghost tiny" onClick={() => zoomBy(1.6)} title={t('Yakınlaştır (Ctrl/⌘ + tekerlek)')}>＋</button>
+          <button className="ghost tiny" onClick={() => setZoom(1)} title={t('Tümünü sığdır')}>⤢</button>
         </div>
       </div>
       <div className={`timeline tool-${tool}`} ref={scroller}
@@ -507,29 +509,29 @@ function Timeline({ store, lib, time, playing, seek, scrubTo, range, setRange, t
         <div className="timeline-inner" style={{ width: inner }} onPointerDown={down}
              onPointerMove={(e) => { if (tool === 'blade') setBladeAt(cutTime(e.clientX)); }}
              onPointerLeave={() => setBladeAt(null)}>
-          <div className="ruler" onPointerDown={scrub} title="Tıkla ya da sürükle: oynatma çizgisini taşı">
+          <div className="ruler" onPointerDown={scrub} title={t('Tıkla ya da sürükle: oynatma çizgisini taşı')}>
             {ticks.map((t) => (
               <div key={t} className="tick" style={{ left: xOf(t) }}><span>{timecode(t, tick < 1)}</span></div>
             ))}
           </div>
           {range && (
             <div className="range" style={{ left: xOf(range.a), width: Math.max(2, (range.b - range.a) * pps) }}>
-              <div className="range-handle l" onPointerDown={rangeEdge('a')} title="Aralığın başı" />
-              <div className="range-handle r" onPointerDown={rangeEdge('b')} title="Aralığın sonu" />
+              <div className="range-handle l" onPointerDown={rangeEdge('a')} title={t('Aralığın başı')} />
+              <div className="range-handle r" onPointerDown={rangeEdge('b')} title={t('Aralığın sonu')} />
               <div className="range-bar" onPointerDown={(e) => e.stopPropagation()}>
-                <span className="mono">{(range.b - range.a).toFixed(2)} sn</span>
-                <button onClick={onDeleteRange} title="Bu kısmı sil (Sil)">⌫ Sil</button>
-                <button onClick={onIsolate} title="Bu kısmı ayrı bir klip yap (S)">┆ Ayır</button>
-                <button onClick={() => onSpeed(2)} title="Bu kısmı 2 kat hızlı oynat">⏩ ×2</button>
-                <button onClick={() => onSpeed(4)} title="Bu kısmı 4 kat hızlı oynat">⏩ ×4</button>
-                {onCamera && <button onClick={onCamera} title="Bu kısımda kamerayı başka yere taşı, büyüt ya da gizle">📷 Kamera</button>}
-                {onLens && <button onClick={onLens} title="Bu kısımda imlecin altını büyüteçle göster">🔍 Büyüteç</button>}
+                <span className="mono">{t('{s} sn', { s: (range.b - range.a).toFixed(2) })}</span>
+                <button onClick={onDeleteRange} title={t('Bu kısmı sil (Sil)')}>⌫ {t('Sil')}</button>
+                <button onClick={onIsolate} title={t('Bu kısmı ayrı bir klip yap (S)')}>┆ {t('Ayır')}</button>
+                <button onClick={() => onSpeed(2)} title={t('Bu kısmı 2 kat hızlı oynat')}>⏩ ×2</button>
+                <button onClick={() => onSpeed(4)} title={t('Bu kısmı 4 kat hızlı oynat')}>⏩ ×4</button>
+                {onCamera && <button onClick={onCamera} title={t('Bu kısımda kamerayı başka yere taşı, büyüt ya da gizle')}>📷 {t('Kamera')}</button>}
+                {onLens && <button onClick={onLens} title={t('Bu kısımda imlecin altını büyüteçle göster')}>🔍 {t('Büyüteç')}</button>}
               </div>
             </div>
           )}
-          <div className="lane-label">ZOOM</div>
-          {onCamera && <div className="lane-label cam">KAMERA</div>}
-          {onLens && <div className="lane-label lens">BÜYÜTEÇ</div>}
+          <div className="lane-label">{t('ZOOM')}</div>
+          {onCamera && <div className="lane-label cam">{t('KAMERA')}</div>}
+          {onLens && <div className="lane-label lens">{t('BÜYÜTEÇ')}</div>}
           {p.clips.map((clip, i) => {
             const x = xOf(starts[i]), w = clipDuration(clip) * pps;
             const media = assetOf(p, clip.mediaID);
@@ -549,7 +551,7 @@ function Timeline({ store, lib, time, playing, seek, scrubTo, range, setRange, t
                 {onCamera && (clip.cameraSegments ?? []).map((cs) => {
                   const s = Math.max(cs.start, clip.sourceStart), e = Math.min(cs.end, clip.sourceEnd);
                   if (e <= s) return null;
-                  return <SegmentBlock key={cs.id} kind="camera" className={`cam-seg ${cs.mode}`} label={cameraLabel(cs)} title="Kamera bölümü"
+                  return <SegmentBlock key={cs.id} kind="camera" className={`cam-seg ${cs.mode}`} label={cameraLabel(cs)} title={t('Kamera bölümü')}
                                        update={(q, f) => updateCameraSegment(q, clip.id, cs.id, f)}
                                        store={store} clip={clip} seg={cs} pps={pps} seek={seek} tool={tool} drag={drag}
                                        left={x + toLocal(clip, s) * pps} width={Math.max(toLocal(clip, e) * pps - toLocal(clip, s) * pps, 6)}
@@ -558,7 +560,7 @@ function Timeline({ store, lib, time, playing, seek, scrubTo, range, setRange, t
                 {onLens && (clip.magnifiers ?? []).map((ms) => {
                   const s = Math.max(ms.start, clip.sourceStart), e = Math.min(ms.end, clip.sourceEnd);
                   if (e <= s) return null;
-                  return <SegmentBlock key={ms.id} kind="magnifier" className="lens-seg" label={lensLabel(ms)} title="Büyüteç"
+                  return <SegmentBlock key={ms.id} kind="magnifier" className="lens-seg" label={lensLabel(ms)} title={t('Büyüteç')}
                                        update={(q, f) => updateMagnifier(q, clip.id, ms.id, f)}
                                        store={store} clip={clip} seg={ms} pps={pps} seek={seek} tool={tool} drag={drag}
                                        left={x + toLocal(clip, s) * pps} width={Math.max(toLocal(clip, e) * pps - toLocal(clip, s) * pps, 6)}
@@ -572,7 +574,7 @@ function Timeline({ store, lib, time, playing, seek, scrubTo, range, setRange, t
             <div className={`blade-line ${bladeAt === time ? 'snapped' : ''}`} style={{ left: xOf(bladeAt) }}><span>✂ {timecode(bladeAt)}</span></div>
           )}
           <div className={`playhead ${scrubbing ? 'dragging' : ''}`} style={{ left: xOf(time) }}>
-            <div className="playhead-knob" onPointerDown={scrub} title="Tut ve sürükle: videoda ileri-geri git" />
+            <div className="playhead-knob" onPointerDown={scrub} title={t('Tut ve sürükle: videoda ileri-geri git')} />
             {tool === 'select' && <div className="playhead-grip" onPointerDown={scrub} />}
             {scrubbing && <span className="playhead-time">{timecode(time)}</span>}
           </div>
@@ -630,12 +632,12 @@ function ClipBlock({ store, clip, media, index, left, width, pps, selected, tool
          style={{ left, width: Math.max(width, 2) }} onPointerDown={body}>
       <Waveform envelope={envelope} clip={clip} width={Math.max(width, 2)} />
       <span className="clip-label">
-        {media?.kind === 'externalVideo' ? '🎞' : '🖥'} {media?.displayName ?? '?'} <i>{timecode(clipDuration(clip), false)}</i>
+        {media?.kind === 'externalVideo' ? '🎞' : '🖥'} <span data-raw>{media?.displayName ?? '?'}</span> <i>{timecode(clipDuration(clip), false)}</i>
         {speed !== 1 && <b className="speed">×{speed}</b>}
-        {media?.cameraFile && <i title="Kamera var"> · 📷</i>}
+        {media?.cameraFile && <i title={t('Kamera var')}> · 📷</i>}
       </span>
-      <div className="trim l" onPointerDown={edge('start')} title="Başı kırp" />
-      <div className="trim r" onPointerDown={edge('end')} title="Sonu kırp (oynatma çizgisine yapışır)" />
+      <div className="trim l" onPointerDown={edge('start')} title={t('Başı kırp')} />
+      <div className="trim r" onPointerDown={edge('end')} title={t('Sonu kırp (oynatma çizgisine yapışır)')} />
     </div>
   );
 }
@@ -688,7 +690,7 @@ function ZoomBlock({ store, clip, zoom, pps, left, width, seek, toTimeline, drag
   };
   return (
     <div className={`zoom ${zoom.isGenerated ? 'auto' : 'manual'} ${selected ? 'selected' : ''}`} style={{ left, width }}
-         onPointerDown={start('body')} title={`${zoom.isGenerated ? 'Otomatik' : 'Düzenlenmiş'} zoom · sürükle: taşı · kenarlar: süre`}>
+         onPointerDown={start('body')} title={zoom.isGenerated ? t('Otomatik zoom · sürükle: taşı · kenarlar: süre') : t('Düzenlenmiş zoom · sürükle: taşı · kenarlar: süre')}>
       <div className="handle l" onPointerDown={start('left')} />
       <span>{isFollow(zoom.focus) ? '➚' : '⌖'} ×{zoom.scale.toFixed(1)}</span>
       <div className="handle r" onPointerDown={start('right')} />
@@ -697,7 +699,7 @@ function ZoomBlock({ store, clip, zoom, pps, left, width, seek, toTimeline, drag
 }
 
 const cameraLabel = (seg: CameraSegment) =>
-  seg.mode === 'full' ? '⛶ Tam ekran' : seg.mode === 'hidden' ? '⊘ Gizli' : `📷 ${cameraPositions.find((p) => p.id === seg.position)?.title ?? ''}`;
+  seg.mode === 'full' ? `⛶ ${t('Tam ekran')}` : seg.mode === 'hidden' ? `⊘ ${t('Gizli')}` : `📷 ${t(cameraPositions.find((p) => p.id === seg.position)?.title ?? '')}`;
 
 const lensLabel = (seg: MagnifierSegment) => `🔍 ×${seg.zoom.toFixed(1)}`;
 
@@ -729,7 +731,7 @@ function SegmentBlock<T extends { id: string; start: number; end: number }>({ ki
   };
   return (
     <div className={`${className} ${selected ? 'selected' : ''}`} style={{ left, width }} onPointerDown={start('body')}
-         title={`${title} · sürükle: taşı · kenarlar: süre · tıkla: ayarları sağda`}>
+         title={t('{what} · sürükle: taşı · kenarlar: süre · tıkla: ayarları sağda', { what: title })}>
       <div className="handle l" onPointerDown={start('left')} />
       <span>{label}</span>
       <div className="handle r" onPointerDown={start('right')} />

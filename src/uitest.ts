@@ -1,5 +1,6 @@
 // Drives the real UI with DOM events (no OS-level input): home screen, open project, add/drag/
 // edit zooms, fixed focus, undo/redo, style toggle, playback, export dialog, autosave.
+import { lang, t } from './i18n/index.ts';
 import { odak } from './bridge.ts';
 import { type Project, clipDuration, clipStarts, normalizeProject, projectDuration } from './core/model.ts';
 import type { EditorStore } from './ui/store.ts';
@@ -46,7 +47,7 @@ export async function runUiTest() {
     if (!pkg) throw new Error('no project');
     await until('home', () => !!$('.home'));
     await sleep(300);
-    check(!!byText('button', 'Kaydı Başlat') && !!$('.projects'), 'home screen shows recording panel and projects');
+    check(!!byText('button', t('Kaydı Başlat')) && !!$('.projects'), 'home screen shows recording panel and projects');
     log.push(`shot: ${await odak().uiTestCapture('1-home')}`);
 
     await hooks().openProject(pkg);
@@ -70,7 +71,7 @@ export async function runUiTest() {
     await until('zoom added', () => project().clips[0].zooms.length === initialZooms + 1);
     const added = selectedZoom()!;
     check(!!added && !added.isGenerated && Math.abs(added.start - target) < 0.1, `“＋ Zoom” adds a selected zoom at the playhead (${added?.start.toFixed(2)}s)`);
-    check(!!byText('.inspector h3', 'Zoom') && !!byText('.badge', 'Elle düzenlendi'), 'inspector shows the selected zoom');
+    check(!!byText('.inspector h3', t('Zoom')) && !!byText('.badge', t('Elle düzenlendi')), 'inspector shows the selected zoom');
 
     // Drag the block far left: it must stop at the previous zoom and keep its length.
     const block = $('.zoom.selected')!;
@@ -88,7 +89,7 @@ export async function runUiTest() {
     await sleep(50);
     check(Math.abs(selectedZoom()!.scale - 3) < 1e-9, 'amount slider sets ×3');
 
-    click(byText('.segmented button', 'Sabit nokta'));
+    click(byText('.segmented button', t('Sabit nokta')));
     await until('fixed focus', () => !!$('.focus-picker'));
     await sleep(400);
     const fp = $('.focus-picker')!.getBoundingClientRect();
@@ -100,7 +101,7 @@ export async function runUiTest() {
     log.push(`shot: ${await odak().uiTestCapture('3-zoom-inspector')}`);
     layoutOK('zoom panel');
     $('.inspector')!.scrollTop = 1e5; await sleep(150);
-    check(!!byText('.inspector h3', 'Kısayollar') && !!byText('.inspector h3', 'Geçiş') && !!byText('.inspector button', 'Sonraki'),
+    check(!!byText('.inspector h3', t('Kısayollar')) && !!byText('.inspector h3', t('Geçiş')) && !!byText('.inspector button', t('Sonraki')),
       'zoom panel: transition, previous/next and a shortcuts card');
     log.push(`shot: ${await odak().uiTestCapture('3b-zoom-inspector-end')}`);
     $('.inspector')!.scrollTop = 0;
@@ -116,41 +117,41 @@ export async function runUiTest() {
 
     // “‹ Genel ayarlara dön” leaves the zoom panel; then deselect by clicking the timeline and change the look.
     const backTo = async (what: string) => {
-      const b = byText('.inspector-back button', 'Genel ayarlara dön');
+      const b = byText('.inspector-back button', t('Genel ayarlara dön'));
       click(b);
-      await until(`back from ${what}`, () => !!byText('.inspector h3', 'Arka plan'));
+      await until(`back from ${what}`, () => !!byText('.inspector h3', t('Arka plan')));
       check(!!b && store().selection === null, `“‹ Genel ayarlara dön” leaves the ${what} panel`);
     };
     await backTo('zoom');
     store().select({ kind: 'zoom', clipID: project().clips[0].id, zoomID: project().clips[0].zooms[0].id });
-    await until('zoom panel', () => !!byText('.inspector h3', 'Zoom'));
+    await until('zoom panel', () => !!byText('.inspector h3', t('Zoom')));
     pointer(tl, 'pointerdown', r.left + 30, r.top + 10); pointer(tl, 'pointerup', r.left + 30, r.top + 10);
-    await until('style inspector', () => !!byText('.inspector h3', 'Arka plan'));
-    click(byText('.inspector label', 'Gölge')?.querySelector('input') ?? null);
+    await until('style inspector', () => !!byText('.inspector h3', t('Arka plan')));
+    click(byText('.inspector label', t('Gölge'))?.querySelector('input') ?? null);
     await sleep(50);
     check(project().style.shadow === false, 'shadow checkbox updates the project style');
 
-    click(byText('.inspector .segmented button', 'Tema'));
+    click(byText('.inspector .segmented button', t('Tema')));
     await until('themes', () => $$('.theme').length >= 8);
     const groups = $$('.theme-group-title').map((e) => e.textContent);
     const proCount = $$('.theme-group')[0]?.querySelectorAll('.theme').length ?? 0;
-    click(byText('.theme', 'Mermer'));
+    click(byText('.theme', t('Mermer')));
     await sleep(300);
-    check(groups[0] === 'Profesyonel' && groups[1]?.startsWith('Eğlenceli') && proCount >= 15 && project().style.backgroundTheme === 'mermer',
+    check(groups[0] === t('Profesyonel') && groups[1] === t('Eğlenceli & mevsimsel') && proCount >= 15 && project().style.backgroundTheme === 'mermer',
       `themes are grouped (${groups.join(' / ')}, ${proCount} professional) and “Mermer” can be chosen`);
-    click(byText('.theme', 'Kutlama'));
+    click(byText('.theme', t('Kutlama')));
     await sleep(400);
     check(project().style.backgroundKind === 'theme' && project().style.backgroundTheme === 'kutlama' && project().style.padding >= 0.1,
       'choosing the “Kutlama” theme sets the background (and enough padding to show it)');
-    click($$('.cursor-opt').find((b) => b.title === 'Nokta') ?? null);
+    click($$('.cursor-opt').find((b) => b.title === t('Nokta')) ?? null);
     await sleep(50);
     check(project().style.cursorStyle === 'dot', 'cursor style “Nokta” is applied');
-    click(byText('.inspector label', 'Vurgu halkası')?.querySelector('input') ?? null);
+    click(byText('.inspector label', t('Vurgu halkası'))?.querySelector('input') ?? null);
     await sleep(50);
     check(project().style.cursorHighlight === true, 'highlight toggle is applied');
     if (project().media.some((m) => m.cameraFile)) {
-      click($$('.positions button').find((b) => b.title === 'Sol üst') ?? null);
-      click(byText('.inspector .segmented button', 'Yuvarlak köşe'));
+      click($$('.positions button').find((b) => b.title === t('Sol üst')) ?? null);
+      click(byText('.inspector .segmented button', t('Yuvarlak köşe')));
       await sleep(50);
       check(project().style.camera.position === 'top-left' && project().style.camera.shape === 'rounded', 'camera position and shape controls work');
     } else check(false, 'test project has a camera recording');
@@ -185,7 +186,7 @@ export async function runUiTest() {
     await until('split', () => project().clips.length === n0 + 1);
     check(Math.abs(project().clips[0].sourceEnd - ed.player.currentTime) < 0.05 && store().selection?.kind === 'clip', `S splits at the playhead (${project().clips[0].sourceEnd.toFixed(2)} s)`);
 
-    click(byText('.inspector button', 'Çoğalt'));
+    click(byText('.inspector button', t('Çoğalt')));
     await until('duplicate', () => project().clips.length === n0 + 2);
     check(true, 'Çoğalt duplicates the clip');
     click(byText('.inspector .segmented button', '×2'));
@@ -279,7 +280,7 @@ export async function runUiTest() {
       'scissors tool shows the cut line and splits where clicked');
 
     // Range (R): drag over the clips to select a part, then speed it up / make it a clip / delete it.
-    click(byText('.timeline-bar button', 'Aralık'));
+    click(byText('.timeline-bar button', t('Aralık')));
     await until('range tool', () => !!$('.timeline.tool-range'));
     const dragRange = async (a: number, b: number) => {
       const c0 = clipEls()[0];
@@ -300,7 +301,7 @@ export async function runUiTest() {
     await sleep(50);
     await dragRange(2, 3.5);
     const r2 = curRange();
-    click(byText('.range-bar button', 'Ayır'));
+    click(byText('.range-bar button', t('Ayır')));
     await sleep(80);
     const sel = project().clips.findIndex((c) => c.id === (store().selection as { clipID: string } | null)?.clipID);
     const st = clipStarts(project()), ends = st.map((t, i) => t + clipDuration(project().clips[i]));
@@ -322,19 +323,19 @@ export async function runUiTest() {
     key('r');
     await until('range tool', () => !!$('.timeline.tool-range'));
     await dragRange(3, 5);
-    click(byText('.range-bar button', 'Kamera'));
-    await until('camera segment', () => !!camSel() && !!$('.cam-seg') && !!byText('.inspector h3', 'Kamera bölümü'));
+    click(byText('.range-bar button', t('Kamera')));
+    await until('camera segment', () => !!camSel() && !!$('.cam-seg') && !!byText('.inspector h3', t('Kamera bölümü')));
     const cs0 = camSel()!;
     check(cs0.mode === 'bubble' && cs0.position !== project().style.camera.position, `📷 Kamera adds a segment for the range (${cs0.position}) and opens its settings`);
-    click(byText('.inspector .segmented button', 'Tam ekran'));
+    click(byText('.inspector .segmented button', t('Tam ekran')));
     await sleep(50);
     check(camSel()?.mode === 'full' && !!$('.cam-seg.full'), 'segment set to full frame');
     await (ed.player as unknown as { seek: (t: number) => Promise<void> }).seek(4.2);
     await sleep(300);
     log.push(`shot: ${await odak().uiTestCapture('5c-camera-full')}`);
-    click(byText('.inspector .segmented button', 'Balon'));
+    click(byText('.inspector .segmented button', t('Balon')));
     await sleep(30);
-    click($$('.positions button').find((b) => b.title === 'Üst orta') ?? null);
+    click($$('.positions button').find((b) => b.title === t('Üst orta')) ?? null);
     await sleep(50);
     check(camSel()?.mode === 'bubble' && camSel()?.position === 'top-center', 'segment moved to the top centre with the position picker');
     const blk = $('.cam-seg')!, br = blk.getBoundingClientRect(), st0 = camSel()!.start;
@@ -348,7 +349,7 @@ export async function runUiTest() {
     await sleep(50);
     check(!!$('.cam-seg'), 'undo brings it back');
     if (store().selection?.kind !== 'camera') store().select({ kind: 'camera', clipID: project().clips.find((c) => c.cameraSegments.length)!.id, segID: project().clips.find((c) => c.cameraSegments.length)!.cameraSegments[0].id });
-    await until('camera panel', () => !!byText('.inspector h3', 'Kamera bölümü'));
+    await until('camera panel', () => !!byText('.inspector h3', t('Kamera bölümü')));
     log.push(`shot: ${await odak().uiTestCapture('5d-camera-panel')}`);
     layoutOK('camera panel');
     await backTo('camera segment');
@@ -359,13 +360,13 @@ export async function runUiTest() {
     key('r');
     await until('range tool', () => !!$('.timeline.tool-range'));
     await dragRange(5.5, 7.5);
-    click(byText('.range-bar button', 'Büyüteç'));
-    await until('magnifier', () => !!lensSel() && !!$('.lens-seg') && !!byText('.inspector h3', 'Büyüteç'));
+    click(byText('.range-bar button', t('Büyüteç')));
+    await until('magnifier', () => !!lensSel() && !!$('.lens-seg') && !!byText('.inspector h3', t('Büyüteç')));
     check(lensSel()!.zoom === 2 && lensSel()!.shape === 'circle', '🔍 Büyüteç adds a lens for the range and opens its settings');
     const sliders = $$('.inspector input[type=range]');
     setRange(sliders[0] as HTMLInputElement, 0.45);
     setRange(sliders[1] as HTMLInputElement, 3);
-    click(byText('.inspector .segmented button', 'Yuvarlak kare'));
+    click(byText('.inspector .segmented button', t('Yuvarlak kare')));
     await sleep(60);
     check(Math.abs(lensSel()!.size - 0.45) < 1e-6 && Math.abs(lensSel()!.zoom - 3) < 1e-6 && lensSel()!.shape === 'rounded', 'lens size, magnification and shape can be changed');
     await (ed.player as unknown as { seek: (t: number) => Promise<void> }).seek(6.5);
@@ -392,7 +393,7 @@ export async function runUiTest() {
       const before = JSON.stringify(project().clips);
       key(k);
       await sleep(80);
-      const added = store().selection?.kind === kind && JSON.stringify(project().clips) !== before && !!byText('.inspector h3', what);
+      const added = store().selection?.kind === kind && JSON.stringify(project().clips) !== before && !!byText('.inspector h3', t(what));
       store().undo();
       await sleep(60);
       check(at >= 0 && added && JSON.stringify(project().clips) === before, `${k.toUpperCase()} adds a ${kind} at ${at.toFixed(2)} s and opens its panel; undo restores the project`);
@@ -406,12 +407,12 @@ export async function runUiTest() {
     check(!!imported && project().media.some((m) => m.id === imported.mediaID && m.kind === 'externalVideo') && clipDuration(imported) > 9,
       'importing a video adds it as a clip');
 
-    click(byText('.timeline-bar button', 'Durgun'));
-    await until('quiet dialog', () => !!byText('.modal h2', 'Durgun anlar') && !byText('.modal p', 'inceleniyor'), 15000);
-    check(!!byText('.modal button', 'Hızlandır'), 'quiet moments dialog analyses the recording');
+    click(byText('.timeline-bar button', t('Durgun anlar')));
+    await until('quiet dialog', () => !!byText('.modal h2', t('Durgun anlar')) && !byText('.modal p', t('Kayıt inceleniyor…')), 15000);
+    check(!!byText('.modal button', t('Hızlandır')), 'quiet moments dialog analyses the recording');
     log.push(`shot: ${await odak().uiTestCapture('5-quiet')}`);
-    click(byText('.modal button', 'Vazgeç'));
-    await until('quiet closed', () => !byText('.modal h2', 'Durgun anlar'));
+    click(byText('.modal button', t('Vazgeç')));
+    await until('quiet closed', () => !byText('.modal h2', t('Durgun anlar')));
 
     const n1 = project().clips.length;
     store().select({ kind: 'clip', clipID: newId });
@@ -424,26 +425,26 @@ export async function runUiTest() {
     await sleep(300);
     log.push(`shot: ${await odak().uiTestCapture('6-timeline')}`);
 
-    click(byText('.toolbar button', 'Dışa Aktar'));
-    await until('export dialog', () => !!byText('.modal h2', 'Dışa Aktar'));
-    check(!!byText('.modal button', 'Dışa Aktar…') && $$('.formats .format').length === 7, 'export dialog offers 7 formats');
+    click(byText('.toolbar button', t('Dışa Aktar')));
+    await until('export dialog', () => !!byText('.modal h2', t('Dışa Aktar')));
+    check(!!byText('.modal button', t('Dışa Aktar…')) && $$('.formats .format').length === 7, 'export dialog offers 7 formats');
     const summary = () => $$('.modal .row.between .mono').map((e) => e.textContent).join(' ');
     click(byText('.formats .format', 'GIF'));
     await sleep(50);
-    check(!!byText('.modal label', 'Genişlik') && summary().includes('GIF'), `GIF shows its own options (${summary()})`);
+    check(!!byText('.modal label', t('Genişlik')) && summary().includes('GIF'), `GIF shows its own options (${summary()})`);
     click(byText('.formats .format', 'WebM'));
     await sleep(50);
     const codecOpts = $$('.modal select option').map((o) => o.textContent ?? '');
     check(summary().includes('WebM') && codecOpts.some((t) => t.startsWith('VP9')) && !codecOpts.some((t) => t.startsWith('H.264')), 'WebM offers VP9/AV1, not H.264');
-    const aspectSel = $$('.modal label').find((l) => l.textContent?.startsWith('En-boy'))!.querySelector('select')!;
+    const aspectSel = $$('.modal label').find((l) => l.textContent?.startsWith(t('En-boy')))!.querySelector('select')!;
     Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value')!.set!.call(aspectSel, 'vertical');
     aspectSel.dispatchEvent(new Event('change', { bubbles: true }));
     await sleep(80);
     check(project().export.aspect === 'vertical' && /1080×1920/.test(summary()), `9:16 updates the project and the output size (${summary()})`);
     click(byText('.formats .format', 'MP4'));
     log.push(`shot: ${await odak().uiTestCapture('7-export-dialog')}`);
-    click(byText('.modal button', 'Kapat'));
-    await until('dialog closed', () => !byText('.modal h2', 'Dışa Aktar'));
+    click(byText('.modal button', t('Kapat')));
+    await until('dialog closed', () => !byText('.modal h2', t('Dışa Aktar')));
     log.push(`shot: ${await odak().uiTestCapture('7b-vertical-preview')}`);
     store().update((p) => ({ ...p, export: { ...p.export, aspect: 'wide' } }));
     await sleep(50);
@@ -452,6 +453,134 @@ export async function runUiTest() {
     const saved = await odak().loadProject(pkg);
     check(!!saved.project && JSON.stringify(normalizeProject(saved.project)) === JSON.stringify(project()), 'autosave wrote the edits to project.json');
     log.push(`shot: ${await odak().uiTestCapture('8-editor-final')}`);
+
+    // ---- Interface language: Settings switches everything in place (the open project stays open),
+    // and in English no Turkish text is left on any screen, panel or dialog.
+    const startLang = lang();
+    const editorStore = store();
+    const pickLang = async (name: string, want: 'tr' | 'en' | null) => {
+      click($$('.modal.settings .segmented button').find((b) => b.textContent === name) ?? null);
+      if (want) await until(`language ${want}`, () => lang() === want && document.documentElement.lang === want);
+      await sleep(150);
+    };
+    click($('.toolbar .settings-btn'));
+    await until('settings', () => !!$('.modal.settings'));
+    check(!!byText('.modal.settings h3', 'Dil · Language') && $$('.modal.settings .segmented button').length === 3,
+      'Settings offers System language / Türkçe / English (labelled in both languages)');
+    if (startLang === 'en') await pickLang('Türkçe', 'tr');
+    check(!!byText('.toolbar button', 'Dışa Aktar'), 'Turkish interface');
+    await pickLang('English', 'en');
+    check(store() === editorStore && !!$('.editor') && !!byText('.toolbar button', 'Export') && !!byText('.modal h2', 'Settings'),
+      'English: the whole interface switches in place and the open project stays open');
+    log.push(`shot: ${await odak().uiTestCapture('9-english-settings')}`);
+    const sel0 = store().selection;
+    document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    await until('settings closed', () => !$('.modal.settings'));
+    check(store().selection === sel0, 'Esc closes Settings without reaching the editor');
+
+    const TR = /[çğıöşüÇĞİÖŞÜ]/;
+    const TR_WORDS = /\b(Sil|Kamera|Tema|Renk|Kapat|Tamam|Kare|Daire|Balon|Gizle|Boyut|Kes|Orta|Yeni|Projeler|Ayarlar|Konum|Miktar|Ses|Halka|Dolgu|Nokta|Kalite|Kodek|Makas|Ayır|Klasör|Bitiş|sn|ve|ya da|için|bir)\b/;
+    const leftovers = () => {
+      const out = new Set<string>();
+      const raw = (el: Element | null) => !!el?.closest('[data-raw]');
+      const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+      for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+        const text = n.textContent?.trim() ?? '';
+        if (text && !raw(n.parentElement) && (TR.test(text) || TR_WORDS.test(text))) out.add(text);
+      }
+      for (const el of $$('[title]')) if (!raw(el) && (TR.test(el.title) || TR_WORDS.test(el.title))) out.add(`title: ${el.title}`);
+      return [...out];
+    };
+    const english = (where: string) => {
+      const left = leftovers();
+      check(!left.length, `English ${where}: no Turkish text${left.length ? ` (${left.slice(0, 6).join(' | ')})` : ''}`);
+      layoutOK(`English ${where}`);
+    };
+    store().select(null);
+    await sleep(100);
+    const bg0 = project().style.backgroundKind;
+    for (const kind of ['gradient', 'theme', 'image'] as const) {
+      store().update((p) => ({ ...p, style: { ...p.style, backgroundKind: kind } }));
+      await sleep(80);
+      english(`general settings (background: ${kind})`);
+      if (kind === 'theme') log.push(`shot: ${await odak().uiTestCapture('9a-english-editor')}`);
+    }
+    store().update((p) => ({ ...p, style: { ...p.style, backgroundKind: bg0 } }));
+    check(!!byText('.lane-label', 'CAMERA') && !!byText('.lane-label', 'MAGNIFIER'), 'English timeline lanes');
+    const zc = project().clips.find((c) => c.zooms.length)!;
+    store().select({ kind: 'zoom', clipID: zc.id, zoomID: zc.zooms[0].id });
+    await until('zoom panel', () => !!byText('.inspector h3', 'Between zooms'));
+    english('zoom panel');
+    log.push(`shot: ${await odak().uiTestCapture('9b-english-zoom')}`);
+    store().select({ kind: 'clip', clipID: project().clips[0].id });
+    await until('clip panel', () => !!byText('.inspector h3', 'Actions'));
+    english('clip panel');
+    const camClip = project().clips.find((c) => c.cameraSegments.length), lensClip = project().clips.find((c) => c.magnifiers.length);
+    check(!!camClip && !!lensClip, 'English: the project has a camera layout and a magnifier to check');
+    if (camClip) {
+      store().select({ kind: 'camera', clipID: camClip.id, segID: camClip.cameraSegments[0].id });
+      await until('camera panel', () => !!byText('.inspector h3', 'Camera layout'));
+      english('camera layout panel');
+    }
+    if (lensClip) {
+      store().select({ kind: 'magnifier', clipID: lensClip.id, segID: lensClip.magnifiers[0].id });
+      await until('magnifier panel', () => !!byText('.inspector h3', 'Magnifier'));
+      english('magnifier panel');
+    }
+    store().select(null);
+    const edHooks = (window as unknown as { __odakEditor: { setRange: (r: { a: number; b: number } | null) => void } }).__odakEditor;
+    edHooks.setRange({ a: 1, b: 2.5 });
+    await until('range bar', () => !!$('.range-bar'));
+    english('range bar');
+    edHooks.setRange(null);
+    for (const [k, hint] of [['c', 'Blade:'], ['r', 'Range:'], ['v', 'Select:']] as const) {
+      key(k);
+      await until(`${k} hint`, () => ($('.bar-hint')?.textContent ?? '').startsWith(hint));
+    }
+    check(true, 'English tool hints');
+    english('tools');
+    click(byText('.toolbar button', 'Export'));
+    await until('export dialog', () => !!byText('.modal h2', 'Export'));
+    for (const f of ['GIF', 'PNG', 'WAV', 'MP4']) {
+      click(byText('.formats .format', f));
+      await sleep(60);
+      english(`export dialog (${f})`);
+    }
+    log.push(`shot: ${await odak().uiTestCapture('9c-english-export')}`);
+    click(byText('.modal button', 'Close'));
+    await until('export closed', () => !$('.modal'));
+    click(byText('.timeline-bar button', 'Quiet moments'));
+    await until('quiet dialog', () => !!byText('.modal h2', 'Quiet moments') && !byText('.modal p', 'Looking through'), 15000);
+    english('quiet moments dialog');
+    click(byText('.modal button', 'Cancel'));
+    await until('quiet closed', () => !$('.modal'));
+    click(byText('.timeline-bar button', 'Record'));
+    await until('record dialog', () => !!byText('.modal h2', 'Add a recording'));
+    await sleep(300);
+    english('add-recording dialog');
+    click(byText('.modal button', 'Cancel'));
+    await until('record closed', () => !$('.modal'));
+    store().setError(t('Projede en az bir klip kalmalı.'));
+    await until('error', () => !!byText('.modal p', 'at least one clip'));
+    english('error message');
+    click(byText('.modal button', 'OK'));
+    await until('error closed', () => !$('.modal'));
+
+    await sleep(600);
+    click(byText('.toolbar button', 'Projects'));
+    await until('home', () => !!$('.home'));
+    await sleep(300);
+    check(!!byText('h1', 'New recording') && !!byText('button', 'Start Recording'), 'English home screen');
+    english('home screen');
+    log.push(`shot: ${await odak().uiTestCapture('9d-english-home')}`);
+    // “System language” follows the computer; then back to the language the test started in.
+    click($('.projects .settings-btn'));
+    await until('settings', () => !!$('.modal.settings'));
+    const sys = odak().settings().system;
+    await pickLang(t('Sistem dili'), sys ?? null);
+    check(odak().settings().pref === 'auto' && lang() === sys, `“System language” follows the computer (${sys})`);
+    await pickLang(startLang === 'en' ? 'English' : 'Türkçe', startLang);
+    check(lang() === startLang && !!byText('h1', startLang === 'en' ? 'New recording' : 'Yeni kayıt'), `back to ${startLang}`);
   } catch (e) {
     check(false, `exception: ${(e as Error).stack ?? e}`);
   }

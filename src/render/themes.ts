@@ -1,6 +1,8 @@
 // Background themes, drawn procedurally (our own artwork, no image assets). Every theme uses a
 // fixed-seed random generator, so it renders identically in the preview and in the export.
 
+import { N } from '../i18n/index.ts';
+
 type Ctx = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
 
 /** `pro`: calm looks for business, product and teaching videos; `fun`: playful and seasonal. */
@@ -135,7 +137,7 @@ const line = (m: number, k: number) => Math.max(1, m * k);
 
 export const themes: Theme[] = [
   {
-    id: 'eglenceli', title: 'Eğlenceli', emoji: '🎈', group: 'fun',
+    id: 'eglenceli', title: N('Eğlenceli'), emoji: '🎈', group: 'fun',
     draw(ctx, w, h) {
       gradient(ctx, w, h, ['#ff5fa2', '#ff9a5a', '#ffd84d']);
       const r = rng(7), m = Math.min(w, h);
@@ -163,7 +165,7 @@ export const themes: Theme[] = [
     },
   },
   {
-    id: 'yilbasi', title: 'Yılbaşı', emoji: '🎄', group: 'fun',
+    id: 'yilbasi', title: N('Yılbaşı'), emoji: '🎄', group: 'fun',
     draw(ctx, w, h) {
       gradient(ctx, w, h, ['#0b1d3a', '#17325a', '#123d33'], 0, true);
       const r = rng(2026), m = Math.min(w, h);
@@ -197,7 +199,7 @@ export const themes: Theme[] = [
     },
   },
   {
-    id: 'sonbahar', title: 'Sonbahar', emoji: '🍂', group: 'fun',
+    id: 'sonbahar', title: N('Sonbahar'), emoji: '🍂', group: 'fun',
     draw(ctx, w, h) {
       gradient(ctx, w, h, ['#ffd27a', '#f39a4c', '#a8452a']);
       const r = rng(1023), m = Math.min(w, h);
@@ -207,7 +209,7 @@ export const themes: Theme[] = [
     },
   },
   {
-    id: 'kutlama', title: 'Kutlama', emoji: '🎉', group: 'fun',
+    id: 'kutlama', title: N('Kutlama'), emoji: '🎉', group: 'fun',
     draw(ctx, w, h) {
       gradient(ctx, w, h, ['#3a1c71', '#d76d77', '#ffaf7b']);
       const r = rng(99), m = Math.min(w, h);
@@ -235,7 +237,7 @@ export const themes: Theme[] = [
     },
   },
   {
-    id: 'bahar', title: 'Bahar', emoji: '🌸', group: 'fun',
+    id: 'bahar', title: N('Bahar'), emoji: '🌸', group: 'fun',
     draw(ctx, w, h) {
       gradient(ctx, w, h, ['#d7f5e9', '#f9e1f0', '#ffd6e5']);
       const r = rng(321), m = Math.min(w, h);
@@ -246,7 +248,7 @@ export const themes: Theme[] = [
     },
   },
   {
-    id: 'uzay', title: 'Uzay', emoji: '🪐', group: 'fun',
+    id: 'uzay', title: N('Uzay'), emoji: '🪐', group: 'fun',
     draw(ctx, w, h) {
       const g = ctx.createRadialGradient(w * 0.5, h * 0.5, 0, w * 0.5, h * 0.5, Math.max(w, h) * 0.75);
       g.addColorStop(0, '#1d1b4b'); g.addColorStop(1, '#05050f');
@@ -268,7 +270,7 @@ export const themes: Theme[] = [
     },
   },
   {
-    id: 'okyanus', title: 'Okyanus', emoji: '🌊', group: 'fun',
+    id: 'okyanus', title: N('Okyanus'), emoji: '🌊', group: 'fun',
     draw(ctx, w, h) {
       gradient(ctx, w, h, ['#7fdcf0', '#2a9fc4', '#0b4a6e'], 0, true);
       const r = rng(77), m = Math.min(w, h);
@@ -284,7 +286,7 @@ export const themes: Theme[] = [
     },
   },
   {
-    id: 'minimal', title: 'Sade açık', emoji: '⬜️', group: 'pro',
+    id: 'minimal', title: N('Sade açık'), emoji: '⬜️', group: 'pro',
     draw(ctx, w, h) {
       gradient(ctx, w, h, ['#f7f7fa', '#e6e7ee']);
       const m = Math.min(w, h), step = m * 0.035;
@@ -293,7 +295,7 @@ export const themes: Theme[] = [
     },
   },
   {
-    id: 'gece', title: 'Sade koyu', emoji: '⬛️', group: 'pro',
+    id: 'gece', title: N('Sade koyu'), emoji: '⬛️', group: 'pro',
     draw(ctx, w, h) {
       gradient(ctx, w, h, ['#1d1d24', '#2c2c38']);
       const m = Math.min(w, h), step = m * 0.035;
@@ -304,7 +306,7 @@ export const themes: Theme[] = [
   },
   // ---------------------------------------------------------------- professional
   {
-    id: 'kurumsal', title: 'Kurumsal', emoji: '🏢', group: 'pro',
+    id: 'kurumsal', title: N('Kurumsal'), emoji: '🏢', group: 'pro',
     draw(ctx, w, h) {
       const m = Math.min(w, h);
       gradient(ctx, w, h, ['#0a1430', '#122852', '#0b1838'], 0.6);
@@ -338,7 +340,7 @@ export const themes: Theme[] = [
     },
   },
   {
-    id: 'grafit', title: 'Grafit', emoji: '◼️', group: 'pro',
+    id: 'grafit', title: N('Grafit'), emoji: '◼️', group: 'pro',
     draw(ctx, w, h) {
       const m = Math.min(w, h);
       gradient(ctx, w, h, ['#1b1c20', '#232429', '#18191c'], 0.5, true);
@@ -359,7 +361,7 @@ export const themes: Theme[] = [
     },
   },
   {
-    id: 'mermer', title: 'Mermer', emoji: '🏛️', group: 'pro',
+    id: 'mermer', title: N('Mermer'), emoji: '🏛️', group: 'pro',
     draw(ctx, w, h) {
       const m = Math.min(w, h), r = rng(1907);
       gradient(ctx, w, h, ['#f6f4f0', '#ece8e1', '#f3f0ea'], 0.8);
@@ -394,7 +396,7 @@ export const themes: Theme[] = [
     },
   },
   {
-    id: 'blueprint', title: 'Teknik çizim', emoji: '📐', group: 'pro',
+    id: 'blueprint', title: N('Teknik çizim'), emoji: '📐', group: 'pro',
     draw(ctx, w, h) {
       const m = Math.min(w, h);
       gradient(ctx, w, h, ['#0e3f6e', '#0b3460', '#082a4f'], 0.5);
@@ -433,7 +435,7 @@ export const themes: Theme[] = [
     },
   },
   {
-    id: 'aurora', title: 'Aurora', emoji: '🌌', group: 'pro',
+    id: 'aurora', title: N('Aurora'), emoji: '🌌', group: 'pro',
     draw(ctx, w, h) {
       const m = Math.min(w, h);
       gradient(ctx, w, h, ['#070b1a', '#0c1226'], 0.5, true);
@@ -448,7 +450,7 @@ export const themes: Theme[] = [
     },
   },
   {
-    id: 'pastel', title: 'Pastel', emoji: '🫧', group: 'pro',
+    id: 'pastel', title: N('Pastel'), emoji: '🫧', group: 'pro',
     draw(ctx, w, h) {
       const m = Math.min(w, h);
       gradient(ctx, w, h, ['#f8fafc', '#f1f5f9'], 0.5, true);
@@ -461,7 +463,7 @@ export const themes: Theme[] = [
     },
   },
   {
-    id: 'topografya', title: 'Topoğrafya', emoji: '🗺️', group: 'pro',
+    id: 'topografya', title: N('Topoğrafya'), emoji: '🗺️', group: 'pro',
     draw(ctx, w, h) {
       const m = Math.min(w, h), r = rng(4242);
       gradient(ctx, w, h, ['#0f1f1c', '#13291f', '#0d1b18'], 0.7);
@@ -487,7 +489,7 @@ export const themes: Theme[] = [
     },
   },
   {
-    id: 'kagit', title: 'Kağıt', emoji: '📜', group: 'pro',
+    id: 'kagit', title: N('Kağıt'), emoji: '📜', group: 'pro',
     draw(ctx, w, h) {
       const m = Math.min(w, h), r = rng(808);
       gradient(ctx, w, h, ['#f6f0e4', '#efe6d4', '#f4ecdd'], 0.9);
@@ -505,7 +507,7 @@ export const themes: Theme[] = [
     },
   },
   {
-    id: 'siyah-altin', title: 'Siyah & Altın', emoji: '✨', group: 'pro',
+    id: 'siyah-altin', title: N('Siyah & Altın'), emoji: '✨', group: 'pro',
     draw(ctx, w, h) {
       const m = Math.min(w, h), gold = (a: number) => `rgba(212,175,55,${a})`;
       gradient(ctx, w, h, ['#0b0b0d', '#151418', '#0c0b0e'], 0.6);
@@ -534,7 +536,7 @@ export const themes: Theme[] = [
     },
   },
   {
-    id: 'bokeh', title: 'Ofis ışıkları', emoji: '💡', group: 'pro',
+    id: 'bokeh', title: N('Ofis ışıkları'), emoji: '💡', group: 'pro',
     draw(ctx, w, h) {
       const m = Math.min(w, h), r = rng(616);
       gradient(ctx, w, h, ['#0e1628', '#18233b', '#2a2433'], 0.4, true);
@@ -552,7 +554,7 @@ export const themes: Theme[] = [
     },
   },
   {
-    id: 'finans', title: 'Finans', emoji: '📈', group: 'pro',
+    id: 'finans', title: N('Finans'), emoji: '📈', group: 'pro',
     draw(ctx, w, h) {
       const m = Math.min(w, h), r = rng(2024);
       gradient(ctx, w, h, ['#0a1120', '#0d1a2e', '#0a1424'], 0.5);
@@ -585,7 +587,7 @@ export const themes: Theme[] = [
     },
   },
   {
-    id: 'cam', title: 'Cam', emoji: '🪟', group: 'pro',
+    id: 'cam', title: N('Cam'), emoji: '🪟', group: 'pro',
     draw(ctx, w, h) {
       const m = Math.min(w, h);
       gradient(ctx, w, h, ['#1e1b4b', '#1e3a8a', '#0f766e'], 0.8);
@@ -613,7 +615,7 @@ export const themes: Theme[] = [
     },
   },
   {
-    id: 'geometrik', title: 'Geometrik', emoji: '🔷', group: 'pro',
+    id: 'geometrik', title: N('Geometrik'), emoji: '🔷', group: 'pro',
     draw(ctx, w, h) {
       const m = Math.min(w, h), r = rng(5150);
       // Low-poly: a jittered grid split into triangles, shaded by a soft light from the top left.
@@ -650,14 +652,14 @@ function hexToRgba(hex: string) {
 
 /** Ready-made colour gradients for the "Renk" background mode. */
 export const gradientPresets: { title: string; top: string; bottom: string }[] = [
-  { title: 'Gece', top: '#333d6b', bottom: '#87548c' },
-  { title: 'Okyanus', top: '#1e9ad6', bottom: '#2d3a8c' },
-  { title: 'Gün batımı', top: '#ff7e5f', bottom: '#feb47b' },
-  { title: 'Orman', top: '#134e5e', bottom: '#71b280' },
-  { title: 'Şeker', top: '#ff6fb5', bottom: '#7b6cff' },
-  { title: 'Kömür', top: '#232526', bottom: '#414345' },
-  { title: 'Lavanta', top: '#b8a9ff', bottom: '#f3c4fb' },
-  { title: 'Nane', top: '#b2f5ea', bottom: '#38b2ac' },
+  { title: N('Gece'), top: '#333d6b', bottom: '#87548c' },
+  { title: N('Okyanus'), top: '#1e9ad6', bottom: '#2d3a8c' },
+  { title: N('Gün batımı'), top: '#ff7e5f', bottom: '#feb47b' },
+  { title: N('Orman'), top: '#134e5e', bottom: '#71b280' },
+  { title: N('Şeker'), top: '#ff6fb5', bottom: '#7b6cff' },
+  { title: N('Kömür'), top: '#232526', bottom: '#414345' },
+  { title: N('Lavanta'), top: '#b8a9ff', bottom: '#f3c4fb' },
+  { title: N('Nane'), top: '#b2f5ea', bottom: '#38b2ac' },
 ];
 
 /** Display order: the most eye-catching professional looks first, then the calm basics. */
