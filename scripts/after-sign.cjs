@@ -10,6 +10,12 @@ exports.default = async function afterSign(context) {
   // electron-builder deliberately skips signing pull-request builds; do not verify an unsigned bundle here.
   if (process.env.GITHUB_EVENT_NAME === 'pull_request') return;
   const app = path.join(context.appOutDir, `${context.packager.appInfo.productFilename}.app`);
+  // Preserve electron-builder's Developer ID signature for release builds. It already gives
+  // macOS a stable designated requirement across updates.
+  if (process.env.CSC_LINK || process.env.CSC_NAME) {
+    execFileSync('codesign', ['--verify', '--deep', '--strict', app], { stdio: 'inherit' });
+    return;
+  }
   const id = context.packager.appInfo.id;
   execFileSync('codesign', ['--force', '--sign', '-', `-r=designated => identifier "${id}"`, app], { stdio: 'inherit' });
   execFileSync('codesign', ['--verify', '--deep', '--strict', app], { stdio: 'inherit' });

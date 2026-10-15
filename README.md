@@ -160,11 +160,11 @@ brew tap lioneltchami/tap
 brew install --cask focara
 ```
 
-The cask is updated automatically after each release when the Homebrew tap deploy key is configured. Focara is not signed or notarized yet, so macOS may require **System Settings › Privacy & Security › Open Anyway** on first launch.
+The cask is updated automatically after each release when the Homebrew tap deploy key is configured. The v0.1.0 macOS build is not signed or notarized. Future tagged macOS releases are built with Developer ID signing and Apple notarization; the release workflow stops if its signing secrets are missing.
 
 > **Not sure which Mac you have?** Apple menu  › *About This Mac*. "Chip: Apple M…" → Apple Silicon. "Processor: Intel…" → Intel.
 
-Focara is not signed with a paid Apple Developer ID or a Windows code-signing certificate yet, so your system will warn you the first time. This is expected; here is how to open it.
+The v0.1.0 macOS build is not signed or notarized, so Gatekeeper requires a one-time approval. Future tagged macOS releases will be signed and notarized. Windows builds remain unsigned and may show a SmartScreen warning.
 
 ### macOS
 
@@ -172,10 +172,6 @@ Focara is not signed with a paid Apple Developer ID or a Windows code-signing ce
 2. Open Focara from *Applications*. macOS says it can't verify the app — click **Done** (not *Move to Trash*).
 3. Open **System Settings › Privacy & Security**, scroll down to the message about Focara and click **Open Anyway**, then confirm with your password or Touch ID.
    - On macOS 14 you can instead right-click Focara in *Applications* › **Open** › **Open**.
-   - Terminal alternative (removes the "downloaded from the internet" flag):
-     ```bash
-     xattr -dr com.apple.quarantine /Applications/Focara.app
-     ```
 4. On your first recording macOS asks for permissions:
    - **Screen & System Audio Recording** — required. After allowing it, macOS may ask you to quit and reopen Focara.
    - **Camera** and **Microphone** — only if you choose a camera or microphone.
@@ -485,7 +481,7 @@ node scripts/helper-smoke.mjs                      # records 3 s of this screen 
 
 ## Known limitations
 
-- The apps are not signed/notarized with Apple/Microsoft certificates yet, so the first launch shows a warning (see [Download and install](#download-and-install)).
+- The v0.1.0 macOS app is unsigned and not notarized; Windows builds are unsigned. Future tagged macOS releases require signing and notarization secrets in GitHub Actions before they can publish (see [Download and install](#download-and-install)).
 - Intel Mac builds pass the in-app self-test under Rosetta but haven't been tried on a real Intel Mac yet.
 - Displays larger than 4096×2304: on macOS the recording is scaled to fit; on Windows HEVC is used, which needs HEVC decoding to edit.
 - Linux: editing and export work when built from source; recording is not supported yet.

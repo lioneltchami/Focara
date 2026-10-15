@@ -55,7 +55,7 @@ Ekran kaydı, otomatik zoom ve zoom'ları elle düzenleme. **macOS ve Windows'ta
 
 | Sistem | Dosya | Not |
 |---|---|---|
-| macOS 14+ (Apple Silicon: M1–M4) | `Focara-x.y.z-mac-arm64.dmg` | Uygulama imzalı/notarize değil. İlk açılışta Sistem Ayarları › Gizlilik ve Güvenlik › **Yine de Aç**. |
+| macOS 14+ (Apple Silicon: M1–M4) | `Focara-x.y.z-mac-arm64.dmg` | v0.1.0 imzalı/notarize değil; sonraki macOS etiketli sürümler imzalama ve notarizasyon olmadan yayımlanamaz. |
 | macOS 14+ (Intel) | `Focara-x.y.z-mac-x64.dmg` | Aynı. Rosetta altında selftest'i geçiyor; gerçek bir Intel Mac'te henüz denenmedi. |
 | Windows 10 (2004+) / 11 | `Focara-Setup-x.y.z.exe` | İmzalı değil. SmartScreen uyarısında **Ek bilgi › Yine de çalıştır**. Kurulumsuz kullanım için `Focara-x.y.z-win-x64.zip`. |
 
@@ -68,7 +68,7 @@ brew tap lioneltchami/tap
 brew install --cask focara
 ```
 
-Homebrew cask'i, dağıtım anahtarı tanımlıysa her sürümden sonra otomatik güncellenir. Focara henüz imzalı/notarize değil; ilk açılışta **Sistem Ayarları › Gizlilik ve Güvenlik › Yine de Aç** gerekebilir.
+Homebrew cask'i, dağıtım anahtarı tanımlıysa her sürümden sonra otomatik güncellenir. v0.1.0 macOS yapısı imzalı/notarize değil; sonraki etiketli macOS sürümleri imzalama sırları eksikse yayımlanmaz.
 
 macOS'ta ilk kayıtta **Ekran ve Sistem Sesi Kaydı** izni istenir. Mikrofon kullanılacaksa mikrofon izni de istenir. İzinden sonra uygulamayı yeniden başlatmak gerekebilir.
 

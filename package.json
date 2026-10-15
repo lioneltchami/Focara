@@ -72,8 +72,8 @@
       ],
       "category": "public.app-category.video",
       "icon": "build/icon.png",
-      "identity": "-",
-      "hardenedRuntime": false,
+      "hardenedRuntime": true,
+      "notarize": true,
       "extraResources": [
         {
           "from": "native/mac/build/odak-capture",
