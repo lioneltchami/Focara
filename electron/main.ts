@@ -9,7 +9,9 @@ import path from 'node:path';
 const isSelftest = process.argv.includes('--selftest');
 const uiTestIndex = process.argv.indexOf('--uitest');
 const uiTestProject = uiTestIndex >= 0 ? process.argv[uiTestIndex + 1] : null;
-const isTest = isSelftest || !!uiTestProject;
+// Performance test: a heavy project driven through the real editor in a visible window.
+const isPerftest = process.argv.includes('--perftest');
+const isTest = isSelftest || !!uiTestProject || isPerftest;
 const devUrl = process.env.ODAK_DEV_URL;
 const isMac = process.platform === 'darwin';
 const isWin = process.platform === 'win32';
@@ -171,13 +173,16 @@ ipcMain.handle('dialog:openProject', async () => {
   return r.canceled ? null : r.filePaths[0] ?? null;
 });
 
-ipcMain.handle('dialog:saveVideo', async (_e, name: string) => {
+ipcMain.handle('dialog:saveExport', async (_e, name: string, ext: string, label: string) => {
+  const safeExt = /^[a-z0-9]{2,5}$/.test(ext) ? ext : 'mp4';
   const r = await dialog.showSaveDialog(mainWindow!, {
-    title: 'Video Dışa Aktar',
-    defaultPath: path.join(app.getPath('videos'), name),
-    filters: [{ name: 'MP4 Video', extensions: ['mp4'] }],
+    title: 'Dışa Aktar',
+    defaultPath: path.join(app.getPath(safeExt === 'png' ? 'pictures' : safeExt === 'm4a' || safeExt === 'wav' ? 'music' : 'videos'), `${name}.${safeExt}`),
+    filters: [{ name: label, extensions: [safeExt] }],
   });
-  return r.canceled ? null : r.filePath ?? null;
+  if (r.canceled || !r.filePath) return null;
+  // Keep the extension the format needs even if the name was typed without it.
+  return path.extname(r.filePath).toLowerCase() === `.${safeExt}` ? r.filePath : `${r.filePath}.${safeExt}`;
 });
 
 ipcMain.handle('dialog:importVideo', async () => {
@@ -502,7 +507,8 @@ function createWindow() {
     show: false, title: 'Odak', backgroundColor: '#1e1e22',
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'), contextIsolation: true, sandbox: true,
-      additionalArguments: isSelftest ? ['--selftest'] : uiTestProject ? ['--uitest'] : [],
+      additionalArguments: isSelftest ? ['--selftest'] : isPerftest ? ['--perftest', ...process.argv.filter((a) => a === '--perf-report')]
+        : uiTestProject ? ['--uitest'] : [],
       // Keep timers and capture running while the window is hidden during a recording.
       backgroundThrottling: false,
       offscreen: !!uiTestProject,
@@ -511,12 +517,14 @@ function createWindow() {
   if (devUrl) void mainWindow.loadURL(devUrl);
   else void mainWindow.loadFile(path.join(__dirname, '..', 'dist', 'index.html'));
   if (!isTest) mainWindow.once('ready-to-show', () => mainWindow?.show());
+  // Measured like real use: on screen (without taking focus).
+  if (isPerftest) mainWindow.once('ready-to-show', () => mainWindow?.showInactive());
   mainWindow.webContents.on('render-process-gone', (_e, d) => {
     if (isTest) { process.stdout.write(`renderer gone: ${d.reason}\n`); app.exit(3); }
   });
   if (isTest) {
     mainWindow.webContents.on('console-message', (e) => process.stdout.write(`[renderer] ${e.message}\n`));
-    setTimeout(() => { process.stdout.write('SELFTEST TIMEOUT\n'); app.exit(2); }, 240000);
+    setTimeout(() => { process.stdout.write('SELFTEST TIMEOUT\n'); app.exit(2); }, isPerftest ? 900000 : 240000);
   }
   mainWindow.on('closed', () => { mainWindow = null; });
 }

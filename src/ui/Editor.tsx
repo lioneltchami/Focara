@@ -75,6 +75,7 @@ export function Editor({ store, onClose, busy, onRecordInto }: {
   }, [player, p, store]);
 
   const seek = useCallback((t: number) => { player?.pause(); void player?.seek(t); }, [player]);
+  const scrubTo = useCallback((t: number) => player?.scrub(t), [player]);
   const now = () => player?.currentTime ?? time;
 
   useEffect(() => {
@@ -258,7 +259,7 @@ export function Editor({ store, onClose, busy, onRecordInto }: {
         </div>
         <Inspector store={store} lib={lib} seek={seek} onDelete={deleteSelected} actions={actions} />
       </div>
-      <Timeline store={store} lib={lib} time={time} playing={playing} seek={seek} range={range} setRange={setRange} tool={tool}
+      <Timeline store={store} lib={lib} time={time} playing={playing} seek={seek} scrubTo={scrubTo} range={range} setRange={setRange} tool={tool}
                 hint={flash ?? (range ? `${(range.b - range.a).toFixed(2)} sn seçili · Sil, Ayır ya da ×2 / ×4` : toolHints[tool])} warn={!!flash}
                 onDeleteRange={deleteSelected} onIsolate={isolate} onSpeed={speedUp} onCut={cutAt} onCamera={hasCamera ? addCamera : null}
                 bar={<>
@@ -283,7 +284,7 @@ export function Editor({ store, onClose, busy, onRecordInto }: {
                             title={hasCamera ? 'Seçili aralıkta (ya da oynatma çizgisinden 3 sn) kamerayı başka yere taşı, büyüt ya da gizle' : 'Bu projede kamera kaydı yok'}>📷 Kamera</button>
                   </div>
                 </>} />
-      {dialog === 'export' && <ExportDialog store={store} lib={lib} onClose={() => setDialog(null)} />}
+      {dialog === 'export' && <ExportDialog store={store} lib={lib} onClose={() => setDialog(null)} range={range} time={now()} />}
       {dialog === 'quiet' && <QuietDialog store={store} lib={lib} onClose={() => setDialog(null)} />}
       {dialog === 'record' && (
         <div className="modal-backdrop">
@@ -316,8 +317,8 @@ export function Editor({ store, onClose, busy, onRecordInto }: {
 const INSET = 18;
 const SNAP_PX = 7;
 
-function Timeline({ store, lib, time, playing, seek, range, setRange, tool, bar, hint, warn, onDeleteRange, onIsolate, onSpeed, onCut, onCamera }: {
-  store: EditorStore; lib: MediaLibrary; time: number; playing: boolean; seek: (t: number) => void;
+function Timeline({ store, lib, time, playing, seek, scrubTo, range, setRange, tool, bar, hint, warn, onDeleteRange, onIsolate, onSpeed, onCut, onCamera }: {
+  store: EditorStore; lib: MediaLibrary; time: number; playing: boolean; seek: (t: number) => void; scrubTo: (t: number) => void;
   range: { a: number; b: number } | null; setRange: (r: { a: number; b: number } | null) => void;
   tool: Tool; bar: React.ReactNode; hint: string; warn: boolean;
   onDeleteRange: () => void; onIsolate: () => void; onSpeed: (s: number) => void; onCut: (t: number) => void;
@@ -406,7 +407,8 @@ function Timeline({ store, lib, time, playing, seek, range, setRange, tool, bar,
     if (e.button !== 0) return;
     setScrubbing(true);
     seek(clampT(tOf(e.clientX)));
-    drag(e, (ev) => { follow(ev.clientX); seek(clampT(tOf(ev.clientX))); }, () => setScrubbing(false));
+    // While dragging: quick key-frame previews; on release: the exact frame.
+    drag(e, (ev) => { follow(ev.clientX); scrubTo(clampT(tOf(ev.clientX))); }, (ev) => { setScrubbing(false); seek(clampT(tOf(ev.clientX))); });
   };
 
   /** Drags out a time range (Aralık tool, or Shift+drag with any tool). */

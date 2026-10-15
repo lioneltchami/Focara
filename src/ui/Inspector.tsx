@@ -241,6 +241,15 @@ function StyleInspector({ store, lib }: { store: EditorStore; lib: MediaLibrary 
   return (
     <>
       <section>
+        <h3>Görüntü oranı</h3>
+        <div className="segmented">
+          {([['wide', '16:9'], ['vertical', '9:16'], ['square', '1:1'], ['recording', 'Kayıt']] as const).map(([k, t]) => (
+            <button key={k} className={p.export.aspect === k ? 'on' : ''} title={k === 'vertical' ? 'Dikey: Shorts, Reels, TikTok' : k === 'recording' ? 'Kaydın kendi oranı' : undefined}
+                    onClick={() => store.update((q) => ({ ...q, export: { ...q.export, aspect: k } }), 'export-aspect')}>{t}</button>
+          ))}
+        </div>
+      </section>
+      <section>
         <h3>Arka plan</h3>
         <div className="segmented">
           {([['gradient', 'Renk'], ['theme', 'Tema'], ['image', 'Görsel']] as const).map(([k, t]) => (

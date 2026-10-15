@@ -73,7 +73,8 @@ export interface CameraBox { x: number; y: number; width: number; height: number
 
 export function layoutBox(canvas: Size, layout: CameraLayout, shape: CameraShape): CameraBox {
   if (layout.mode === 'full') return { x: 0, y: 0, width: canvas.width, height: canvas.height, radius: 0, alpha: 1, frame: 0 };
-  const h = canvas.height * layout.size;
+  // Sized on the short side, so a vertical (9:16) frame gets the same bubble as a 16:9 one.
+  const h = Math.min(canvas.width, canvas.height) * layout.size;
   const w = shape === 'rounded' ? h * (4 / 3) : h;
   const margin = Math.min(canvas.width, canvas.height) * 0.035;
   const pos = layout.position;

@@ -5,7 +5,8 @@ Ekran kaydı, otomatik zoom ve zoom'ları elle düzenleme. **macOS ve Windows'ta
 - Kayıtta sistem imleci gizlenir. İmleç konumu ve tıklamalar ayrıca saklanır; imleç sonradan yeniden çizilir, yumuşatılır ve boyutlandırılır.
 - Zoom'lar tıklamalardan otomatik oluşur. Her zoom'un zamanı, miktarı ve odağı (imleci takip / sabit nokta) düzenlenebilir.
 - **Düzenleme:** Birden çok kayıt ve bilgisayardan video tek zaman çizelgesinde. Böl, kenarından kırp, sürükleyip sırala, çoğalt, aralık seçip sil, klip hızı (×0.5–×8). **Durgun anlar** tek adımda bulunur, hızlandırılır ya da kesilir.
-- Önizleme ile dışa aktarılan MP4 aynı çizim koduyla üretilir. Görüntü, zamanlama ve ses senkronu aynıdır.
+- **Dışa aktarma:** MP4, MOV, WebM, GIF, yalnızca ses (M4A, WAV) ya da tek kare (PNG). 720p–4K, 24/30/60 fps, H.264 / HEVC / AV1 / VP9, üç kalite düzeyi. Görüntü oranı 16:9, **9:16 dikey** (Shorts, Reels, TikTok), 1:1 kare ya da kaydın kendi oranı. İstersen yalnızca seçili aralık aktarılır.
+- Önizleme ile dışa aktarılan dosya aynı çizim koduyla üretilir. Görüntü, zamanlama ve ses senkronu aynıdır.
 - **Kamera:** Ekranla aynı anda kaydedilir. Videoda daire, yuvarlak köşe ya da kare balon olarak görünür; 9 konumdan birine yerleşir, boyutu, ayna görüntüsü ve çerçevesi ayarlanabilir. **Kamera bölümleri** ile videonun istediğin kısmında kamera başka yere kayar, tam ekran olur ya da gizlenir.
 - **Ses:** Sistem sesi ve mikrofon ayrı dosyalara kaydedilir, ses düzeyleri ayrı ayarlanır. Kamera ve mikrofon listeden seçilir (örneğin harici USB mikrofon), gürültü azaltma isteğe bağlıdır.
 - **Arka plan:** Hazır renk geçişleri, temalar ya da bilgisayarından seçtiğin bir görsel (bulanıklaştırılabilir). Temalar: Eğlenceli, Yılbaşı, Sonbahar, Kutlama, Bahar, Uzay, Okyanus, Sade açık, Sade koyu. Hepsi kod ile çizilir, dışarıdan görsel kullanılmaz.
@@ -50,7 +51,18 @@ Geliştirme modunda (`npm run dev`) macOS izinleri "Electron" uygulamasına veri
 3. Zaman çizelgesinde bir zoom'u **sürükle** (taşı) ya da **kenarından** uzat. Tıklayınca sağ panelden miktarını ve odağını değiştirebilirsin.
 4. **＋ Zoom** oynatma çizgisine yeni bir zoom ekler. **✦ Oto zoom** dokunulmamış zoom'ları yeniden üretir; elle düzenlediklerin korunur.
 5. Sağ paneldeki **Arka plan**, **İmleç**, **Kamera** ve **Ses** bölümlerinden görünümü ayarla. Hiçbir şey seçili değilken bu bölümler görünür.
-6. **Dışa Aktar**: 1080p / 1440p / 4K, 30/60 fps, H.264 ya da HEVC.
+6. **Dışa Aktar**: biçimi seç, ayarlarını yap, kaydet.
+
+| Biçim | Ne için | Seçenekler |
+|---|---|---|
+| **MP4** | YouTube ve her yer | H.264 (en uyumlu), HEVC (daha küçük), AV1 (en küçük, yavaş) |
+| **MOV** | Final Cut, iMovie, Premiere | H.264, HEVC |
+| **WebM** | Web siteleri | VP9, AV1 · ses Opus |
+| **GIF** | README, sohbet (sessiz) | 480–1280 px, 10–25 fps; durgun ekran neredeyse yer kaplamaz |
+| **Ses · M4A / WAV** | Podcast, altyazı, ses düzenleme | AAC ya da kayıpsız PCM |
+| **Kare · PNG** | YouTube kapak görseli | Oynatma çizgisindeki kare, seçilen çözünürlükte |
+
+Video biçimlerinde çözünürlük 720p / 1080p / 1440p / 4K, kare hızı 24 / 30 / 60 ve kalite (Yüksek / Orta / Küçük dosya) seçilir. Bu bilgisayarın kodlayamadığı kodekler listede soluk görünür. **Görüntü oranı** (sağ panelin en üstü ya da dışa aktarma penceresi): 16:9, 9:16 dikey, 1:1 kare ya da kaydın kendi oranı; önizleme hemen değişir. Zaman çizelgesinde bir aralık seçiliyse **Yalnızca seçili aralık** ile sadece o kısım aktarılır.
 
 ### Kesme, birleştirme, düzenleme
 
@@ -134,11 +146,34 @@ npm run selftest       # uygulama içinde: sentetik kayıt → zoom → kaydet/a
 npm run uitest -- "examples/Örnek Proje.odak"   # gerçek arayüz: zoom'lar, böl/kırp/sürükle/sil, oynatma çizgisini sürükleme,
                                                #   makas, aralık ×2/ayır/sil, kamera bölümleri, video ekle, durgun anlar, geri al,
                                                #   oynat, otomatik kayıt
+npm run perftest       # performans: 40 sn 2560×1600@60 kayıt + kamera + 2 ses izi, 16 klip, zoom'lar ve kamera bölümleri;
+                       #   gerçek editörde oynatma (kesimler dahil), sürükleme, düzenleme, zaman çizelgesi, dışa aktarma
+zsh native/mac/test.sh                         # macOS yardımcısı: WAV hizalaması, anahtar karelerin en fazla ~1 sn arayla olması
 node scripts/helper-smoke.mjs                  # kayıt yardımcısıyla 3 sn gerçek kayıt (izin gerekir)
 cargo test --manifest-path native/win/Cargo.toml   # Windows yardımcısının WAV hizalaması
 ```
 
-`.github/workflows/build.yml`, bunların hepsini **Windows ve macOS** makinelerinde çalıştırır ve kurulum dosyalarını üretir.
+Selftest ayrıca her dışa aktarma biçimini gerçekten üretip açar: boyut, süre ve sesin yeri (milisaniye düzeyinde) denetlenir; GIF'in kareleri ve süresi bayt düzeyinde, PNG ise videodaki kareyle karşılaştırılır.
+
+`.github/workflows/build.yml`, bunların hepsini **Windows ve macOS** makinelerinde çalıştırır ve kurulum dosyalarını üretir. CI makinelerinde ekran kartı olmadığı için performans testi orada yalnızca rapor verir.
+
+### Performans
+
+`npm run perftest` sonuçları (Apple M4 Pro, 120 Hz ekran, paketlenmiş uygulama):
+
+| Ölçüm | Sonuç |
+|---|---|
+| Projeyi açma → ilk kare | ~0.12 sn |
+| Oynatma | ekranın tazeleme hızında (120 kare/sn), geç kalan kare yok, kesimlerde bile kareler arası en uzun boşluk ~10 ms |
+| Oynatma çizgisini sürükleme | ~59 kare/sn, bırakınca tam kare ~40 ms'de |
+| Düzenleme (böl, seç, geri al…) | tıklamadan ekrana ~17 ms |
+| Zaman çizelgesi yakınlaştırma/kaydırma | takılma yok |
+| 1080p60 dışa aktarma | gerçek zamanın ~3 katı hızında, bu sırada arayüz akıcı |
+
+Bunu sağlayan üç şey:
+- Oynatma bir kesime yaklaşınca sonraki klibin çözücüsü önceden açılır; kesim anında beklenmez.
+- Sürüklerken her konum için en yakın anahtar kare gösterilir (bir kare çözmek yeter), durunca tam kare gelir.
+- macOS kayıtlarında en az saniyede bir anahtar kare vardır. Ekran durgunken kareler seyrek geldiği için bu ayrıca zamana göre sınırlanır.
 
 ## Bilinen sınırlar
 
@@ -147,3 +182,4 @@ cargo test --manifest-path native/win/Cargo.toml   # Windows yardımcısının W
 - Linux'ta düzenleme ve dışa aktarma çalışır, kayıt henüz desteklenmiyor.
 - Hızı 1× olmayan kliplerde ses kapatılır (sesi perdesini bozmadan hızlandırma henüz yok).
 - Durgun anlar yalnızca Odak'ın kendi ekran kayıtlarında aranır; içe aktarılan videolarda imleç verisi olmadığı için analiz edilmez.
+- Windows'ta kullanılan yakalama kütüphanesi anahtar kare aralığını ayarlamaya izin vermiyor. Oynatıcı sonraki klibi gerektiğinde daha erken açarak bunu telafi eder. Windows'taki performans henüz ölçülmedi; CI iş akışı performans testini orada rapor olarak çalıştırır.

@@ -2,12 +2,12 @@
 // synthetic recording -> auto zoom -> save/reopen -> export MP4 -> compare preview frames with
 // exported frames -> measure audio sync in the export.
 import {
-  ALL_FORMATS, AudioBufferSink, AudioBufferSource, CanvasSource, CustomSource, EncodedPacketSink, Input,
+  ALL_FORMATS, canEncodeVideo, AudioBufferSink, AudioBufferSource, CanvasSource, CustomSource, EncodedPacketSink, Input,
   Mp4OutputFormat, Output, QUALITY_HIGH, StreamTarget, VideoSampleSink, WavOutputFormat,
   getFirstEncodableAudioCodec, getFirstEncodableVideoCodec,
 } from 'mediabunny';
 import { odak } from './bridge.ts';
-import { type CursorTrack, type MediaAsset, type Project, newClip, newProject, normalizeProject, uuid } from './core/model.ts';
+import { type CursorTrack, type ExportSettings, type MediaAsset, type Project, newClip, newProject, normalizeProject, uuid } from './core/model.ts';
 import { SideRecorder } from './media/sideRecorder.ts';
 import { generateAutoZooms } from './core/zoom.ts';
 import { encoderDelay, exportProject } from './media/exporter.ts';
@@ -67,6 +67,23 @@ function psnr(a: Uint8ClampedArray, b: Uint8ClampedArray) {
 
 const dirOf = (p: string) => p.replace(/[\\/][^\\/]*$/, '');
 const baseOf = (p: string) => p.replace(/^.*[\\/]/, '');
+
+/** Walks a GIF's blocks: size, frame count and total delay (centiseconds). */
+function parseGif(b: Uint8Array) {
+  const sig = String.fromCharCode(...b.subarray(0, 6));
+  const w = b[6] | (b[7] << 8), h = b[8] | (b[9] << 8);
+  let i = 13, frames = 0, delay = 0;
+  if (b[10] & 0x80) i += 3 * (1 << ((b[10] & 7) + 1));
+  const skipBlocks = () => { while (i < b.length && b[i] !== 0) i += b[i] + 1; i++; };
+  while (i < b.length) {
+    const c = b[i++];
+    if (c === 0x3b) return { sig, w, h, frames, delay, ok: true };
+    if (c === 0x21) { if (b[i++] === 0xf9) delay += b[i + 2] | (b[i + 3] << 8); skipBlocks(); }
+    else if (c === 0x2c) { frames++; const f = b[i + 8]; i += 9; if (f & 0x80) i += 3 * (1 << ((f & 7) + 1)); i++; skipBlocks(); }
+    else break;
+  }
+  return { sig, w, h, frames, delay, ok: false };
+}
 
 function openAbsolute(path: string) {
   const pkg = dirOf(path), rel = baseOf(path);
@@ -331,6 +348,69 @@ export async function runSelftest() {
     check(onsets.length === 2 && Math.abs(onsets[0] - 2.0) < 0.01 && Math.abs(onsets[1] - 5.5) < 0.01,
       `edited audio beeps at ${onsets.map((x) => x.toFixed(4)).join(', ')} s (expected 2.0000, 5.5000)`);
     elib.dispose();
+
+    // 7b. Every export format: it opens, has the right size and length, and its audio is on time.
+    const firstBeep = async (input: Input, from: number) => {
+      const track = await input.getPrimaryAudioTrack();
+      if (!track) return null;
+      for await (const b of new AudioBufferSink(track).buffers(Math.max(0, from), from + 2)) {
+        const d = b.buffer.getChannelData(0);
+        for (let i = 0; i < d.length; i++) if (Math.abs(d[i]) > 0.3) return b.timestamp + i / b.buffer.sampleRate;
+      }
+      return null;
+    };
+    const bytesOf = async (path: string) => odak().readFile(dirOf(path), baseOf(path), 0, await odak().fileSize(dirOf(path), baseOf(path)));
+    const flib = new MediaLibrary(pkg);
+    const fx = (o: Partial<ExportSettings>): ExportSettings => ({ ...reopened.export, fps: 30, ...o });
+    const canHevc = await canEncodeVideo('hevc', { width: 1920, height: 1080 });
+    const videoCases: [string, ExportSettings, { from: number; to: number } | undefined, string, number, number][] = [
+      ['MOV H.264', fx({ format: 'mov', codec: 'h264' }), undefined, 'avc', 1920, 1080],
+      ['WebM VP9 720p', fx({ format: 'webm', codec: 'vp9', resolution: 'p720', quality: 'medium' }), undefined, 'vp9', 1280, 720],
+      ['MP4 9:16 720p, range 1.5–4.5 s', fx({ format: 'mp4', aspect: 'vertical', resolution: 'p720' }), { from: 1.5, to: 4.5 }, 'avc', 720, 1280],
+      ['MP4 1:1 small', fx({ format: 'mp4', aspect: 'square', resolution: 'p720', quality: 'small' }), undefined, 'avc', 720, 720],
+      ...(canHevc ? [['MP4 HEVC', fx({ format: 'mp4', codec: 'hevc' }), undefined, 'hevc', 1920, 1080] as [string, ExportSettings, undefined, string, number, number]] : []),
+    ];
+    if (!canHevc) log.push('note: this machine cannot encode HEVC; skipped');
+    for (const [name, st, range, codec, w, h] of videoCases) {
+      const file = `${tmp}/format-${name.replace(/[^A-Za-z0-9]+/g, '_')}.${st.format}`;
+      const t1 = performance.now();
+      const r = await exportProject(reopened, flib, file, st, () => {}, undefined, { range });
+      const input = openAbsolute(file);
+      const v = (await input.getPrimaryVideoTrack())!;
+      const len = await v.computeDuration(), want = range ? range.to - range.from : SECONDS;
+      const beep = await firstBeep(input, range ? 0 : 1.5), wantBeep = range ? 2.0 - range.from : 2.0;
+      check(v.codec === codec && v.displayWidth === w && v.displayHeight === h && Math.abs(len - want) < 0.05 && beep !== null && Math.abs(beep - wantBeep) < 0.01,
+        `${name}: ${r.videoCodec}/${r.audioCodec} ${v.displayWidth}×${v.displayHeight}, ${len.toFixed(2)} s, beep ${beep?.toFixed(4)} s (${((performance.now() - t1) / 1000).toFixed(1)} s)`);
+    }
+    for (const format of ['m4a', 'wav'] as const) {
+      const file = `${tmp}/format-audio.${format}`;
+      const r = await exportProject(reopened, flib, file, fx({ format }), () => {});
+      const input = openAbsolute(file);
+      const a = await input.getPrimaryAudioTrack(), v = await input.getPrimaryVideoTrack();
+      const len = a ? await a.computeDuration() : 0;
+      const b1 = await firstBeep(input, 1.5), b2 = await firstBeep(input, 5.5);
+      check(!!a && !v && Math.abs(len - SECONDS) < 0.06 && b1 !== null && Math.abs(b1 - 2) < 0.01 && b2 !== null && Math.abs(b2 - 6) < 0.01,
+        `${format.toUpperCase()}: ${r.audioCodec}, ${len.toFixed(3)} s, beeps ${b1?.toFixed(4)} / ${b2?.toFixed(4)} s`);
+    }
+    {
+      const file = `${tmp}/format.gif`;
+      const t1 = performance.now();
+      await exportProject(reopened, flib, file, fx({ format: 'gif', gifWidth: 480, gifFps: 10 }), () => {}, undefined, { range: { from: 0, to: 4 } });
+      const g = parseGif(await bytesOf(file));
+      check(g.ok && g.sig === 'GIF89a' && g.w === 480 && g.h === 270 && g.frames >= 2 && Math.abs(g.delay - 400) <= 2,
+        `GIF: ${g.sig} ${g.w}×${g.h}, ${g.frames} frames, ${(g.delay / 100).toFixed(2)} s (${((performance.now() - t1) / 1000).toFixed(1)} s)`);
+    }
+    {
+      const file = `${tmp}/format.png`;
+      await exportProject(reopened, flib, file, fx({ format: 'png' }), () => {}, undefined, { frameTime: 2.5 });
+      const bmp = await createImageBitmap(new Blob([new Uint8Array(await bytesOf(file))], { type: "image/png" }));
+      const png = grab((c) => c.drawImage(bmp, 0, 0));
+      const s1 = await exSink.getSample(2.5 + 1e-6);
+      const ref = grab((c) => s1!.draw(c, 0, 0)); s1!.close();
+      const db = psnr(png, ref);
+      check(bmp.width === 1920 && bmp.height === 1080 && db > 35, `PNG frame at 2.5 s: ${bmp.width}×${bmp.height}, matches the video frame (${db.toFixed(1)} dB)`);
+    }
+    flib.dispose();
 
     // 8. Camera + microphone recorder with Chromium's fake devices.
     const devices = await navigator.mediaDevices.enumerateDevices();

@@ -29,7 +29,9 @@ jobs:
           cargo build --release --manifest-path native/win/Cargo.toml
       - name: Capture helper (macOS)
         if: runner.os == 'macOS'
-        run: zsh native/mac/build.sh
+        run: |
+          zsh native/mac/build.sh
+          zsh native/mac/test.sh
 
       - name: End-to-end selftest (synthetic recording → zoom → save/open → export → preview parity, audio sync)
         run: npm run selftest
@@ -38,6 +40,8 @@ jobs:
         run: |
           cp -R "examples/Örnek Proje.odak" "$RUNNER_TEMP/ui.odak"
           npm run uitest -- "$RUNNER_TEMP/ui.odak"
+      - name: Performance test (heavy project in the real editor; CI machines have no GPU, so report only)
+        run: npm run perftest -- --perf-report
       - name: Capture helper smoke test (records 3 s of this machine's screen)
         run: node scripts/helper-smoke.mjs
 

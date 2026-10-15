@@ -40,6 +40,24 @@ class FrameCursor {
   async close() { this.current?.close(); this.next?.close(); this.current = this.next = null; await this.it.return(undefined); }
 }
 
+/** Playback measurements for the performance test. */
+export class PlaybackStats {
+  frames = 0;
+  late = 0;
+  stills = 0;
+  drawMs: number[] = [];
+  maxGap = 0;
+  private last = 0;
+  /** A frame drawn while playing; `lag` is how far behind the clock its content is (seconds). */
+  played(lag: number) {
+    const now = performance.now();
+    if (this.last) this.maxGap = Math.max(this.maxGap, now - this.last);
+    this.last = now;
+    this.frames++;
+    if (lag > 2.5 / 60) this.late++;
+  }
+}
+
 /**
  * Preview playback. The Web Audio clock is the master clock: audio buffers of every source are
  * scheduled on it, and video frames are drawn for the time it reports.
@@ -53,9 +71,12 @@ export class Player {
   private ctx: CanvasRenderingContext2D;
   private audio: AudioContext | null = null;
   private gen = 0;
-  private pendingDraw: number | null = null;
+  private pendingDraw: { t: number; fast: boolean } | null = null;
+  private exactTimer: ReturnType<typeof setTimeout> | null = null;
   private drawing: Promise<void> | null = null;
   private lastError = 0;
+  /** Set by the performance test only. */
+  stats: PlaybackStats | null = null;
   private nodes: AudioScheduledSourceNode[] = [];
   private clockStart = 0;
   private timeStart = 0;
@@ -90,34 +111,66 @@ export class Player {
    * Requests are coalesced: while one frame decodes, only the newest requested time is kept,
    * so dragging the playhead never runs a pile of full-resolution decoders at once.
    */
-  drawAt(t: number): Promise<void> {
-    this.pendingDraw = t;
+  drawAt(t: number, fast = false): Promise<void> {
+    this.pendingDraw = { t, fast };
     this.drawing ??= (async () => {
       while (this.pendingDraw !== null) {
         const next = this.pendingDraw;
         this.pendingDraw = null;
-        try { await this.drawOnce(next); } catch (e) { this.decodeFailed(e, next); }
+        try { await this.drawOnce(next.t, next.fast); } catch (e) { this.decodeFailed(e, next.t); }
       }
     })().finally(() => { this.drawing = null; });
     return this.drawing;
   }
 
-  private async drawOnce(t: number) {
+  /**
+   * Dragging the playhead: show the nearest key frame at once (one frame to decode instead of
+   * up to a second's worth), and the exact frame as soon as the pointer rests or lets go.
+   */
+  scrub(t: number) {
+    if (this.playing) this.stopPlayback();
+    this.currentTime = Math.min(Math.max(0, t), this.duration);
+    this.onTime(this.currentTime);
+    void this.drawAt(this.currentTime, true);
+    if (this.exactTimer) clearTimeout(this.exactTimer);
+    this.exactTimer = setTimeout(() => { this.exactTimer = null; void this.drawAt(this.currentTime); }, 120);
+  }
+
+  /** Resolves once no paused-frame draw is pending (including the exact frame after scrubbing). */
+  async idle(): Promise<void> {
+    while (this.drawing || this.exactTimer) {
+      await (this.drawing ?? new Promise((r) => setTimeout(r, 20)));
+    }
+  }
+
+  private async drawOnce(t: number, fast = false) {
+    const began = performance.now();
     const p = this.project;
     if (!p) return;
     const loc = locate(p, t);
     if (!loc) { this.ctx.fillStyle = '#000'; this.ctx.fillRect(0, 0, this.size.width, this.size.height); return; }
     const clip = p.clips[loc.index];
     const media = await this.lib.open(assetOf(p, clip.mediaID)!.videoFile);
-    const sample = media.videoSink ? await media.videoSink.getSample(loc.sourceTime) : null;
+    let at = loc.sourceTime;
+    if (fast && media.videoPackets) {
+      // The key frame at or before t; if the cut trimmed it away, the first key frame inside the clip.
+      let key = await media.videoPackets.getKeyPacket(loc.sourceTime, { metadataOnly: true });
+      while (key && key.timestamp < clip.sourceStart) key = await media.videoPackets.getNextKeyPacket(key, { metadataOnly: true });
+      if (key && key.timestamp < clip.sourceEnd) at = key.timestamp;
+    }
     const cam = await this.lib.camera(p, clip);
-    const camSample = cam ? await cam.videoSink!.getSample(loc.sourceTime) : null;
+    const [sample, camSample] = await Promise.all([
+      media.videoSink ? media.videoSink.getSample(at) : null,
+      cam ? cam.videoSink!.getSample(loc.sourceTime) : null,
+    ]);
     if (this.playing) { sample?.close(); camSample?.close(); return; }
     renderSample(this.ctx, this.size, sample, this.data[loc.index], loc.sourceTime, camSample);
     sample?.close(); camSample?.close();
+    if (this.stats) { this.stats.stills++; this.stats.drawMs.push(performance.now() - began); }
   }
 
   async seek(t: number) {
+    if (this.exactTimer) { clearTimeout(this.exactTimer); this.exactTimer = null; }
     const wasPlaying = this.playing;
     if (wasPlaying) this.stopPlayback();
     this.currentTime = Math.min(Math.max(0, t), this.duration);
@@ -204,10 +257,33 @@ export class Player {
     odak().log('preview decode failed', { t: Number(t.toFixed(3)), file, error: String((e as Error)?.message ?? e) });
   }
 
+  /**
+   * Draws frames for the audio clock. A clip's decoders are opened before playback reaches it
+   * (PREROLL seconds ahead), so a cut never waits for a decoder to catch up from a key frame.
+   */
   private async videoLoop(gen: number, p: Project) {
-    let clipIndex = -1;
-    let screen: FrameCursor | null = null, camera: FrameCursor | null = null;
-    const release = async () => { const s = screen, c = camera; screen = camera = null; await Promise.allSettled([s?.close(), c?.close()]); };
+    const starts = clipStarts(p);
+    // How early to open a clip: more when its first frame is far from a key frame (more to decode).
+    const leadFor = async (index: number) => {
+      const clip = p.clips[index];
+      const media = await this.lib.open(assetOf(p, clip.mediaID)!.videoFile);
+      const key = await media.videoPackets?.getKeyPacket(clip.sourceStart, { metadataOnly: true });
+      const behind = key ? clip.sourceStart - key.timestamp : 0;
+      return Math.min(6, 1.5 + behind * 0.5);
+    };
+    let lead = 1.5, leadIndex = -1;
+    type Cursors = { index: number; screen: FrameCursor | null; camera: FrameCursor | null; ready: Promise<unknown> };
+    const open = async (index: number, from: number): Promise<Cursors> => {
+      const clip = p.clips[index];
+      const media = await this.lib.open(assetOf(p, clip.mediaID)!.videoFile);
+      const screen = media.videoSink ? new FrameCursor(media.videoSink, from, clip.sourceEnd) : null;
+      const cam = await this.lib.camera(p, clip);
+      const camera = cam ? new FrameCursor(cam.videoSink!, from, clip.sourceEnd) : null;
+      // Start decoding now; by the time playback gets here the first frames are waiting.
+      return { index, screen, camera, ready: Promise.all([screen?.at(from), camera?.at(from)]) };
+    };
+    const release = (c: Cursors | null) => { if (c) void c.ready.catch(() => {}).then(() => Promise.allSettled([c.screen?.close(), c.camera?.close()])); };
+    let current = null as Cursors | null, upcoming = null as Cursors | null;
     try {
       while (gen === this.gen) {
         const t = Math.max(this.timeStart, this.clock());
@@ -220,32 +296,39 @@ export class Player {
         this.currentTime = t;
         this.onTime(t);
         const loc = locate(p, t)!;
-        if (loc.index !== clipIndex) {
-          await release();
-          clipIndex = loc.index;
-          const clip = p.clips[clipIndex];
-          const media = await this.lib.open(assetOf(p, clip.mediaID)!.videoFile);
-          if (media.videoSink) screen = new FrameCursor(media.videoSink, loc.sourceTime, clip.sourceEnd);
-          const cam = await this.lib.camera(p, clip);
-          if (cam) camera = new FrameCursor(cam.videoSink!, loc.sourceTime, clip.sourceEnd);
-        }
         let frame: VideoSample | null, camFrame: VideoSample | null;
         try {
-          [frame, camFrame] = await Promise.all([screen?.at(loc.sourceTime) ?? null, camera?.at(loc.sourceTime) ?? null]);
+          if (current?.index !== loc.index) {
+            release(current);
+            if (upcoming?.index === loc.index) { current = upcoming; upcoming = null; }
+            else { release(upcoming); upcoming = null; current = await open(loc.index, loc.sourceTime); }
+            await current.ready;
+          }
+          const clipEnd = starts[loc.index] + clipDuration(p.clips[loc.index]);
+          if (leadIndex !== loc.index + 1 && loc.index + 1 < p.clips.length) { leadIndex = loc.index + 1; lead = await leadFor(loc.index + 1); }
+          if (!upcoming && loc.index + 1 < p.clips.length && clipEnd - t < lead) {
+            upcoming = await open(loc.index + 1, p.clips[loc.index + 1].sourceStart);
+            upcoming.ready.catch(() => {});
+          }
+          [frame, camFrame] = await Promise.all([current.screen?.at(loc.sourceTime) ?? null, current.camera?.at(loc.sourceTime) ?? null]);
         } catch (e) {
           // Reopen the decoders at the current time on the next pass; the clock keeps running.
           this.decodeFailed(e, t);
-          await release().catch(() => {});
-          clipIndex = -1;
+          release(current); release(upcoming);
+          current = upcoming = null;
           await new Promise((r) => setTimeout(r, 100));
           continue;
         }
         if (gen !== this.gen) break;
         renderSample(this.ctx, this.size, frame, this.data[loc.index], loc.sourceTime, camFrame);
+        if (this.stats && frame) {
+          const c = p.clips[loc.index];
+          this.stats.played(this.clock() - (starts[loc.index] + (frame.timestamp - c.sourceStart) / (c.speed || 1)));
+        }
         await new Promise((r) => requestAnimationFrame(r));
       }
     } finally {
-      await release();
+      release(current); release(upcoming);
     }
   }
 

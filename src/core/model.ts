@@ -126,19 +126,46 @@ export const defaultCamera = (): CameraSettings => ({
   show: true, position: 'bottom-right', size: 0.28, shape: 'circle', mirror: true, border: true,
 });
 
-export type Resolution = 'p1080' | 'p1440' | 'p2160';
+export type Resolution = 'p720' | 'p1080' | 'p1440' | 'p2160';
 export const resolutions: { id: Resolution; title: string; height: number }[] = [
+  { id: 'p720', title: '720p', height: 720 },
   { id: 'p1080', title: '1080p', height: 1080 },
   { id: 'p1440', title: '1440p', height: 1440 },
   { id: 'p2160', title: '4K', height: 2160 },
 ];
 
+export type ExportFormat = 'mp4' | 'mov' | 'webm' | 'gif' | 'm4a' | 'wav' | 'png';
+export type VideoCodecChoice = 'h264' | 'hevc' | 'av1' | 'vp9';
+export type ExportQuality = 'high' | 'medium' | 'small';
+/** Frame shape: 16:9, the recording's own, vertical 9:16 (Shorts/Reels/TikTok) or square. */
+export type Aspect = 'wide' | 'recording' | 'vertical' | 'square';
+
 export interface ExportSettings {
+  format: ExportFormat;
+  /** Height of the frame (for vertical and square: its width). */
   resolution: Resolution;
   fps: number;
-  codec: 'h264' | 'hevc';
-  aspect: 'wide' | 'recording';
+  codec: VideoCodecChoice;
+  quality: ExportQuality;
+  aspect: Aspect;
+  /** GIF only: width in pixels and frames per second. */
+  gifWidth: number;
+  gifFps: number;
 }
+
+export const exportFormats: { id: ExportFormat; title: string; ext: string; kind: 'video' | 'gif' | 'audio' | 'image'; note: string; codecs?: VideoCodecChoice[] }[] = [
+  { id: 'mp4', title: 'MP4', ext: 'mp4', kind: 'video', note: 'YouTube ve her yer', codecs: ['h264', 'hevc', 'av1'] },
+  { id: 'mov', title: 'MOV', ext: 'mov', kind: 'video', note: 'Final Cut, iMovie, Premiere', codecs: ['h264', 'hevc'] },
+  { id: 'webm', title: 'WebM', ext: 'webm', kind: 'video', note: 'Web siteleri, küçük dosya', codecs: ['vp9', 'av1'] },
+  { id: 'gif', title: 'GIF', ext: 'gif', kind: 'gif', note: 'README, sohbet · sessiz' },
+  { id: 'm4a', title: 'Ses · M4A', ext: 'm4a', kind: 'audio', note: 'Yalnızca ses (AAC)' },
+  { id: 'wav', title: 'Ses · WAV', ext: 'wav', kind: 'audio', note: 'Kayıpsız ses' },
+  { id: 'png', title: 'Kare · PNG', ext: 'png', kind: 'image', note: 'Kapak görseli için tek kare' },
+];
+export const formatOf = (id: ExportFormat) => exportFormats.find((f) => f.id === id) ?? exportFormats[0];
+export const codecTitles: Record<VideoCodecChoice, string> = {
+  h264: 'H.264 (en uyumlu)', hevc: 'HEVC (daha küçük)', av1: 'AV1 (en küçük, yavaş)', vp9: 'VP9',
+};
 
 export interface Project {
   formatVersion: number;
@@ -182,7 +209,9 @@ export const defaultStyle = (): StyleSettings => ({
   camera: defaultCamera(),
 });
 
-export const defaultExport = (): ExportSettings => ({ resolution: 'p1080', fps: 60, codec: 'h264', aspect: 'wide' });
+export const defaultExport = (): ExportSettings => ({
+  format: 'mp4', resolution: 'p1080', fps: 60, codec: 'h264', quality: 'high', aspect: 'wide', gifWidth: 800, gifFps: 15,
+});
 
 export function newProject(name: string): Project {
   return {
@@ -243,6 +272,8 @@ export interface Rect { x: number; y: number; width: number; height: number }
 
 export function canvasSize(p: Project, s: ExportSettings = p.export): Size {
   const h = resolutions.find((r) => r.id === s.resolution)?.height ?? 1080;
+  if (s.aspect === 'vertical') return { width: h, height: Math.round((h * 16) / 9 / 2) * 2 };
+  if (s.aspect === 'square') return { width: h, height: h };
   let aspect = 16 / 9;
   const first = p.clips[0] && assetOf(p, p.clips[0].mediaID);
   if (s.aspect === 'recording' && first) aspect = first.pixelWidth / Math.max(first.pixelHeight, 1);

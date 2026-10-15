@@ -27,6 +27,8 @@ export interface OdakAPI {
   platform: 'darwin' | 'win32' | 'linux';
   isSelftest: boolean;
   isUiTest: boolean;
+  isPerfTest: boolean;
+  perfReportOnly: boolean;
   uiTestProject(): Promise<string | null>;
   uiTestCapture(name: string): Promise<string>;
   requestScreenPermission(): Promise<boolean>;
@@ -50,7 +52,7 @@ export interface OdakAPI {
   fileWrite(handle: number, data: Uint8Array, position: number): Promise<void>;
   fileClose(handle: number, remove?: boolean, truncateTo?: number): Promise<void>;
   openProjectDialog(): Promise<string | null>;
-  saveVideoDialog(defaultName: string): Promise<string | null>;
+  saveExportDialog(name: string, ext: string, label: string): Promise<string | null>;
   reveal(path: string): Promise<void>;
   openPath(path: string): Promise<void>;
   recents(): Promise<string[]>;

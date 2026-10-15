@@ -324,11 +324,28 @@ export async function runUiTest() {
     log.push(`shot: ${await odak().uiTestCapture('6-timeline')}`);
 
     click(byText('.toolbar button', 'Dışa Aktar'));
-    await until('export dialog', () => !!byText('.modal h2', 'Video Dışa Aktar'));
-    check(!!byText('.modal button', 'Dışa Aktar…'), 'export dialog opens with its options');
+    await until('export dialog', () => !!byText('.modal h2', 'Dışa Aktar'));
+    check(!!byText('.modal button', 'Dışa Aktar…') && $$('.formats .format').length === 7, 'export dialog offers 7 formats');
+    const summary = () => $$('.modal .row.between .mono').map((e) => e.textContent).join(' ');
+    click(byText('.formats .format', 'GIF'));
+    await sleep(50);
+    check(!!byText('.modal label', 'Genişlik') && summary().includes('GIF'), `GIF shows its own options (${summary()})`);
+    click(byText('.formats .format', 'WebM'));
+    await sleep(50);
+    const codecOpts = $$('.modal select option').map((o) => o.textContent ?? '');
+    check(summary().includes('WebM') && codecOpts.some((t) => t.startsWith('VP9')) && !codecOpts.some((t) => t.startsWith('H.264')), 'WebM offers VP9/AV1, not H.264');
+    const aspectSel = $$('.modal label').find((l) => l.textContent?.startsWith('En-boy'))!.querySelector('select')!;
+    Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value')!.set!.call(aspectSel, 'vertical');
+    aspectSel.dispatchEvent(new Event('change', { bubbles: true }));
+    await sleep(80);
+    check(project().export.aspect === 'vertical' && /1080×1920/.test(summary()), `9:16 updates the project and the output size (${summary()})`);
+    click(byText('.formats .format', 'MP4'));
     log.push(`shot: ${await odak().uiTestCapture('7-export-dialog')}`);
     click(byText('.modal button', 'Kapat'));
-    await until('dialog closed', () => !byText('.modal h2', 'Video Dışa Aktar'));
+    await until('dialog closed', () => !byText('.modal h2', 'Dışa Aktar'));
+    log.push(`shot: ${await odak().uiTestCapture('7b-vertical-preview')}`);
+    store().update((p) => ({ ...p, export: { ...p.export, aspect: 'wide' } }));
+    await sleep(50);
 
     await sleep(800);
     const saved = await odak().loadProject(pkg);

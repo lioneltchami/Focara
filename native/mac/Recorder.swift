@@ -40,6 +40,26 @@ enum HelperError: Error, CustomStringConvertible {
 }
 
 final class Recorder: NSObject, SCStreamOutput, SCStreamDelegate, @unchecked Sendable {
+    /// H.264 settings for the screen video (also used by tests/KeyframeTest.swift).
+    static func videoSettings(width w: Int, height h: Int, fps: Int) -> [String: Any] {
+        [
+            AVVideoCodecKey: AVVideoCodecType.h264, AVVideoWidthKey: w, AVVideoHeightKey: h,
+            AVVideoColorPropertiesKey: [AVVideoColorPrimariesKey: AVVideoColorPrimaries_ITU_R_709_2,
+                                        AVVideoTransferFunctionKey: AVVideoTransferFunction_ITU_R_709_2,
+                                        AVVideoYCbCrMatrixKey: AVVideoYCbCrMatrix_ITU_R_709_2],
+            AVVideoCompressionPropertiesKey: [
+                AVVideoAverageBitRateKey: min(60_000_000, max(10_000_000, w * h * fps / 12)),
+                AVVideoExpectedSourceFrameRateKey: fps,
+                AVVideoMaxKeyFrameIntervalKey: fps,
+                // Frames only arrive when the screen changes, so also cap the interval in time:
+                // the editor seeks and cuts from key frames, at most a second apart.
+                AVVideoMaxKeyFrameIntervalDurationKey: 1.0,
+                AVVideoAllowFrameReorderingKey: false,
+                AVVideoProfileLevelKey: AVVideoProfileLevelH264HighAutoLevel,
+            ],
+        ]
+    }
+
     private var stream: SCStream?
     private let videoQueue = DispatchQueue(label: "odak.video", qos: .userInitiated)
     private let audioQueue = DispatchQueue(label: "odak.audio", qos: .userInitiated)
@@ -90,18 +110,7 @@ final class Recorder: NSObject, SCStreamOutput, SCStreamDelegate, @unchecked Sen
         if #available(macOS 15.0, *) { config.captureMicrophone = o.microphone }
 
         let writer = try AVAssetWriter(outputURL: o.out.appendingPathComponent("screen.mp4"), fileType: .mp4)
-        let input = AVAssetWriterInput(mediaType: .video, outputSettings: [
-            AVVideoCodecKey: AVVideoCodecType.h264, AVVideoWidthKey: w, AVVideoHeightKey: h,
-            AVVideoColorPropertiesKey: [AVVideoColorPrimariesKey: AVVideoColorPrimaries_ITU_R_709_2,
-                                        AVVideoTransferFunctionKey: AVVideoTransferFunction_ITU_R_709_2,
-                                        AVVideoYCbCrMatrixKey: AVVideoYCbCrMatrix_ITU_R_709_2],
-            AVVideoCompressionPropertiesKey: [
-                AVVideoAverageBitRateKey: min(60_000_000, max(10_000_000, w * h * o.fps / 12)),
-                AVVideoExpectedSourceFrameRateKey: o.fps,
-                AVVideoMaxKeyFrameIntervalKey: o.fps,
-                AVVideoAllowFrameReorderingKey: false,
-                AVVideoProfileLevelKey: AVVideoProfileLevelH264HighAutoLevel,
-            ]])
+        let input = AVAssetWriterInput(mediaType: .video, outputSettings: Recorder.videoSettings(width: w, height: h, fps: o.fps))
         input.expectsMediaDataInRealTime = true
         guard writer.canAdd(input) else { throw HelperError.writer("video") }
         writer.add(input)

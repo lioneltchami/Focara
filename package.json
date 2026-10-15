@@ -15,6 +15,7 @@
     "build:helper:mac": "zsh native/mac/build.sh",
     "build:helper:win": "cargo build --release --manifest-path native/win/Cargo.toml",
     "uitest": "node scripts/build.mjs && electron . --uitest",
+    "perftest": "node scripts/build.mjs && electron . --perftest",
     "dist:mac": "node scripts/build.mjs && electron-builder --mac",
     "dist:win": "node scripts/build.mjs && electron-builder --win"
   },
@@ -89,5 +90,8 @@
       "artifactName": "Odak-Kurulum-${version}.${ext}"
     },
     "afterSign": "scripts/after-sign.cjs"
+  },
+  "dependencies": {
+    "gifenc": "1.0.3"
   }
 }

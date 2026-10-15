@@ -223,3 +223,12 @@ input[type=checkbox] { accent-color: var(--accent); }
 .inspector-back button { flex: 1; text-align: left; font-weight: 600; background: var(--panel-2); }
 .inspector-back button:hover { border-color: var(--accent); }
 .inspector-back kbd { font: 10px ui-monospace, Menlo, monospace; color: var(--muted); border: 1px solid var(--line); border-radius: 4px; padding: 1px 5px; }
+
+/* Export dialog */
+.modal.export { width: 560px; }
+.formats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 4px; }
+.formats .format { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 7px 9px; text-align: left; }
+.formats .format b { font-size: 13px; }
+.formats .format span { font-size: 10px; color: var(--muted); line-height: 1.25; }
+.formats .format.on { border-color: var(--accent); background: rgba(123,108,255,.18); }
+.formats .format.on span { color: var(--text); }

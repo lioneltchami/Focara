@@ -12,6 +12,8 @@ export interface MediaFile {
   audio: InputAudioTrack | null;
   videoSink: VideoSampleSink | null;
   audioSink: AudioBufferSink | null;
+  /** Packet index of the video (finds key frames without decoding). */
+  videoPackets: EncodedPacketSink | null;
 }
 
 export class MediaLibrary {
@@ -44,6 +46,7 @@ export class MediaLibrary {
           input, video, audio,
           videoSink: video && (await video.canDecode()) ? new VideoSampleSink(video) : null,
           audioSink: audio && (await audio.canDecode()) ? new AudioBufferSink(audio) : null,
+          videoPackets: video ? new EncodedPacketSink(video) : null,
         };
       })();
       this.files.set(rel, f);
@@ -88,7 +91,9 @@ export class MediaLibrary {
   /** The webcam track of a clip's recording, when it has one and the camera is shown. */
   async camera(p: Project, clip: Clip): Promise<MediaFile | null> {
     const m = assetOf(p, clip.mediaID);
-    if (!m?.cameraFile || !p.style.camera.show) return null;
+    // Hidden everywhere (no camera segment shows it either): don't decode it at all.
+    if (!m?.cameraFile) return null;
+    if (!p.style.camera.show && !p.clips.some((c) => (c.cameraSegments ?? []).some((s) => s.mode !== 'hidden'))) return null;
     const f = await this.open(m.cameraFile);
     return f.videoSink ? f : null;
   }
