@@ -2,17 +2,17 @@
 
 # ODAK / FOCUS
 
-🇬🇧 [English README](README.md) · İngilizce adı *Focus*.
+🇬🇧 [English README](README.md) · Uygulamanın adı Focus; ilk adı *Odak*'tı.
 
-![Odak demo](docs/images/demo.gif)
+![Focus demo](docs/images/demo.gif)
 
 **Editör çalışırken:** Her tıklama zaten bir zoom. Birini derinleştir ya da sabit bir noktaya çevir, kameraya kendi düzenlerini ver:
 
-![Odak editörü: zoom derinleştirilip sabit bir noktaya çevriliyor, kamera tam ekran olup sol üste kayıyor](docs/images/editing.gif)
+![Focus editörü: zoom derinleştirilip sabit bir noktaya çevriliyor, kamera tam ekran olup sol üste kayıyor](docs/images/editing.gif)
 
 İmleci takip eden bir büyüteç ekle, temaları dene:
 
-![Odak editörü: grafiğin üstüne büyüteç ekleniyor, ardından dört tema](docs/images/looks.gif)
+![Focus editörü: grafiğin üstüne büyüteç ekleniyor, ardından dört tema](docs/images/looks.gif)
 
 Makasla kes, yavaş bir kısmı ×4 hızlandır, dışa aktar:
 
@@ -43,10 +43,11 @@ Ekran kaydı, otomatik zoom ve zoom'ları elle düzenleme. **macOS ve Windows'ta
 
   ![Profesyonel temalar](docs/images/themes-business.png)
 - **İmleç:** Beyaz ok, siyah ok, renkli ok ya da nokta. Renk, boyut, vurgu halkası, hareketsizken gizleme, hareket yumuşatma ve tıklama efekti (halka ya da dolgu) ayarlanabilir.
-- Projeler `.odak` klasörlerinde saklanır: ham medya, imleç verisi ve düzenlemeler. Uygulamayı kapatıp açınca kaldığın yerden devam edersin.
-- **Dil:** Arayüz Türkçe ve İngilizce. Odak bilgisayarının diliyle açılır; **⚙ Ayarlar**'dan istediğin an değiştirebilirsin (aşağıda [Dil](#dil)).
+- Projeler `.focus` klasörlerinde saklanır: ham medya, imleç verisi ve düzenlemeler. Uygulamayı kapatıp açınca kaldığın yerden devam edersin.
+- **Odak'tan geçiş:** Uygulamanın eski adı Odak'tı. Focus'u kurduktan sonra *Uygulamalar*'dan Odak'ı silebilirsin (Windows'ta kaldır). Focus ilk açılışta son projelerini, dil ve mikrofon/kamera seçimlerini getirir; **Filmler/Odak** içindeki `.odak` projeleri eskisi gibi açılır. macOS ekran kaydı, kamera ve mikrofon iznini Focus için bir kez daha sorar.
+- **Dil:** Arayüz Türkçe ve İngilizce. Focus bilgisayarının diliyle açılır; **⚙ Ayarlar**'dan istediğin an değiştirebilirsin (aşağıda [Dil](#dil)).
 
-![Odak editörü, Türkçe arayüz](docs/images/tr/editor.png)
+![Focus editörü, Türkçe arayüz](docs/images/tr/editor.png)
 
 ## İndir
 
@@ -54,18 +55,18 @@ Ekran kaydı, otomatik zoom ve zoom'ları elle düzenleme. **macOS ve Windows'ta
 
 | Sistem | Dosya | Not |
 |---|---|---|
-| macOS 14+ (Apple Silicon: M1–M4) | `Odak-x.y.z-mac-arm64.dmg` | Uygulama imzalı/notarize değil. İlk açılışta Sistem Ayarları › Gizlilik ve Güvenlik › **Yine de Aç**. |
-| macOS 14+ (Intel) | `Odak-x.y.z-mac-x64.dmg` | Aynı. Rosetta altında selftest'i geçiyor; gerçek bir Intel Mac'te henüz denenmedi. |
-| Windows 10 (2004+) / 11 | `Odak-Setup-x.y.z.exe` | İmzalı değil. SmartScreen uyarısında **Ek bilgi › Yine de çalıştır**. Kurulumsuz kullanım için `Odak-x.y.z-win-x64.zip`. |
+| macOS 14+ (Apple Silicon: M1–M4) | `Focus-x.y.z-mac-arm64.dmg` | Uygulama imzalı/notarize değil. İlk açılışta Sistem Ayarları › Gizlilik ve Güvenlik › **Yine de Aç**. |
+| macOS 14+ (Intel) | `Focus-x.y.z-mac-x64.dmg` | Aynı. Rosetta altında selftest'i geçiyor; gerçek bir Intel Mac'te henüz denenmedi. |
+| Windows 10 (2004+) / 11 | `Focus-Setup-x.y.z.exe` | İmzalı değil. SmartScreen uyarısında **Ek bilgi › Yine de çalıştır**. Kurulumsuz kullanım için `Focus-x.y.z-win-x64.zip`. |
 
 macOS'ta ilk kayıtta **Ekran ve Sistem Sesi Kaydı** izni istenir. Mikrofon kullanılacaksa mikrofon izni de istenir. İzinden sonra uygulamayı yeniden başlatmak gerekebilir.
 
 ## Dil
 
-Odak **Türkçe** ve **İngilizce** konuşur.
+Focus **Türkçe** ve **İngilizce** konuşur.
 
-- **Otomatik:** Bilgisayarının ilk dili Türkçe ise Odak Türkçe açılır, başka bir dil ise İngilizce.
-- **İstediğin an değiştir:** **⚙ Ayarlar**'a tıkla (ana ekranın sağ üstünde ya da editörün araç çubuğundaki ⚙ düğmesi; macOS'ta *Odak › Ayarlar…*, Windows'ta *Dosya › Ayarlar…*, ya da `⌘,` / `Ctrl+,`) ve **Sistem dili**, **Türkçe** ya da **English** seç. Bütün arayüz hemen değişir; açık proje açık kalır, hiçbir şey kaybolmaz.
+- **Otomatik:** Bilgisayarının ilk dili Türkçe ise Focus Türkçe açılır, başka bir dil ise İngilizce.
+- **İstediğin an değiştir:** **⚙ Ayarlar**'a tıkla (ana ekranın sağ üstünde ya da editörün araç çubuğundaki ⚙ düğmesi; macOS'ta *Focus › Ayarlar…*, Windows'ta *Dosya › Ayarlar…*, ya da `⌘,` / `Ctrl+,`) ve **Sistem dili**, **Türkçe** ya da **English** seç. Bütün arayüz hemen değişir; açık proje açık kalır, hiçbir şey kaybolmaz.
 - Menü çubuğunda iki dilde yazılmış bir **Dil · Language** menüsü de var; hangi dil açık olursa olsun kolayca bulunur.
 - Seçimin hatırlanır. Projeler dile bağlı değildir: Türkçe arayüzde yapılan proje İngilizcede de aynen açılır.
 
@@ -87,7 +88,7 @@ npm run dist:mac              # macOS: .dmg / .zip  → release/
 npm run dist:win              # Windows: kurulum .exe / .zip → release/
 ```
 
-Geliştirme modunda (`npm run dev`) macOS izinleri "Electron" uygulamasına verilir; paketlenmiş uygulamada "Odak"a.
+Geliştirme modunda (`npm run dev`) macOS izinleri "Electron" uygulamasına verilir; paketlenmiş uygulamada "Focus"a.
 
 ## Kullanım
 
@@ -167,10 +168,10 @@ Kısayollar: boşluk (oynat/duraklat), ←/→ (kare kare, Shift ile 10 kare), V
   - Sesler ilk ekran karesine hizalanmış 16 bit WAV olarak yazılır. Boşluklara sessizlik eklenir, çakışan kısımlar atılır.
 - **Önizleme = dışa aktarma:** İkisi de aynı `drawFrame` fonksiyonunu ve aynı kare seçme kuralını kullanır. Kural şu: kaynakta o andan önce ya da o anda başlayan son kare. Dışa aktarmada AAC kodlayıcının eklediği "priming" gecikmesi ölçülüp telafi edilir.
 
-Proje paketi (`~/Movies/Odak` ya da `~/Videos/Odak`):
+Proje paketi (`~/Movies/Focus` ya da `~/Videos/Focus`):
 
 ```
-Kayıt 2026-10-15 10.12.30.odak/
+Kayıt 2026-10-15 10.12.30.focus/
   project.json                 düzenlemeler (klipler, zoom'lar, görünüm, dışa aktarma ayarları)
   media/<id>/screen.mp4        ham ekran videosu (imleçsiz)
   media/<id>/cursor.json       imleç örnekleri ve tıklamalar
@@ -233,5 +234,5 @@ Bunu sağlayan beş şey:
 - 4096×2304'ten büyük ekranlar: macOS'ta kayıt bu boyuta sığdırılır. Windows'ta HEVC kullanılır ve bu kayıtlar ancak HEVC çözebilen bilgisayarlarda düzenlenebilir.
 - Linux'ta düzenleme ve dışa aktarma çalışır, kayıt henüz desteklenmiyor.
 - Hızı 1× olmayan kliplerde ses kapatılır (sesi perdesini bozmadan hızlandırma henüz yok).
-- Durgun anlar yalnızca Odak'ın kendi ekran kayıtlarında aranır; içe aktarılan videolarda imleç verisi olmadığı için analiz edilmez.
+- Durgun anlar yalnızca Focus'un kendi ekran kayıtlarında aranır; içe aktarılan videolarda imleç verisi olmadığı için analiz edilmez.
 - Windows'ta kullanılan yakalama kütüphanesi anahtar kare aralığını ayarlamaya izin vermiyor. Oynatıcı sonraki klibi gerektiğinde daha erken açarak bunu telafi eder. Windows'taki performans henüz ölçülmedi; CI iş akışı performans testini orada rapor olarak çalıştırır.

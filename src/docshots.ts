@@ -359,7 +359,7 @@ export async function runDocshots() {
   try {
     const out = await odak().docshotsDir();
     await odak().selftestTempDir();
-    const pkg = await odak().createPackage('Odak Demo');
+    const pkg = await odak().createPackage('Focus Demo');
     const id = uuid();
     const dir = `${pkg}/media/${id}`;
     const save = async (name: string, data: Uint8Array) => { await odak().writeFile(out, name, data); log.push(`wrote ${name}`); };
@@ -393,7 +393,7 @@ export async function runDocshots() {
       id, kind: 'screenRecording', displayName: 'Screen recording', videoFile: `media/${id}/screen.mp4`, cameraFile: `media/${id}/camera.mp4`,
       cursorFile: `media/${id}/cursor.json`, duration: SECONDS, pixelWidth: W, pixelHeight: H, pixelsPerPoint: 2,
     };
-    let p: Project = newProject('Odak Demo');
+    let p: Project = newProject('Focus Demo');
     p.media = [asset];
     const clip = newClip(id, 0, SECONDS);
     clip.zooms = generateAutoZooms(track, SECONDS);
@@ -618,7 +618,7 @@ export async function runDocshots() {
     while ($('.modal.settings')) await sleep(30);
 
     // Editor GIFs: the real editor with a drawn mouse pointer, filmed by a camera that moves in on
-    // each step, the way Odak zooms in on clicks.
+    // each step, the way Focus zooms in on clicks.
     if (!uiOnly) {
       const fps = 12, OW = 1000, OH = 625, WW = innerWidth, WH = innerHeight;
       const ctx = new OffscreenCanvas(OW, OH).getContext('2d', { willReadFrequently: true })!;

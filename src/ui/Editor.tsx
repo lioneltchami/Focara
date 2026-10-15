@@ -323,7 +323,7 @@ export function Editor({ store, onClose, busy, onRecordInto, onSettings }: {
       {store.error && (
         <div className="modal-backdrop" onClick={() => store.setError(null)}>
           <div className="modal small" onClick={(e) => e.stopPropagation()}>
-            <h3>Odak</h3><p className="pre">{store.error}</p>
+            <h3>Focus</h3><p className="pre">{store.error}</p>
             <div className="row end"><button className="primary" onClick={() => store.setError(null)}>{t('Tamam')}</button></div>
           </div>
         </div>

@@ -1,6 +1,6 @@
 {
   "name": "odak",
-  "productName": "Odak",
+  "productName": "Focus",
   "version": "0.1.0",
   "description": "Screen recorder with automatic, editable zoom, timed webcam layouts and a real editor. macOS and Windows.",
   "main": "dist-electron/main.cjs",
@@ -39,8 +39,8 @@
   "type": "module",
   "author": "Yıldız Dikme",
   "build": {
-    "appId": "com.odak.app",
-    "productName": "Odak",
+    "appId": "com.yildizdikme.focus",
+    "productName": "Focus",
     "copyright": "Copyright © Yıldız Dikme",
     "directories": {
       "output": "release",
@@ -81,11 +81,11 @@
         }
       ],
       "extendInfo": {
-        "NSMicrophoneUsageDescription": "Odak, kayıtlarına mikrofon sesini ayrı bir iz olarak eklemek için mikrofona erişir.",
-        "NSScreenCaptureUsageDescription": "Odak, seçtiğin ekranı kaydetmek için ekran kaydı iznine ihtiyaç duyar.",
-        "NSCameraUsageDescription": "Odak, ekran kaydıyla birlikte kamera görüntünü kaydetmek için kameraya erişir."
+        "NSMicrophoneUsageDescription": "Focus, kayıtlarına mikrofon sesini ayrı bir iz olarak eklemek için mikrofona erişir.",
+        "NSScreenCaptureUsageDescription": "Focus, seçtiğin ekranı kaydetmek için ekran kaydı iznine ihtiyaç duyar.",
+        "NSCameraUsageDescription": "Focus, ekran kaydıyla birlikte kamera görüntünü kaydetmek için kameraya erişir."
       },
-      "artifactName": "Odak-${version}-mac-${arch}.${ext}"
+      "artifactName": "Focus-${version}-mac-${arch}.${ext}"
     },
     "win": {
       "target": [
@@ -99,12 +99,12 @@
           "to": "bin/odak-capture.exe"
         }
       ],
-      "artifactName": "Odak-${version}-win-${arch}.${ext}"
+      "artifactName": "Focus-${version}-win-${arch}.${ext}"
     },
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
-      "artifactName": "Odak-Setup-${version}.${ext}"
+      "artifactName": "Focus-Setup-${version}.${ext}"
     },
     "afterSign": "scripts/after-sign.cjs"
   }
