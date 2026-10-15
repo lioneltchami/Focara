@@ -7,6 +7,8 @@ const path = require('node:path');
 
 exports.default = async function afterSign(context) {
   if (context.electronPlatformName !== 'darwin') return;
+  // electron-builder deliberately skips signing pull-request builds; do not verify an unsigned bundle here.
+  if (process.env.GITHUB_EVENT_NAME === 'pull_request') return;
   const app = path.join(context.appOutDir, `${context.packager.appInfo.productFilename}.app`);
   const id = context.packager.appInfo.id;
   execFileSync('codesign', ['--force', '--sign', '-', `-r=designated => identifier "${id}"`, app], { stdio: 'inherit' });
