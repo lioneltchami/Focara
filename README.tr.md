@@ -59,6 +59,17 @@ Ekran kaydı, otomatik zoom ve zoom'ları elle düzenleme. **macOS ve Windows'ta
 | macOS 14+ (Intel) | `Focus-x.y.z-mac-x64.dmg` | Aynı. Rosetta altında selftest'i geçiyor; gerçek bir Intel Mac'te henüz denenmedi. |
 | Windows 10 (2004+) / 11 | `Focus-Setup-x.y.z.exe` | İmzalı değil. SmartScreen uyarısında **Ek bilgi › Yine de çalıştır**. Kurulumsuz kullanım için `Focus-x.y.z-win-x64.zip`. |
 
+### macOS'ta Homebrew ile kurulum
+
+İlk sürüm etiketi yayımlandıktan sonra:
+
+```bash
+brew tap lioneltchami/tap
+brew install --cask focus
+```
+
+Homebrew cask'i, dağıtım anahtarı tanımlıysa her sürümden sonra otomatik güncellenir. Focus henüz imzalı/notarize değil; ilk açılışta **Sistem Ayarları › Gizlilik ve Güvenlik › Yine de Aç** gerekebilir.
+
 macOS'ta ilk kayıtta **Ekran ve Sistem Sesi Kaydı** izni istenir. Mikrofon kullanılacaksa mikrofon izni de istenir. İzinden sonra uygulamayı yeniden başlatmak gerekebilir.
 
 ## Dil
@@ -73,6 +84,10 @@ Focus **Türkçe** ve **İngilizce** konuşur.
 ![Ayarlar penceresi: Sistem dili, Türkçe, English](docs/images/tr/settings.png)
 
 ## Kaynaktan çalıştırma
+
+Sürüm etiketini `package.json` sürümüyle aynı tut. CI macOS ve Windows kurulum dosyalarını oluşturur, GitHub Releases'a ekler ve dağıtım anahtarı tanımlıysa Homebrew cask'ini günceller.
+
+Homebrew güncellemelerini açmak için `lioneltchami/homebrew-tap` deposuna yazma izni olan bir deploy key ekle; özel anahtarını bu depodaki `HOMEBREW_TAP_DEPLOY_KEY` Actions secret'ı olarak kaydet. Anahtar yoksa uygulama sürümü yayımlanır, tap güncellemesi atlanır.
 
 Gerekenler:
 - Her iki sistem: **Node.js 22**.

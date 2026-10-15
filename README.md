@@ -151,6 +151,17 @@ Go to the **[Releases page](../../releases/latest)** and download the file for y
 | Windows PC | `Focus-Setup-x.y.z.exe` | Windows 10 (version 2004 or newer) or Windows 11, 64-bit |
 | Windows, without installing | `Focus-x.y.z-win-x64.zip` | Unzip anywhere and run `Focus.exe` |
 
+### Install with Homebrew (macOS)
+
+After the first tagged release, install or update Focus with:
+
+```bash
+brew tap lioneltchami/tap
+brew install --cask focus
+```
+
+The cask is updated automatically after each release when the Homebrew tap deploy key is configured. Focus is not signed or notarized yet, so macOS may require **System Settings › Privacy & Security › Open Anyway** on first launch.
+
 > **Not sure which Mac you have?** Apple menu  › *About This Mac*. "Chip: Apple M…" → Apple Silicon. "Processor: Intel…" → Intel.
 
 Focus is not signed with a paid Apple Developer ID or a Windows code-signing certificate yet, so your system will warn you the first time. This is expected; here is how to open it.
@@ -397,7 +408,7 @@ Requirements:
 - **Windows:** [Rust](https://rustup.rs) and *Visual Studio Build Tools* ("Desktop development with C++")
 
 ```bash
-git clone https://github.com/YildizDikme/Focus.git
+git clone https://github.com/lioneltchami/Focus.git
 cd Focus
 npm install
 npm run build:helper:mac      # macOS: Swift capture helper (universal: Apple Silicon + Intel)
@@ -409,12 +420,14 @@ npm run dist:win              # Windows: Setup .exe / .zip → release/
 
 In development mode (`npm run dev`) macOS asks for permissions for "Electron"; the packaged app asks for "Focus".
 
-**Publishing a release:** push a version tag — CI builds and tests on macOS and Windows and attaches the installers to a GitHub Release:
+**Publishing a release:** push a version tag that matches `package.json` — CI builds and tests on macOS and Windows, attaches the installers to a GitHub Release, and updates the Homebrew cask when its deploy key is configured:
 
 ```bash
 git tag v0.1.0
 git push origin v0.1.0
 ```
+
+To enable Homebrew updates, add a write-enabled deploy key for `lioneltchami/homebrew-tap` and save its private key as the `HOMEBREW_TAP_DEPLOY_KEY` Actions secret in this repository. If the secret is absent, the app release still publishes and the tap update is skipped.
 
 ## How it works
 
