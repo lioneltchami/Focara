@@ -39,7 +39,7 @@
   "type": "module",
   "author": "Yıldız Dikme",
   "build": {
-    "appId": "com.yildizdikme.focus",
+    "appId": "com.lioneltchami.focara",
     "productName": "Focara",
     "copyright": "Copyright © Yıldız Dikme",
     "directories": {
