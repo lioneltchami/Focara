@@ -151,7 +151,7 @@ async function writeMedia(p: Project, lib: MediaLibrary, settings: ExportSetting
  * Renders `count` frames from timeline time `from` into ctx, one per step. Each clip's frames
  * come from one sequential reader, so every source packet is decoded at most once.
  */
-async function* renderFrames(p: Project, lib: MediaLibrary, data: ClipRenderData[], ctx: OffscreenCanvasRenderingContext2D, size: Size,
+export async function* renderFrames(p: Project, lib: MediaLibrary, data: ClipRenderData[], ctx: OffscreenCanvasRenderingContext2D, size: Size,
                              fps: number, from: number, count: number, signal?: AbortSignal): AsyncGenerator<number, void, unknown> {
   const total = projectDuration(p);
   const at = (k: number) => locate(p, Math.min(from + k / fps, total - 1e-6))!;

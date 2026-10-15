@@ -5,14 +5,21 @@ Free, runs on **macOS and Windows**, works completely offline.
 
 🇹🇷 [Türkçe README](README.tr.md)
 
-![Odak demo: automatic zoom on clicks, a webcam that starts full frame and moves aside, smooth cursor](docs/images/demo.gif)
+![Odak demo: a webcam that starts full frame, automatic zoom on clicks, a cut, the same recording on other themes while the camera moves aside](docs/images/demo.gif)
 
-<sub>The GIF above was exported by Odak itself from a demo project (the app, the presenter and the cursor path are all generated for the demo).</sub>
+<sub>Rendered by Odak itself from a demo project (the app, the presenter and the cursor path are generated for the demo). The theme changes show the same recording with different backgrounds — one click each.</sub>
+
+### The editor in action
+
+Picking themes, cutting with the scissors, speeding up a slow part ×4 and giving the camera a full-frame moment:
+
+![The Odak editor: choosing themes, a scissors cut, a range sped up ×4, a full-frame camera layout](docs/images/editing.gif)
 
 ---
 
 ## Contents
 
+- [The editor in action](#the-editor-in-action)
 - [Highlights](#highlights)
 - [How is Odak different?](#how-is-odak-different)
 - [Screenshots](#screenshots)
@@ -37,7 +44,7 @@ Free, runs on **macOS and Windows**, works completely offline.
 - 🎥 **Webcam with timed layouts.** Record your camera together with the screen. Show it as a circle, rounded or square bubble — and for any part of the video choose a different layout: **move it to one of 9 positions, make it full frame, or hide it**. Odak animates between layouts smoothly (0.5 s eased transitions).
 - ✂️ **A real editor.** Split, trim, reorder, duplicate, change speed (×0.5–×8), delete a time range across clips, cut with a scissors tool, import other videos, add more recordings to the same project. Everything is undoable.
 - ⏩ **Quiet moments.** One click finds the parts where nothing happens (screen unchanged, cursor still, no sound) and speeds them up or cuts them out — with a small margin so no movement gets clipped.
-- 🖼️ **Looks.** 8 gradient presets, **22 themes drawn in code** — 15 calm, professional ones for product demos, courses and business videos (Corporate, Graphite, Marble, Blueprint, Aurora, Pastel, Topographic, Paper, Black & Gold, Office lights, Finance, Glass, Geometric, Minimal light/dark) and 7 playful or seasonal ones (Fun, New Year, Autumn, Celebration, Spring, Space, Ocean) — or **your own background image** (with optional blur). Padding, rounded corners, shadow.
+- 🖼️ **Looks.** 8 gradient presets, **22 themes drawn in code** — 15 professional ones for product demos, courses and business videos (Topographic, Aurora, Pastel, Geometric, Blueprint, Glass, Black & Gold, Marble, Corporate, Office lights, Finance, Graphite, Paper, Minimal dark/light) and 7 playful or seasonal ones (Fun, New Year, Autumn, Celebration, Spring, Space, Ocean) — or **your own background image** (with optional blur). Padding, rounded corners, shadow.
 - 🖱️ **Cursor styles.** White, black or coloured arrow or a dot; size, highlight ring, hide when idle, motion smoothing, click effects (ring or pulse). The cursor is redrawn, so it stays sharp at any zoom.
 - 🔊 **Separate audio tracks.** System audio and microphone are recorded to separate files with separate volume controls (per project and per clip). Pick any microphone and camera, with optional noise suppression.
 - 📤 **Export anything.** MP4, MOV, WebM, GIF, audio-only (M4A, WAV) or a single PNG frame for your thumbnail. 720p to 4K, 24/30/60 fps, H.264 / HEVC / AV1 / VP9, three quality levels — in **16:9, 9:16 vertical (Shorts, Reels, TikTok), 1:1 square** or the recording's own shape. Export the whole video or just a selected range.
@@ -418,7 +425,8 @@ npm run uitest -- "examples/Örnek Proje.odak"   # the real UI driven by DOM eve
                                                #   playhead dragging, scissors, ranges, camera layouts, import,
                                                #   quiet moments, export dialog, undo, autosave
 npm run perftest       # performance (see above)
-npm run docshots       # regenerates the images in docs/images from a demo project
+npm run docshots       # regenerates docs/images from a demo project: screenshots, frames, theme galleries,
+                       #   the demo GIF and the editor-in-action GIF
 zsh native/mac/test.sh # macOS helper: WAV alignment, key frames at most ~1 s apart
 cargo test --manifest-path native/win/Cargo.toml   # Windows helper: WAV alignment
 node scripts/helper-smoke.mjs                      # records 3 s of this screen with the helper (needs permission)

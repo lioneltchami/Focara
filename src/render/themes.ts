@@ -660,6 +660,11 @@ export const gradientPresets: { title: string; top: string; bottom: string }[] =
   { title: 'Nane', top: '#b2f5ea', bottom: '#38b2ac' },
 ];
 
+/** Display order: the most eye-catching professional looks first, then the calm basics. */
+const order = ['topografya', 'aurora', 'pastel', 'geometrik', 'blueprint', 'cam', 'siyah-altin', 'mermer', 'kurumsal', 'bokeh', 'finans', 'grafit', 'kagit', 'gece', 'minimal'];
+export const themesOf = (group: ThemeGroup) => themes.filter((t) => t.group === group)
+  .sort((a, b) => (order.indexOf(a.id) + 1 || 99) - (order.indexOf(b.id) + 1 || 99));
+
 const cache = new Map<string, OffscreenCanvas>();
 const thumbs = new Map<string, OffscreenCanvas>();
 

@@ -5,7 +5,7 @@ import {
 } from '../core/model.ts';
 import { odak } from '../bridge.ts';
 import { drawCursor } from '../render/renderer.ts';
-import { gradientPresets, themeCanvas, themes } from '../render/themes.ts';
+import { gradientPresets, themeCanvas, themes, themesOf } from '../render/themes.ts';
 import { setClipSpeed, trimClip, updateCameraSegment, updateZoom } from '../core/edit.ts';
 import { cameraPositions } from '../core/cameraLayout.ts';
 import type { MediaLibrary } from '../media/media.ts';
@@ -274,7 +274,7 @@ function StyleInspector({ store, lib }: { store: EditorStore; lib: MediaLibrary 
           <div key={group} className="theme-group">
             <div className="theme-group-title">{title}</div>
             <div className="themes">
-              {themes.filter((t) => t.group === group).map((t) => (
+              {themesOf(group).map((t) => (
                 <button key={t.id} className={`theme ${st.backgroundTheme === t.id ? 'on' : ''}`} title={t.title}
                         onClick={() => setMany({ backgroundTheme: t.id, padding: Math.max(st.padding, 0.1) }, 'theme')}>
                   <ThemeThumb id={t.id} />

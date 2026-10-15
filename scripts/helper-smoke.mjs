@@ -61,7 +61,14 @@ check(vt && (await vt.getCodecParameterString())?.startsWith('avc') || fin.width
 check(vt.displayWidth === fin.width && vt.displayHeight === fin.height, `video ${vt.displayWidth}×${vt.displayHeight}`);
 // Every frame lies inside the recording. (On a still screen the last frame is shown until the
 // end; macOS ends the video exactly there, the Windows encoder may give that frame a longer duration.)
-const lastPacket = await new EncodedPacketSink(vt).getPacket(Infinity);
+const packets = new EncodedPacketSink(vt);
+const lastPacket = await packets.getPacket(Infinity);
+{
+  const ts = [];
+  for (let pk = await packets.getFirstPacket({ metadataOnly: true }); pk; pk = await packets.getNextPacket(pk, { metadataOnly: true })) ts.push(pk.timestamp);
+  ts.sort((a, b) => a - b);
+  console.log(`INFO: ${ts.length} frames in the file (helper sent ${fin.frames ?? '?'}, last at ${fin.lastFrame ?? '?'}s); first ${ts.slice(0, 4).map((x) => x.toFixed(3)).join(' ')} … last ${ts.slice(-4).map((x) => x.toFixed(3)).join(' ')}`);
+}
 check(!!lastPacket && lastPacket.timestamp <= fin.duration + 0.05, `last frame at ${lastPacket?.timestamp.toFixed(2)}s (≤ recording ${fin.duration.toFixed(2)}s)`);
 if (process.platform === 'darwin') check(Math.abs(vdur - fin.duration) < 0.1, `video ends with the recording (${vdur.toFixed(2)}s)`);
 else console.log(`NOTE: video track ${vdur.toFixed(2)}s`);

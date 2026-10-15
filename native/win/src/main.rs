@@ -88,6 +88,7 @@ mod win {
     pub struct Shared {
         pub t0: AtomicI64, // QPC (100 ns) of the first video frame; 0 until known
         pub frames: AtomicU64,
+        pub last: AtomicI64, // timestamp of the latest video frame sent to the encoder
         pub stop: AtomicBool,
         pub error: Mutex<Option<String>>,
     }
@@ -116,6 +117,7 @@ mod win {
             let ts = frame.timestamp()?.Duration;
             let _ = self.shared.t0.compare_exchange(0, ts, Ordering::SeqCst, Ordering::SeqCst);
             if let Some(enc) = self.encoder.as_mut() { enc.send_frame(frame)?; }
+            self.shared.last.store(ts, Ordering::SeqCst);
             self.shared.frames.fetch_add(1, Ordering::SeqCst);
             Ok(())
         }
@@ -148,7 +150,7 @@ mod win {
         let bw = if b.len() == 4 && b[2] > 0 { b[2] as f64 } else { width as f64 };
         let bh = if b.len() == 4 && b[3] > 0 { b[3] as f64 } else { height as f64 };
 
-        let shared = Arc::new(Shared { t0: AtomicI64::new(0), frames: AtomicU64::new(0), stop: AtomicBool::new(false), error: Mutex::new(None) });
+        let shared = Arc::new(Shared { t0: AtomicI64::new(0), frames: AtomicU64::new(0), last: AtomicI64::new(0), stop: AtomicBool::new(false), error: Mutex::new(None) });
         let make_settings = |border: DrawBorderSettings| Settings::new(
             monitor, CursorCaptureSettings::WithoutCursor, border, SecondaryWindowSettings::Default,
             MinimumUpdateIntervalSettings::Custom(Duration::from_millis((1000 / fps.max(1)) as u64)),
@@ -227,6 +229,9 @@ mod win {
             "event": "finished", "video": "screen.mp4", "cursor": "cursor.json",
             "systemAudio": sys_name, "microphone": mic_name, "duration": duration,
             "width": width, "height": height, "pixelsPerPoint": scale * sx,
+            // Diagnostics: frames handed to the encoder and the last one's time on the recording's clock.
+            "frames": shared.frames.load(Ordering::SeqCst),
+            "lastFrame": (shared.last.load(Ordering::SeqCst) - t0) as f64 / 1e7,
         }));
         Ok(())
     }
