@@ -68,7 +68,7 @@ brew tap lioneltchami/tap
 brew install --cask focara
 ```
 
-Homebrew cask'i, dağıtım anahtarı tanımlıysa her sürümden sonra otomatik güncellenir. v0.1.0 macOS yapısı imzalı/notarize değil; sonraki etiketli macOS sürümleri imzalama sırları eksikse yayımlanmaz.
+Homebrew cask'i, dağıtım anahtarı tanımlıysa her sürümden sonra otomatik güncellenir. v0.1.0 macOS yapısı imzalı/notarize değil. Sonraki etiketli macOS sürümleri, GitHub Actions'ta tanımlanan Developer ID sertifikası ve Apple ID notarizasyon sırlarını kullanır; gerekli sırlardan biri eksikse yayımlanmaz. Sır adları çalışan Lamp-Light sürüm düzeniyle aynıdır: `MAC_CSC_LINK`, `MAC_CSC_KEY_PASSWORD`, `MACOS_KEYCHAIN_PASSWORD`, `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD` ve `APPLE_TEAM_ID`.
 
 macOS'ta ilk kayıtta **Ekran ve Sistem Sesi Kaydı** izni istenir. Mikrofon kullanılacaksa mikrofon izni de istenir. İzinden sonra uygulamayı yeniden başlatmak gerekebilir.
 

@@ -160,7 +160,7 @@ brew tap lioneltchami/tap
 brew install --cask focara
 ```
 
-The cask is updated automatically after each release when the Homebrew tap deploy key is configured. The v0.1.0 macOS build is not signed or notarized. Future tagged macOS releases are built with Developer ID signing and Apple notarization; the release workflow stops if its signing secrets are missing.
+The cask is updated automatically after each release when the Homebrew tap deploy key is configured. The v0.1.0 macOS build is not signed or notarized. Future tagged macOS releases use the Developer ID certificate and Apple ID notarization secrets configured in GitHub Actions; the release workflow stops if a required secret is missing. The secret names follow the working Lamp-Light release setup: `MAC_CSC_LINK`, `MAC_CSC_KEY_PASSWORD`, `MACOS_KEYCHAIN_PASSWORD`, `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, and `APPLE_TEAM_ID`.
 
 > **Not sure which Mac you have?** Apple menu  › *About This Mac*. "Chip: Apple M…" → Apple Silicon. "Processor: Intel…" → Intel.
 
