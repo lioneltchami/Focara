@@ -11,7 +11,10 @@ const uiTestIndex = process.argv.indexOf('--uitest');
 const uiTestProject = uiTestIndex >= 0 ? process.argv[uiTestIndex + 1] : null;
 // Performance test: a heavy project driven through the real editor in a visible window.
 const isPerftest = process.argv.includes('--perftest');
-const isTest = isSelftest || !!uiTestProject || isPerftest;
+// Documentation screenshots: builds a demo project and captures the editor into a folder.
+const docIndex = process.argv.indexOf('--docshots');
+const docshotsDir = docIndex >= 0 ? path.resolve(process.argv[docIndex + 1] ?? 'docs/images') : null;
+const isTest = isSelftest || !!uiTestProject || isPerftest || !!docshotsDir;
 const devUrl = process.env.ODAK_DEV_URL;
 const isMac = process.platform === 'darwin';
 const isWin = process.platform === 'win32';
@@ -444,6 +447,7 @@ window.odak.onHudFinishing&&window.odak.onHudFinishing(()=>{b.disabled=true;b.te
 // ---------------------------------------------------------------- selftest
 
 ipcMain.handle('uitest:project', () => uiTestProject);
+ipcMain.handle('docshots:dir', () => docshotsDir);
 ipcMain.handle('uitest:capture', async (_e, name: string) => {
   const img = await mainWindow!.webContents.capturePage();
   selftestDir ??= await fsp.mkdtemp(path.join(os.tmpdir(), 'odak-uitest-'));
@@ -503,15 +507,15 @@ function buildMenu() {
 
 function createWindow() {
   mainWindow = new BrowserWindow({
-    width: 1320, height: 860, minWidth: 1100, minHeight: 720,
+    width: docshotsDir ? 1440 : 1320, height: docshotsDir ? 900 : 860, minWidth: 1100, minHeight: 720,
     show: false, title: 'Odak', backgroundColor: '#1e1e22',
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'), contextIsolation: true, sandbox: true,
       additionalArguments: isSelftest ? ['--selftest'] : isPerftest ? ['--perftest', ...process.argv.filter((a) => a === '--perf-report')]
-        : uiTestProject ? ['--uitest'] : [],
+        : docshotsDir ? ['--docshots'] : uiTestProject ? ['--uitest'] : [],
       // Keep timers and capture running while the window is hidden during a recording.
       backgroundThrottling: false,
-      offscreen: !!uiTestProject,
+      offscreen: !!uiTestProject || !!docshotsDir,
     },
   });
   if (devUrl) void mainWindow.loadURL(devUrl);

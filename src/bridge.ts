@@ -28,6 +28,8 @@ export interface OdakAPI {
   isSelftest: boolean;
   isUiTest: boolean;
   isPerfTest: boolean;
+  isDocshots: boolean;
+  docshotsDir(): Promise<string>;
   perfReportOnly: boolean;
   uiTestProject(): Promise<string | null>;
   uiTestCapture(name: string): Promise<string>;

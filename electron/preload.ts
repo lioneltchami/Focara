@@ -9,7 +9,9 @@ const on = (channel: string, cb: (...a: unknown[]) => void) => {
 contextBridge.exposeInMainWorld('odak', {
   platform: process.platform,
   isSelftest: process.argv.includes('--selftest'),
-  isUiTest: process.argv.includes('--uitest') || process.argv.includes('--perftest'),
+  isUiTest: process.argv.includes('--uitest') || process.argv.includes('--perftest') || process.argv.includes('--docshots'),
+  isDocshots: process.argv.includes('--docshots'),
+  docshotsDir: () => ipcRenderer.invoke('docshots:dir'),
   isPerfTest: process.argv.includes('--perftest'),
   perfReportOnly: process.argv.includes('--perf-report'),
   uiTestProject: () => ipcRenderer.invoke('uitest:project'),
