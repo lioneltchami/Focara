@@ -231,7 +231,7 @@ export async function runUiTest() {
       await sleep(100);
       const afterMissed = ed.player.currentTime, drift3 = await hover();
       check(Math.abs(afterRuler - 5) < 0.1 && Math.abs(afterKnob - 2) < 0.1 && Math.abs(afterMissed - 7) < 0.1 && drift1 + drift2 + drift3 < 1e-6,
-        `real mouse: dragging moves the playhead (5 → 2 → 7 s); hovering afterwards doesn't (${drift1.toFixed(2)} / ${drift2.toFixed(2)} / ${drift3.toFixed(2)} s)`);
+        `real mouse: dragging moves the playhead (${afterRuler.toFixed(2)} / ${afterKnob.toFixed(2)} / ${afterMissed.toFixed(2)} s, expected 5 / 2 / 7); hovering afterwards doesn't (${drift1.toFixed(2)} / ${drift2.toFixed(2)} / ${drift3.toFixed(2)} s)`);
     }
 
     // Playhead: grab the red head and drag it; the ruler scrubs too.

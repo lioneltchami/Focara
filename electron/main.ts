@@ -451,6 +451,8 @@ ipcMain.handle('docshots:dir', () => docshotsDir);
 // Real mouse input through Chromium's input pipeline (pointer capture etc.), for the UI test only.
 ipcMain.handle('uitest:input', async (_e, events: { type: 'mouseDown' | 'mouseUp' | 'mouseMove'; x: number; y: number; held?: boolean }[]) => {
   if (!isTest || !mainWindow) return;
+  // sendInputEvent only reaches a focused window (Windows CI windows start unfocused).
+  mainWindow.focus(); mainWindow.webContents.focus();
   for (const ev of events) {
     mainWindow.webContents.sendInputEvent({ type: ev.type, x: Math.round(ev.x), y: Math.round(ev.y), button: 'left', clickCount: 1,
       modifiers: ev.held || ev.type === 'mouseDown' ? ['leftbuttondown'] : [] });
