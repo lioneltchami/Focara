@@ -1,7 +1,7 @@
 {
   "name": "odak",
   "productName": "Focara",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Screen recorder with automatic, editable zoom, timed webcam layouts and a real editor. macOS and Windows.",
   "main": "dist-electron/main.cjs",
   "private": true,
