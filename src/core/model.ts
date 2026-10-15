@@ -30,6 +30,20 @@ export interface CameraSegment {
   size: number;
 }
 
+export type MagnifierShape = 'circle' | 'rounded';
+
+/** A part of a clip where a magnifying lens follows the cursor (source times, like zooms). */
+export interface MagnifierSegment {
+  id: string;
+  start: number;
+  end: number;
+  /** Lens diameter as a fraction of the frame's short side. */
+  size: number;
+  /** How much the lens magnifies (×). */
+  zoom: number;
+  shape: MagnifierShape;
+}
+
 export interface Clip {
   id: string;
   mediaID: string;
@@ -38,6 +52,8 @@ export interface Clip {
   zooms: ZoomSegment[];
   /** Camera layout changes inside this clip; outside them the project's camera settings apply. */
   cameraSegments: CameraSegment[];
+  /** Magnifier lens over the cursor during these parts. */
+  magnifiers: MagnifierSegment[];
   /** Playback speed (1 = normal). Audio is muted while a clip plays faster or slower. */
   speed: number;
   videoVolume: number;
@@ -221,7 +237,7 @@ export function newProject(name: string): Project {
 }
 
 export function newClip(mediaID: string, sourceStart: number, sourceEnd: number): Clip {
-  return { id: uuid(), mediaID, sourceStart, sourceEnd, zooms: [], cameraSegments: [], speed: 1, videoVolume: 1, systemAudioVolume: 1, microphoneVolume: 1 };
+  return { id: uuid(), mediaID, sourceStart, sourceEnd, zooms: [], cameraSegments: [], magnifiers: [], speed: 1, videoVolume: 1, systemAudioVolume: 1, microphoneVolume: 1 };
 }
 
 /** Fills fields missing from older or foreign project files with defaults. */
@@ -231,7 +247,7 @@ export function normalizeProject(p: Project): Project {
     ...p,
     style: { ...defaultStyle(), ...(p.style ?? {}), camera: { ...defaultCamera(), ...(p.style?.camera ?? {}) } },
     export: { ...defaultExport(), ...(p.export ?? {}) },
-    clips: (p.clips ?? []).map((c) => ({ ...newClip(c.mediaID, c.sourceStart, c.sourceEnd), ...c, zooms: c.zooms ?? [], cameraSegments: c.cameraSegments ?? [] })),
+    clips: (p.clips ?? []).map((c) => ({ ...newClip(c.mediaID, c.sourceStart, c.sourceEnd), ...c, zooms: c.zooms ?? [], cameraSegments: c.cameraSegments ?? [], magnifiers: c.magnifiers ?? [] })),
     media: p.media ?? [],
   };
 }

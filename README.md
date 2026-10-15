@@ -42,6 +42,7 @@ Picking themes, cutting with the scissors, speeding up a slow part ×4 and givin
 - 🎯 **Automatic zoom on clicks.** Odak records your cursor and clicks separately from the video. When you click, the view eases in towards that spot and follows your cursor with spring-smooth camera motion. Zooms on nearby clicks are merged; the camera settles where you spend the most time.
 - ✏️ **Every zoom is editable.** Drag it, resize it, change the amount, or switch from *follow the cursor* to *a fixed point* that you pick on the frame. Regenerate the automatic ones at any time — your hand-edited zooms are kept.
 - 🎥 **Webcam with timed layouts.** Record your camera together with the screen. Show it as a circle, rounded or square bubble — and for any part of the video choose a different layout: **move it to one of 9 positions, make it full frame, or hide it**. Odak animates between layouts smoothly (0.5 s eased transitions).
+- 🔍 **Magnifier.** For any part of the video, a lens follows your cursor and shows what's under it larger — size (12–70 %), magnification (×1.25–×5) and shape (circle or rounded square) are adjustable; it pops open and closes smoothly.
 - ✂️ **A real editor.** Split, trim, reorder, duplicate, change speed (×0.5–×8), delete a time range across clips, cut with a scissors tool, import other videos, add more recordings to the same project. Everything is undoable.
 - ⏩ **Quiet moments.** One click finds the parts where nothing happens (screen unchanged, cursor still, no sound) and speeds them up or cuts them out — with a small margin so no movement gets clipped.
 - 🖼️ **Looks.** 8 gradient presets, **22 themes drawn in code** — 15 professional ones for product demos, courses and business videos (Topographic, Aurora, Pastel, Geometric, Blueprint, Glass, Black & Gold, Marble, Corporate, Office lights, Finance, Graphite, Paper, Minimal dark/light) and 7 playful or seasonal ones (Fun, New Year, Autumn, Celebration, Spring, Space, Ocean) — or **your own background image** (with optional blur). Padding, rounded corners, shadow.
@@ -82,6 +83,10 @@ What Odak focuses on:
 | Intro: camera full frame | A zoom on the click | Camera moved aside |
 |---|---|---|
 | ![Full-frame camera](docs/images/frame-intro-camera.png) | ![Zoomed in](docs/images/frame-zoom.png) | ![Camera at top left](docs/images/frame-camera-moved.png) |
+
+**Magnifier** — a lens follows the cursor for the part you choose (here on the chart tooltip):
+
+![The magnifier over the chart](docs/images/frame-magnifier.png)
 
 **Your own background image** (here a sunset painted in code for the demo) and **vertical 9:16** export:
 
@@ -208,7 +213,7 @@ Editing:
 | **Trim** | Drag a clip's left/right edge. Trimmed parts are not deleted — drag the edge back to restore them. |
 | **Reorder** | Drag a clip; a yellow line shows where it will land. |
 | **Delete** | Select a clip, zoom, camera layout or range and press **⌫ Sil** or `Delete`. Later clips move up; no gaps. |
-| **Part of the video** | Select a range, then use the bar under it: **Sil** (delete), **Ayır** (make it its own clip), **×2 / ×4** (speed up), **📷 Kamera** (camera layout). Works across several clips at once. |
+| **Part of the video** | Select a range, then use the bar under it: **Sil** (delete), **Ayır** (make it its own clip), **×2 / ×4** (speed up), **📷 Kamera** (camera layout), **🔍 Büyüteç** (magnifier). Works across several clips at once. |
 | **Duplicate, speed, volume** | Select a clip; the right panel has **Çoğalt** (duplicate), speed ×0.5–×8, source start/end and per-clip volumes. |
 | **Import a video** | **＋ Video** — MP4, MOV, M4V, WebM or MKV. It is copied into the project and inserted after the selected clip. |
 | **Quiet moments** | **⏩ Durgun anlar** — set the minimum length, choose *speed up ×2/×4/×8* or *cut*, and see the new duration before applying. |
@@ -230,6 +235,18 @@ General settings (right panel, **Kamera** section): show/hide, **9 positions** (
 4. Drag the block to move it, drag its edges to change its length.
 
 The camera eases into the new layout at the start of the block and back at its end (0.5 s). Two blocks next to each other hand over directly, without visiting the default position in between.
+
+### Magnifier
+
+1. Select the part with **↔ Aralık** (or put the playhead where it should start).
+2. Click **🔍 Büyüteç** (in the bar under the range, or in the toolbar — then it covers the next 3 seconds).
+3. A yellow block appears in the **BÜYÜTEÇ** lane and its settings open on the right:
+   - **Boyut** (*size*): the lens diameter, 12–70 % of the frame's short side.
+   - **Büyütme** (*magnification*): ×1.25 to ×5.
+   - **Daire / Yuvarlak kare** (*circle / rounded square*).
+4. Drag the block to move it, drag its edges to change its length.
+
+The lens follows the (smoothed) cursor, pops open at the start of the block and closes at its end. It works together with zooms and camera layouts, and a cut inside a lens block doesn't make it close and reopen.
 
 ### Looks
 
@@ -265,7 +282,7 @@ Click **Dışa Aktar** (*Export*) at the top right or press **⌘E / Ctrl+E**.
 | `←` / `→` | Previous / next frame (`Shift`: 10 frames) |
 | `V` / `R` / `C` | Select / Range / Scissors tool |
 | `S` | Split at the playhead (or at both ends of the selected range) |
-| `Delete` / `Backspace` | Delete the selected clip, zoom, camera layout or range |
+| `Delete` / `Backspace` | Delete the selected clip, zoom, camera layout, magnifier or range |
 | `Esc` | Clear the selection, back to the Select tool and the general settings |
 | `⌘Z` / `Ctrl+Z` | Undo |
 | `⇧⌘Z` / `Ctrl+Shift+Z` | Redo |
@@ -289,6 +306,7 @@ Click **Dışa Aktar** (*Export*) at the top right or press **⌘E / Ctrl+E**.
 | ＋ Zoom · Oto zoom | Add zoom · Auto zoom |
 | Miktar · İmleci takip et · Sabit nokta | Amount · Follow cursor · Fixed point |
 | Kamera bölümü · Balon · Tam ekran · Gizle | Camera layout · Bubble · Full frame · Hide |
+| Büyüteç · Boyut · Büyütme · Daire · Yuvarlak kare | Magnifier · Size · Magnification · Circle · Rounded square |
 | Konum · Boyut | Position · Size |
 | Görüntü oranı | Aspect ratio |
 | Arka plan · Renk · Tema · Görsel | Background · Colour · Theme · Image |

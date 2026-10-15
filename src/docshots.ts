@@ -5,7 +5,7 @@ import { CanvasSource, Mp4OutputFormat, Output, StreamTarget, getFirstEncodableV
 import { odak } from './bridge.ts';
 import { type CursorTrack, type ExportSettings, type MediaAsset, type Project, newClip, newProject, normalizeProject, projectDuration, uuid } from './core/model.ts';
 import { generateAutoZooms } from './core/zoom.ts';
-import { addCameraSegment } from './core/edit.ts';
+import { addCameraSegment, addMagnifier } from './core/edit.ts';
 import { exportProject, renderFrames } from './media/exporter.ts';
 import { GIFEncoder, applyPalette, quantize } from 'gifenc';
 import { drawCursor } from './render/renderer.ts';
@@ -78,7 +78,7 @@ async function png(c: OffscreenCanvas) { return new Uint8Array(await (await c.co
 const CLICKS = [2.0, 3.0, 5.4, 11.2];
 const KEYS: [number, number, number][] = [ // time, x, y
   [0, 1500, 980], [1.7, 1668, 200], [2.2, 1668, 204], [2.9, 900, 560], [3.1, 902, 562], [4.6, 1110, 700],
-  [5.2, 1318, 812], [5.6, 1320, 814], [7.0, 1100, 1000], [9.5, 1000, 980], [10.9, 664, 760], [11.3, 664, 760], [12.8, 900, 980], [14, 1000, 1010],
+  [5.2, 1318, 812], [5.6, 1320, 814], [7.0, 1100, 1000], [9.5, 1000, 980], [10.9, 664, 760], [11.5, 664, 770], [12.3, 810, 688], [13.1, 960, 720], [14, 975, 726],
 ];
 function cursorAt(t: number) {
   let i = 0;
@@ -366,6 +366,8 @@ export async function runDocshots() {
       // The editor with a business theme, for the README.
       const biz: Project = { ...p, style: { ...p.style, backgroundKind: 'theme', backgroundTheme: 'kurumsal', padding: 0.08 } };
       await frame('frame-business-theme.png', biz, 9.6);
+      const lensProject = addMagnifier({ ...p, clips: p.clips.map((c) => ({ ...c, zooms: c.zooms.slice(0, 1) })) }, 10.9, 13.5, { size: 0.36, zoom: 2.2, shape: 'circle' }).project;
+      await frame('frame-magnifier.png', lensProject, 11.6);
     }
 
     // Hero GIF: the output itself. Pastel; auto zoom on the clicks; a pause is cut out; then the
@@ -375,14 +377,16 @@ export async function runDocshots() {
       const gif = new Gif(size.width, size.height, fps);
       const ctx = new OffscreenCanvas(size.width, size.height).getContext('2d', { willReadFrequently: true })!;
       // Shorter zooms leave a wide view in the middle, where the background can be seen.
-      const hero: Project = { ...p, clips: p.clips.map((c) => ({ ...c, zooms: c.zooms.map((z, i) => (i === 0 ? { ...z, end: 5.8 } : { ...z, start: 10.6 })) })) };
+      // The end shows the magnifier instead of a second zoom.
+      const shorter: Project = { ...p, clips: p.clips.map((c) => ({ ...c, zooms: c.zooms.slice(0, 1).map((z) => ({ ...z, end: 5.8 })) })) };
+      const hero = addMagnifier(shorter, 10.9, 13.5, { size: 0.36, zoom: 2.2, shape: 'circle' }).project;
       const segments: { from: number; to: number; theme: string; captions: [number, number, string][] }[] = [
         { from: 0, to: 6.4, theme: 'pastel', captions: [[0, 1.6, '🎥 Camera full frame for the intro'], [1.7, 5.6, '🔍 Auto zoom on every click']] },
         { from: 7.4, to: 8.2, theme: 'pastel', captions: [[7.4, 8.2, '✂ Cut: the pause is gone']] },
         { from: 8.2, to: 9.0, theme: 'topografya', captions: [[8.2, 9.0, '🎨 Theme: Topographic']] },
         { from: 9.0, to: 9.8, theme: 'aurora', captions: [[9.0, 9.8, '🎨 Theme: Aurora']] },
         { from: 9.8, to: 10.6, theme: 'kurumsal', captions: [[9.8, 10.6, '🎨 Theme: Corporate']] },
-        { from: 10.6, to: 13.6, theme: 'pastel', captions: [[10.8, 13.6, '👆 The zoom follows your cursor']] },
+        { from: 10.6, to: 13.6, theme: 'pastel', captions: [[11.0, 13.6, '🔍 A magnifier follows your cursor']] },
       ];
       for (const seg of segments) {
         const ps: Project = { ...hero, style: { ...hero.style, backgroundKind: 'theme', backgroundTheme: seg.theme, padding: 0.07 } };

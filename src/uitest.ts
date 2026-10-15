@@ -304,6 +304,32 @@ export async function runUiTest() {
     log.push(`shot: ${await odak().uiTestCapture('5d-camera-panel')}`);
     await backTo('camera segment');
 
+    // Magnifier: select a range, "🔍 Büyüteç", change it on the right.
+    const lensSel = () => { const sl = store().selection; return sl?.kind === 'magnifier' ? project().clips.find((c) => c.id === sl.clipID)?.magnifiers.find((x) => x.id === sl.segID) : undefined; };
+    check(!!$('.lane-label.lens'), 'the timeline has a BÜYÜTEÇ lane for screen recordings');
+    key('r');
+    await until('range tool', () => !!$('.timeline.tool-range'));
+    await dragRange(5.5, 7.5);
+    click(byText('.range-bar button', 'Büyüteç'));
+    await until('magnifier', () => !!lensSel() && !!$('.lens-seg') && !!byText('.inspector h3', 'Büyüteç'));
+    check(lensSel()!.zoom === 2 && lensSel()!.shape === 'circle', '🔍 Büyüteç adds a lens for the range and opens its settings');
+    const sliders = $$('.inspector input[type=range]');
+    setRange(sliders[0] as HTMLInputElement, 0.45);
+    setRange(sliders[1] as HTMLInputElement, 3);
+    click(byText('.inspector .segmented button', 'Yuvarlak kare'));
+    await sleep(60);
+    check(Math.abs(lensSel()!.size - 0.45) < 1e-6 && Math.abs(lensSel()!.zoom - 3) < 1e-6 && lensSel()!.shape === 'rounded', 'lens size, magnification and shape can be changed');
+    await (ed.player as unknown as { seek: (t: number) => Promise<void> }).seek(6.5);
+    await sleep(300);
+    log.push(`shot: ${await odak().uiTestCapture('5e-magnifier')}`);
+    key('Delete');
+    await sleep(50);
+    check(!$('.lens-seg'), 'Delete removes the lens');
+    store().undo();
+    await sleep(50);
+    check(!!$('.lens-seg'), 'undo brings the lens back');
+    store().select(null);
+
     const cam = project().media.find((m) => m.cameraFile)?.cameraFile;
     const newId = await ed.importFile(`${pkg}/${cam}`);
     await sleep(100);

@@ -49,7 +49,7 @@ input[type=checkbox] { accent-color: var(--accent); }
 .recent .name { font-weight: 550; } .recent .path { color: var(--muted); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* Editor */
-.editor { display: grid; grid-template-rows: 46px minmax(0, 1fr) 266px; grid-template-columns: minmax(0, 1fr); height: 100%; }
+.editor { display: grid; grid-template-rows: 46px minmax(0, 1fr) 290px; grid-template-columns: minmax(0, 1fr); height: 100%; }
 .toolbar { display: flex; align-items: center; justify-content: space-between; padding: 0 12px; border-bottom: 1px solid var(--line); background: var(--panel); }
 .toolbar .title { display: flex; flex-direction: column; align-items: center; }
 .toolbar .title span { color: var(--muted); font-size: 11px; }
@@ -237,3 +237,24 @@ input[type=checkbox] { accent-color: var(--accent); }
 .theme-group { display: flex; flex-direction: column; gap: 6px; }
 .theme-group + .theme-group { margin-top: 6px; }
 .theme-group-title { font-size: 10px; font-weight: 650; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+
+/* Lanes: clips · zooms · camera · magnifier */
+.timeline-inner { min-height: 236px; }
+.clip { top: 30px; height: 48px; }
+.clip .wave { height: 44px; }
+.lane-label { top: 80px; }
+.zoom { top: 90px; height: 32px; }
+.zoom .handle::after { top: 9px; bottom: 9px; }
+.lane-label.cam { top: 124px; }
+.cam-seg { top: 134px; height: 24px; }
+.cam-seg .handle::after { top: 6px; bottom: 6px; }
+.lane-label.lens { top: 160px; }
+.lens-seg { position: absolute; top: 170px; height: 24px; border-radius: 7px; display: flex; align-items: center; justify-content: center;
+  font-size: 11px; white-space: nowrap; overflow: hidden; cursor: grab; background: rgba(250, 204, 21, .3); border: 1px solid #facc15; color: #fff; }
+.lens-seg.selected { border: 2px solid #fff; filter: brightness(1.2); }
+.lens-seg .handle { position: absolute; top: 0; bottom: 0; width: 10px; cursor: ew-resize; }
+.lens-seg .handle::after { content: ''; position: absolute; top: 6px; bottom: 6px; left: 4px; width: 3px; border-radius: 2px; background: rgba(255,255,255,.85); }
+.lens-seg .handle.l { left: 0; } .lens-seg .handle.r { right: 0; }
+.tool-range .lens-seg, .tool-blade .lens-seg { cursor: inherit; }
+.tool-range .lens-seg .handle, .tool-blade .lens-seg .handle { display: none; }
+.range-bar { top: 204px; }

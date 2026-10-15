@@ -1,8 +1,9 @@
 import {
-  type CameraSegment, type Clip, type CursorTrack, type Project, type ZoomSegment, assetOf, clipDuration, clipStarts, followCursor,
+  type CameraSegment, type Clip, type MagnifierSegment, type CursorTrack, type Project, type ZoomSegment, assetOf, clipDuration, clipStarts, followCursor,
   locate, projectDuration, uuid,
 } from './model.ts';
 import type { CameraLayout } from './cameraLayout.ts';
+import type { MagnifierSettings } from './magnifier.ts';
 import { generateAutoZooms } from './zoom.ts';
 
 // Pure editing operations used by the editor UI (and tested headlessly).
@@ -108,11 +109,11 @@ export function splitClipAtSource(p: Project, clipID: string, source: number): {
   if (i < 0) return { error: 'Klip bulunamadı.' };
   const c = p.clips[i];
   if (source - c.sourceStart < MIN_CLIP || c.sourceEnd - source < MIN_CLIP) return { error: 'Bölmek için klibin kenarına çok yakınsın.' };
-  const cams = c.cameraSegments ?? [];
+  const cams = c.cameraSegments ?? [], mags = c.magnifiers ?? [];
   const left: Clip = { ...c, sourceEnd: source, zooms: zoomsWithin(c.zooms, c.sourceStart, source, false),
-    cameraSegments: within(cams, c.sourceStart, source, false, MIN_CAMERA) };
+    cameraSegments: within(cams, c.sourceStart, source, false, MIN_CAMERA), magnifiers: within(mags, c.sourceStart, source, false, MIN_CAMERA) };
   const right: Clip = { ...c, id: uuid(), sourceStart: source, zooms: zoomsWithin(c.zooms, source, c.sourceEnd, true),
-    cameraSegments: within(cams, source, c.sourceEnd, true, MIN_CAMERA) };
+    cameraSegments: within(cams, source, c.sourceEnd, true, MIN_CAMERA), magnifiers: within(mags, source, c.sourceEnd, true, MIN_CAMERA) };
   const clips = [...p.clips];
   clips.splice(i, 1, left, right);
   return { project: { ...p, clips }, rightID: right.id };
@@ -157,7 +158,8 @@ export function duplicateClip(p: Project, clipID: string): { project: Project; n
   const i = p.clips.findIndex((c) => c.id === clipID);
   if (i < 0) return null;
   const copy: Clip = { ...p.clips[i], id: uuid(), zooms: p.clips[i].zooms.map((z) => ({ ...z, id: uuid() })),
-    cameraSegments: (p.clips[i].cameraSegments ?? []).map((s) => ({ ...s, id: uuid() })) };
+    cameraSegments: (p.clips[i].cameraSegments ?? []).map((s) => ({ ...s, id: uuid() })),
+    magnifiers: (p.clips[i].magnifiers ?? []).map((s) => ({ ...s, id: uuid() })) };
   const clips = [...p.clips];
   clips.splice(i + 1, 0, copy);
   return { project: { ...p, clips }, newID: copy.id };
@@ -297,15 +299,19 @@ export function applyQuietRanges(p: Project, mediaID: string, ranges: { start: n
   return q;
 }
 
-// ---------------------------------------------------------------- camera segments
+// ---------------------------------------------------------------- camera segments and magnifiers
 
 const sortByStart = <T extends { start: number }>(list: T[]) => [...list].sort((a, b) => a.start - b.start);
+type Span = { id: string; start: number; end: number };
+type SegmentKey = 'cameraSegments' | 'magnifiers';
+const listOf = <T extends Span>(c: Clip, key: SegmentKey) => ((c[key] ?? []) as unknown as T[]);
+const clamp = (v: number, lo: number, hi: number) => Math.min(Math.max(v, lo), hi);
 
 /**
- * Gives the timeline range [a, b] its own camera layout. The range may cross clips (one segment
+ * Gives the timeline range [a, b] a segment of its own. The range may cross clips (one segment
  * per clip; they play as one). Existing segments under the range are cut back or replaced.
  */
-export function addCameraSegment(p: Project, a: number, b: number, layout: CameraLayout): { project: Project; ids: { clipID: string; segID: string }[] } {
+function addSegments<T extends Span>(p: Project, key: SegmentKey, a: number, b: number, make: (start: number, end: number) => T) {
   a = Math.max(0, a); b = Math.min(projectDuration(p), b);
   const ids: { clipID: string; segID: string }[] = [];
   if (b - a < 0.1) return { project: p, ids };
@@ -316,36 +322,50 @@ export function addCameraSegment(p: Project, a: number, b: number, layout: Camer
     const speed = c.speed || 1;
     const sa = c.sourceStart + (Math.max(a, t0) - t0) * speed, sb = c.sourceStart + (Math.min(b, t1) - t0) * speed;
     if (sb - sa < MIN_CAMERA) return c;
-    const kept = (c.cameraSegments ?? []).flatMap((s) => {
+    const kept = listOf<T>(c, key).flatMap((s) => {
       if (s.end <= sa || s.start >= sb) return [s];
-      const parts: CameraSegment[] = [];
+      const parts: T[] = [];
       if (sa - s.start >= MIN_CAMERA) parts.push({ ...s, end: sa });
       if (s.end - sb >= MIN_CAMERA) parts.push({ ...s, id: parts.length ? uuid() : s.id, start: sb });
       return parts;
     });
-    const seg: CameraSegment = { id: uuid(), start: sa, end: sb, ...layout };
+    const seg = make(sa, sb);
     ids.push({ clipID: c.id, segID: seg.id });
-    return { ...c, cameraSegments: sortByStart([...kept, seg]) };
+    return { ...c, [key]: sortByStart([...kept, seg]) };
   });
   return { project: { ...p, clips }, ids };
 }
 
-/** Changes one camera segment; times stay inside the clip and between its neighbours. */
-export function updateCameraSegment(p: Project, clipID: string, segID: string, change: (s: CameraSegment) => CameraSegment): Project {
+/** Changes one segment; times stay inside the clip and between its neighbours. */
+function updateSegment<T extends Span>(p: Project, key: SegmentKey, clipID: string, segID: string, change: (s: T) => T, settle: (s: T) => T): Project {
   return {
     ...p,
     clips: p.clips.map((c) => {
       if (c.id !== clipID) return c;
-      const list = c.cameraSegments ?? [];
+      const list = listOf<T>(c, key);
       const original = list.find((s) => s.id === segID);
       if (!original) return c;
-      const next = fitSpan(change({ ...original }), original, list, c, 0.2);
-      next.size = Math.min(Math.max(next.size, 0.1), 0.6);
-      return { ...c, cameraSegments: sortByStart(list.map((s) => (s.id === segID ? next : s))) };
+      const next = settle(fitSpan(change({ ...original }), original, list, c, 0.2));
+      return { ...c, [key]: sortByStart(list.map((s) => (s.id === segID ? next : s))) };
     }),
   };
 }
 
-export function deleteCameraSegment(p: Project, clipID: string, segID: string): Project {
-  return { ...p, clips: p.clips.map((c) => (c.id === clipID ? { ...c, cameraSegments: (c.cameraSegments ?? []).filter((s) => s.id !== segID) } : c)) };
+function deleteSegment(p: Project, key: SegmentKey, clipID: string, segID: string): Project {
+  return { ...p, clips: p.clips.map((c) => (c.id === clipID ? { ...c, [key]: listOf<Span>(c, key).filter((s) => s.id !== segID) } : c)) };
 }
+
+/** The timeline range [a, b] gets its own camera layout. */
+export const addCameraSegment = (p: Project, a: number, b: number, layout: CameraLayout) =>
+  addSegments<CameraSegment>(p, 'cameraSegments', a, b, (start, end) => ({ id: uuid(), start, end, ...layout }));
+export const updateCameraSegment = (p: Project, clipID: string, segID: string, change: (s: CameraSegment) => CameraSegment) =>
+  updateSegment<CameraSegment>(p, 'cameraSegments', clipID, segID, change, (s) => ({ ...s, size: clamp(s.size, 0.1, 0.6) }));
+export const deleteCameraSegment = (p: Project, clipID: string, segID: string) => deleteSegment(p, 'cameraSegments', clipID, segID);
+
+/** The timeline range [a, b] gets a magnifier lens that follows the cursor. */
+export const addMagnifier = (p: Project, a: number, b: number, settings: MagnifierSettings) =>
+  addSegments<MagnifierSegment>(p, 'magnifiers', a, b, (start, end) => ({ id: uuid(), start, end, ...settings }));
+export const updateMagnifier = (p: Project, clipID: string, segID: string, change: (s: MagnifierSegment) => MagnifierSegment) =>
+  updateSegment<MagnifierSegment>(p, 'magnifiers', clipID, segID, change,
+    (s) => ({ ...s, size: clamp(s.size, 0.12, 0.7), zoom: clamp(s.zoom, 1.25, 5) }));
+export const deleteMagnifier = (p: Project, clipID: string, segID: string) => deleteSegment(p, 'magnifiers', clipID, segID);

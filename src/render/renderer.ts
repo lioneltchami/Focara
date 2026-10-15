@@ -1,5 +1,6 @@
 import { type Clip, type CursorStyle, type CursorTrack, type MediaAsset, type RGBA, type Size, type StyleSettings, screenRect, toLocal } from '../core/model.ts';
 import { type CameraBox, type CameraSpan, baseLayout, cameraBoxAt, layoutBox } from '../core/cameraLayout.ts';
+import { type MagnifierSettings, type MagnifierSpan, magnifierAt } from '../core/magnifier.ts';
 import { CameraTimeline } from '../core/zoom.ts';
 import { imageCanvas, themeCanvas } from './themes.ts';
 
@@ -16,6 +17,7 @@ export interface ClipRenderData {
   /** Where this clip starts on the timeline, and the project's camera layout track (timeline seconds). */
   timelineStart?: number;
   cameraSpans?: CameraSpan[];
+  magnifierSpans?: MagnifierSpan[];
 }
 
 export function makeRenderData(clip: Clip, asset: MediaAsset, track: CursorTrack | null, style: StyleSettings): ClipRenderData {
@@ -94,6 +96,14 @@ export function drawFrame(ctx: Ctx, canvas: Size, source: DrawSource | null, src
   ctx.restore();
 
   const p = data.timeline.cursor(t);
+  // Magnifier: a lens over the cursor showing the screen under it larger (drawn under the cursor).
+  if (p && data.asset.kind === 'screenRecording' && data.magnifierSpans?.length) {
+    const lens = magnifierAt(data.magnifierSpans, (data.timelineStart ?? 0) + toLocal(data.clip, t));
+    if (lens) {
+      const c = { x: r.x + (p.x / data.asset.pixelWidth) * w, y: r.y + (p.y / data.asset.pixelHeight) * h };
+      drawMagnifier(ctx, canvas, source, r, c, lens.settings, lens.open);
+    }
+  }
   if (style.showCursor && data.asset.kind === 'screenRecording' && p) {
     const ax = data.asset.pixelWidth, ay = data.asset.pixelHeight;
     const toCanvas = (x: number, y: number) => ({ x: r.x + (x / ax) * w, y: r.y + (y / ay) * h });
@@ -187,6 +197,38 @@ export function drawCursor(ctx: Ctx, tip: { x: number; y: number }, scale: numbe
 export function cameraRect(canvas: Size, style: StyleSettings): { x: number; y: number; width: number; height: number } {
   const b = layoutBox(canvas, { ...baseLayout(style.camera), mode: 'bubble' }, style.camera.shape);
   return { x: b.x, y: b.y, width: b.width, height: b.height };
+}
+
+/**
+ * The lens: the screen drawn again, `zoom` times larger around the cursor, inside a circle or a
+ * rounded square that grows from nothing as `open` goes 0 → 1 (slightly past 1 when it pops open).
+ */
+function drawMagnifier(ctx: Ctx, canvas: Size, source: DrawSource, r: { x: number; y: number; width: number; height: number },
+                       c: { x: number; y: number }, s: MagnifierSettings, open: number) {
+  const unit = Math.min(canvas.width, canvas.height);
+  const R = ((unit * s.size) / 2) * open;
+  if (R < 1) return;
+  const zoom = 1 + (s.zoom - 1) * Math.min(1, open);
+  const path = () => {
+    ctx.beginPath();
+    if (s.shape === 'circle') ctx.arc(c.x, c.y, R, 0, Math.PI * 2);
+    else ctx.roundRect(c.x - R, c.y - R, 2 * R, 2 * R, R * 0.3);
+  };
+  ctx.save();
+  ctx.shadowColor = 'rgba(0, 0, 0, 0.45)'; ctx.shadowBlur = unit * 0.035; ctx.shadowOffsetY = unit * 0.01;
+  ctx.fillStyle = '#16161c'; path(); ctx.fill();
+  ctx.restore();
+  ctx.save();
+  path(); ctx.clip();
+  source(ctx, c.x + (r.x - c.x) * zoom, c.y + (r.y - c.y) * zoom, r.width * zoom, r.height * zoom);
+  const sheen = ctx.createLinearGradient(0, c.y - R, 0, c.y + R);
+  sheen.addColorStop(0, 'rgba(255, 255, 255, 0.16)'); sheen.addColorStop(0.45, 'rgba(255, 255, 255, 0)');
+  ctx.fillStyle = sheen; ctx.fillRect(c.x - R, c.y - R, 2 * R, 2 * R);
+  ctx.restore();
+  ctx.save();
+  ctx.lineWidth = Math.max(1.5, unit * 0.005); ctx.strokeStyle = 'rgba(255, 255, 255, 0.95)';
+  path(); ctx.stroke();
+  ctx.restore();
 }
 
 /** Draws the webcam into its box (a circle is a square box with half-height corners). */

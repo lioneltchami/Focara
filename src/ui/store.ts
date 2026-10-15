@@ -5,6 +5,7 @@ import { odak } from '../bridge.ts';
 export type Selection =
   | { kind: 'zoom'; clipID: string; zoomID: string }
   | { kind: 'camera'; clipID: string; segID: string }
+  | { kind: 'magnifier'; clipID: string; segID: string }
   | { kind: 'clip'; clipID: string }
   | null;
 

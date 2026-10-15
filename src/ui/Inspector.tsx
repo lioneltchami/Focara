@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import {
-  type CameraPosition, type CameraSegment, type CameraSettings, type Clip, type CursorStyle, type RGBA, type StyleSettings, type ZoomSegment,
+  type CameraPosition, type CameraSegment, type MagnifierSegment, type CameraSettings, type Clip, type CursorStyle, type RGBA, type StyleSettings, type ZoomSegment,
   assetOf, clipDuration, clipStarts, fixedFocus, followCursor, isFollow, toLocal, zoomSpeeds,
 } from '../core/model.ts';
 import { odak } from '../bridge.ts';
 import { drawCursor } from '../render/renderer.ts';
 import { gradientPresets, themeCanvas, themes, themesOf } from '../render/themes.ts';
-import { setClipSpeed, trimClip, updateCameraSegment, updateZoom } from '../core/edit.ts';
+import { setClipSpeed, trimClip, updateCameraSegment, updateMagnifier, updateZoom } from '../core/edit.ts';
 import { cameraPositions } from '../core/cameraLayout.ts';
 import type { MediaLibrary } from '../media/media.ts';
 import { type EditActions, timecode } from './Editor.tsx';
@@ -23,6 +23,11 @@ export function Inspector({ store, lib, seek, onDelete, actions }: {
     const c = store.project.clips.find((x) => x.id === s.clipID);
     const seg = c?.cameraSegments.find((x) => x.id === s.segID);
     if (c && seg) return panel(<CameraSegmentInspector key={seg.id} store={store} clip={c} seg={seg} seek={seek} onDelete={onDelete} />);
+  }
+  if (s?.kind === 'magnifier') {
+    const c = store.project.clips.find((x) => x.id === s.clipID);
+    const seg = c?.magnifiers.find((x) => x.id === s.segID);
+    if (c && seg) return panel(<MagnifierInspector key={seg.id} store={store} clip={c} seg={seg} seek={seek} onDelete={onDelete} />);
   }
   const clip = s?.kind === 'zoom' ? store.project.clips.find((c) => c.id === s.clipID) : undefined;
   const zoom = s?.kind === 'zoom' ? clip?.zooms.find((z) => z.id === s.zoomID) : undefined;
@@ -142,6 +147,49 @@ function CameraSegmentInspector({ store, clip, seg, seek, onDelete }: {
         <div className="field row between"><span>Süre</span><span className="mono">{(toLocal(clip, seg.end) - toLocal(clip, seg.start)).toFixed(2)} sn</span></div>
         <div className="row between">
           <button onClick={() => seek(clipStart + Math.max(0, toLocal(clip, seg.start) - 0.7))}>Başına Git</button>
+          <button className="danger" onClick={onDelete}>Sil</button>
+        </div>
+      </section>
+    </>
+  );
+}
+
+function MagnifierInspector({ store, clip, seg, seek, onDelete }: {
+  store: EditorStore; clip: Clip; seg: MagnifierSegment; seek: (t: number) => void; onDelete: () => void;
+}) {
+  const set = (key: string, change: (s: MagnifierSegment) => MagnifierSegment) =>
+    store.update((p) => updateMagnifier(p, clip.id, seg.id, change), `${key}-${seg.id}`);
+  const clipStart = clipStarts(store.project)[store.project.clips.findIndex((c) => c.id === clip.id)] ?? 0;
+  return (
+    <>
+      <section>
+        <h3>Büyüteç</h3>
+        <p className="muted small">Bu aralıkta imlecin etrafında bir büyüteç açılır ve imleci takip eder. Başında açılır, sonunda kapanır.</p>
+        <label className="field">Boyut
+          <div className="row">
+            <input type="range" min={0.12} max={0.7} step={0.01} value={seg.size} onChange={(e) => set('size', (x) => ({ ...x, size: Number(e.target.value) }))} />
+            <span className="mono value">{Math.round(seg.size * 100)}%</span>
+          </div>
+        </label>
+        <label className="field">Büyütme
+          <div className="row">
+            <input type="range" min={1.25} max={5} step={0.05} value={seg.zoom} onChange={(e) => set('zoom', (x) => ({ ...x, zoom: Number(e.target.value) }))} />
+            <span className="mono value">×{seg.zoom.toFixed(2)}</span>
+          </div>
+        </label>
+        <div className="segmented">
+          {([['circle', 'Daire'], ['rounded', 'Yuvarlak kare']] as const).map(([k, t]) => (
+            <button key={k} className={seg.shape === k ? 'on' : ''} onClick={() => set('shape', (x) => ({ ...x, shape: k }))}>{t}</button>
+          ))}
+        </div>
+      </section>
+      <section>
+        <h3>Zamanlama</h3>
+        <TimeField label="Başlangıç" value={seg.start - clip.sourceStart} onCommit={(v) => set('start', (x) => ({ ...x, start: clip.sourceStart + v }))} />
+        <TimeField label="Bitiş" value={seg.end - clip.sourceStart} onCommit={(v) => set('end', (x) => ({ ...x, end: clip.sourceStart + v }))} />
+        <div className="field row between"><span>Süre</span><span className="mono">{(toLocal(clip, seg.end) - toLocal(clip, seg.start)).toFixed(2)} sn</span></div>
+        <div className="row between">
+          <button onClick={() => seek(clipStart + Math.max(0, toLocal(clip, seg.start) - 0.5))}>Başına Git</button>
           <button className="danger" onClick={onDelete}>Sil</button>
         </div>
       </section>

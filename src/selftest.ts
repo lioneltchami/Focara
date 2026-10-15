@@ -11,7 +11,7 @@ import { type CursorTrack, type ExportSettings, type MediaAsset, type Project, n
 import { SideRecorder } from './media/sideRecorder.ts';
 import { generateAutoZooms } from './core/zoom.ts';
 import { encoderDelay, exportProject } from './media/exporter.ts';
-import { addCameraSegment, duplicateClip, insertClip, setClipSpeed, splitClipAtSource, trimClip } from './core/edit.ts';
+import { addCameraSegment, addMagnifier, duplicateClip, insertClip, setClipSpeed, splitClipAtSource, trimClip } from './core/edit.ts';
 import { projectDuration } from './core/model.ts';
 import { MediaLibrary } from './media/media.ts';
 import { Player } from './media/player.ts';
@@ -250,6 +250,8 @@ export async function runSelftest() {
         q = addCameraSegment(q, 6, 9, { mode: 'bubble', position: 'top-center', size: 0.28 }).project;
         return { ...q, style: { ...q.style, camera: { ...q.style.camera, shape: 'circle', position: 'bottom-right', size: 0.28, show: true } } };
       }, [1.0, 2.2, 3.0, 6.2, 7.5, 8.7]], // on 30 fps frame times: mid-transition frames must match too
+      // A magnifier lens over the cursor 2–6 s (opening, open, closing), otherwise the default look.
+      ['magnifier', (p) => addMagnifier(p, 2, 6, { size: 0.3, zoom: 2.5, shape: 'circle' }).project, [2.1, 4.0, 5.9]],
     ];
     const px = (rgba: Uint8ClampedArray, x: number, y: number) => { const i = (Math.round(y) * 1920 + Math.round(x)) * 4; return [rgba[i], rgba[i + 1], rgba[i + 2]]; };
     const skin = (c: number[]) => Math.abs(c[0] - 0xf2) < 30 && Math.abs(c[1] - 0xc9) < 30 && Math.abs(c[2] - 0xa0) < 30;
@@ -269,6 +271,24 @@ export async function runSelftest() {
         const ev = grab((c) => s1!.draw(c, 0, 0)); s1!.close();
         const db = psnr(pv, ev);
         check(db > 32, `${name} t=${t}: preview vs export ${db.toFixed(1)} dB`);
+        if (name === 'magnifier' && t === 4.0) {
+          // Against the same moment without the lens (both uncompressed previews): only the lens differs.
+          const pp = new Player(document.createElement('canvas'), vlib, () => {}, () => {});
+          await pp.setProject(reopened); await pp.seek(t);
+          const plain = grab((c) => c.drawImage(pp.canvas, 0, 0)); pp.destroy();
+          let changed = 0, x0 = 1e9, y0 = 1e9, x1 = -1, y1 = -1;
+          for (let i = 0; i < pv.length; i += 4) {
+            if (Math.abs(pv[i] - plain[i]) + Math.abs(pv[i + 1] - plain[i + 1]) + Math.abs(pv[i + 2] - plain[i + 2]) <= 24) continue;
+            changed++;
+            const px = (i / 4) % 1920, py = Math.floor(i / 4 / 1920);
+            x0 = Math.min(x0, px); x1 = Math.max(x1, px); y0 = Math.min(y0, py); y1 = Math.max(y1, py);
+          }
+          const frac = changed / (pv.length / 4), lens = 0.3 * 1080; // lens diameter
+          check(frac > 0.005 && frac < 0.15 && x1 - x0 < lens * 1.6 && y1 - y0 < lens * 1.6,
+            `magnifier: ${(frac * 100).toFixed(1)}% of the frame changes, all within ${x1 - x0}×${y1 - y0} px around the cursor (lens ${lens} px)`);
+          const c = new OffscreenCanvas(1920, 1080); c.getContext('2d')!.putImageData(new ImageData(new Uint8ClampedArray(ev), 1920, 1080), 0, 0);
+          await odak().writeFile(pkg, 'look-magnifier.png', new Uint8Array(await (await c.convertToBlob({ type: 'image/png' })).arrayBuffer()));
+        }
         if (name === 'camera segments') {
           // The synthetic camera has a skin-coloured face in the middle of the frame.
           if (t === 1.0) check(!skin(px(ev, 960, 540)), 'camera segments: before, the screen is in the middle');
