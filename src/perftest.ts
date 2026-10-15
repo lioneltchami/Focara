@@ -176,6 +176,15 @@ export async function runPerfTest() {
     await sleep(1500); // waveforms etc. settle
 
     const mon = new FrameMonitor();
+    // Input the test didn't make (someone using the machine meanwhile) and focus/visibility changes
+    // explain an odd number; they're listed with the results.
+    const t0 = performance.now(), outside: string[] = [];
+    const note = (what: string) => { if (outside.length < 12) outside.push(`${((performance.now() - t0) / 1000).toFixed(2)}s ${what}`); };
+    for (const type of ['pointermove', 'pointerdown', 'pointerup', 'keydown'])
+      window.addEventListener(type, (e) => { if (e.isTrusted) note(type); }, true);
+    window.addEventListener('blur', () => note('window blur'));
+    window.addEventListener('focus', () => note('window focus'));
+    document.addEventListener('visibilitychange', () => note(`visibility ${document.visibilityState}`));
     const clipStartsOf = () => clipStarts(hooks().store!.project).slice(1, 8);
     const heap = () => ((performance as unknown as { memory?: { usedJSHeapSize: number } }).memory?.usedJSHeapSize ?? 0) / 1e6;
     const heap0 = heap();
@@ -281,6 +290,7 @@ export async function runPerfTest() {
 
     const heap1 = heap();
     log.push(`JS heap: ${heap0.toFixed(0)} → ${heap1.toFixed(0)} MB`);
+    if (outside.length) log.push(`outside events during the run: ${outside.join(', ')}`);
   } catch (e) {
     check(false, `exception: ${(e as Error).stack ?? e}`);
     failures++;

@@ -45,13 +45,47 @@ function BackBar({ store }: { store: EditorStore }) {
   );
 }
 
+/** ⌘ on macOS, Ctrl elsewhere. */
+const MOD = typeof navigator !== 'undefined' && /Mac/.test(navigator.platform) ? '⌘' : 'Ctrl';
+
+/** The most useful keys for what the panel shows. */
+function Shortcuts({ items }: { items: [string, string][] }) {
+  return (
+    <section className="shortcuts">
+      <h3>Kısayollar</h3>
+      <ul>
+        {items.map(([keys, what]) => (
+          <li key={what}><span>{what}</span><span className="keys">{keys.split(' ').map((k) => <kbd key={k}>{k}</kbd>)}</span></li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+const commonKeys: [string, string][] = [['Space', 'Oynat / duraklat'], ['← →', 'Kare kare'], [`${MOD} Z`, 'Geri al'], ['Esc', 'Genel ayarlara dön']];
+
+/** Quick values next to a slider. */
+function Chips({ values, value, format, onPick }: { values: number[]; value: number; format: (v: number) => string; onPick: (v: number) => void }) {
+  return (
+    <div className="chips">
+      {values.map((v) => <button key={v} className={Math.abs(value - v) < 1e-3 ? 'on' : ''} onClick={() => onPick(v)}>{format(v)}</button>)}
+    </div>
+  );
+}
+
 function ZoomInspector({ store, lib, clip, zoom, seek, onDelete }: {
   store: EditorStore; lib: MediaLibrary; clip: Clip; zoom: ZoomSegment; seek: (t: number) => void; onDelete: () => void;
 }) {
   const set = (key: string, change: (z: ZoomSegment) => ZoomSegment) =>
     store.update((p) => updateZoom(p, clip.id, zoom.id, change), `${key}-${zoom.id}`);
   const fixed = !isFollow(zoom.focus);
-  const clipStart = clipStarts(store.project)[store.project.clips.findIndex((c) => c.id === clip.id)] ?? 0;
+  const starts = clipStarts(store.project);
+  const clipStart = starts[store.project.clips.findIndex((c) => c.id === clip.id)] ?? 0;
+  // Every zoom on the timeline, in order, for the previous / next buttons.
+  const all = store.project.clips.flatMap((c, i) => c.zooms
+    .filter((z) => z.end > c.sourceStart && z.start < c.sourceEnd)
+    .map((z) => ({ clipID: c.id, zoomID: z.id, t: starts[i] + toLocal(c, Math.max(z.start, c.sourceStart)) })));
+  const at = all.findIndex((z) => z.zoomID === zoom.id);
+  const go = (k: number) => { const z = all[k]; store.select({ kind: 'zoom', clipID: z.clipID, zoomID: z.zoomID }); seek(Math.max(0, z.t - 0.3)); };
 
   const switchFocus = async (toFixed: boolean) => {
     if (!toFixed) { set('focus', (z) => ({ ...z, focus: followCursor() })); return; }
@@ -74,6 +108,7 @@ function ZoomInspector({ store, lib, clip, zoom, seek, onDelete }: {
             <span className="mono value">×{zoom.scale.toFixed(2)}</span>
           </div>
         </label>
+        <Chips values={[1.25, 1.5, 2, 2.5, 3]} value={zoom.scale} format={(v) => `×${v}`} onPick={(v) => set('scale', (z) => ({ ...z, scale: v }))} />
         <div className="segmented">
           <button className={!fixed ? 'on' : ''} onClick={() => void switchFocus(false)}>İmleci takip et</button>
           <button className={fixed ? 'on' : ''} onClick={() => void switchFocus(true)}>Sabit nokta</button>
@@ -96,6 +131,25 @@ function ZoomInspector({ store, lib, clip, zoom, seek, onDelete }: {
           <button className="danger" onClick={onDelete}>Sil</button>
         </div>
       </section>
+      <section>
+        <h3>Geçiş</h3>
+        <div className="segmented">
+          {zoomSpeeds.map((z) => (
+            <button key={z.id} className={store.project.style.zoomSpeed === z.id ? 'on' : ''}
+                    onClick={() => store.update((q) => ({ ...q, style: { ...q.style, zoomSpeed: z.id } }), 'style-zoomSpeed')}>{z.title}</button>
+          ))}
+        </div>
+        <p className="muted small">Zoom'a giriş ve çıkışın ne kadar yumuşak olacağı (bütün zoom'lar için).</p>
+      </section>
+      <section>
+        <h3>Zoom'lar arasında</h3>
+        <div className="row between">
+          <button disabled={at <= 0} onClick={() => go(at - 1)}>‹ Önceki</button>
+          <span className="mono muted">{at + 1} / {all.length}</span>
+          <button disabled={at >= all.length - 1} onClick={() => go(at + 1)}>Sonraki ›</button>
+        </div>
+      </section>
+      <Shortcuts items={[['Z', 'Oynatma çizgisine zoom ekle'], ['Sil', "Bu zoom'u sil"], ...commonKeys]} />
     </>
   );
 }
@@ -150,6 +204,7 @@ function CameraSegmentInspector({ store, clip, seg, seek, onDelete }: {
           <button className="danger" onClick={onDelete}>Sil</button>
         </div>
       </section>
+      <Shortcuts items={[['K', 'Kamera bölümü ekle'], ['Sil', 'Bu bölümü sil'], ...commonKeys]} />
     </>
   );
 }
@@ -171,12 +226,14 @@ function MagnifierInspector({ store, clip, seg, seek, onDelete }: {
             <span className="mono value">{Math.round(seg.size * 100)}%</span>
           </div>
         </label>
+        <Chips values={[0.22, 0.32, 0.45]} value={seg.size} format={(v) => (v < 0.3 ? 'Küçük' : v < 0.4 ? 'Orta' : 'Büyük')} onPick={(v) => set('size', (x) => ({ ...x, size: v }))} />
         <label className="field">Büyütme
           <div className="row">
             <input type="range" min={1.25} max={5} step={0.05} value={seg.zoom} onChange={(e) => set('zoom', (x) => ({ ...x, zoom: Number(e.target.value) }))} />
             <span className="mono value">×{seg.zoom.toFixed(2)}</span>
           </div>
         </label>
+        <Chips values={[1.5, 2, 3]} value={seg.zoom} format={(v) => `×${v}`} onPick={(v) => set('zoom', (x) => ({ ...x, zoom: v }))} />
         <div className="segmented">
           {([['circle', 'Daire'], ['rounded', 'Yuvarlak kare']] as const).map(([k, t]) => (
             <button key={k} className={seg.shape === k ? 'on' : ''} onClick={() => set('shape', (x) => ({ ...x, shape: k }))}>{t}</button>
@@ -193,6 +250,7 @@ function MagnifierInspector({ store, clip, seg, seek, onDelete }: {
           <button className="danger" onClick={onDelete}>Sil</button>
         </div>
       </section>
+      <Shortcuts items={[['B', 'Büyüteç ekle'], ['Sil', 'Bu büyüteci sil'], ...commonKeys]} />
     </>
   );
 }
@@ -418,6 +476,8 @@ function StyleInspector({ store, lib }: { store: EditorStore; lib: MediaLibrary 
           </div>
         ))}
       </section>
+      <Shortcuts items={[['Space', 'Oynat / duraklat'], ['S', 'Böl'], ['Z', 'Zoom ekle'], ['K', 'Kamera bölümü'], ['B', 'Büyüteç'],
+                          ['V R C', 'Seç · Aralık · Makas'], [`${MOD} Z`, 'Geri al'], [`${MOD} E`, 'Dışa aktar']]} />
     </>
   );
 }
@@ -509,6 +569,7 @@ function ClipInspector({ store, clip, actions, seek }: { store: EditorStore; cli
         </div>
         <p className="muted small">Sıralamak için klibi zaman çizelgesinde sürükle.</p>
       </section>
+      <Shortcuts items={[['S', 'Oynatma çizgisinden böl'], ['Sil', 'Bu klibi sil'], ['V R C', 'Seç · Aralık · Makas'], ...commonKeys]} />
     </>
   );
 }

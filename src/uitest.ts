@@ -3,7 +3,7 @@
 import { odak } from './bridge.ts';
 import { type Project, clipDuration, clipStarts, normalizeProject, projectDuration } from './core/model.ts';
 import type { EditorStore } from './ui/store.ts';
-import { speedRange } from './core/edit.ts';
+import { addZoomAt, speedRange } from './core/edit.ts';
 
 const log: string[] = [];
 let failures = 0;
@@ -12,6 +12,13 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const $ = <T extends Element = HTMLElement>(s: string) => document.querySelector(s) as T | null;
 const $$ = (s: string) => [...document.querySelectorAll<HTMLElement>(s)];
 const byText = (sel: string, text: string) => $$(sel).find((e) => e.textContent?.includes(text)) ?? null;
+// Inspector layout: no clipped labels on the pill controls and nothing wider than the panel.
+const layoutOK = (where: string) => {
+  const ins = $('.inspector');
+  const clipped = $$('.inspector .segmented button, .inspector .chips button, .inspector .shortcuts li').filter((e) => e.scrollWidth > e.clientWidth + 1).map((e) => e.textContent?.trim());
+  const wide = !!ins && ins.scrollWidth > ins.clientWidth + 1;
+  check(!clipped.length && !wide, `${where}: no clipped labels, no sideways overflow${clipped.length ? ` (clipped: ${clipped.join(', ')})` : ''}${wide ? ' (panel overflows)' : ''}`);
+};
 
 async function until(what: string, cond: () => boolean, ms = 8000) {
   const t = performance.now();
@@ -91,6 +98,12 @@ export async function runUiTest() {
     const f = selectedZoom()!.focus;
     check('fixed' in f && Math.abs(f.fixed.x - 0.8) < 0.01 && Math.abs(f.fixed.y - 0.2) < 0.01, 'focus picker sets a fixed point at (0.8, 0.2)');
     log.push(`shot: ${await odak().uiTestCapture('3-zoom-inspector')}`);
+    layoutOK('zoom panel');
+    $('.inspector')!.scrollTop = 1e5; await sleep(150);
+    check(!!byText('.inspector h3', 'Kısayollar') && !!byText('.inspector h3', 'Geçiş') && !!byText('.inspector button', 'Sonraki'),
+      'zoom panel: transition, previous/next and a shortcuts card');
+    log.push(`shot: ${await odak().uiTestCapture('3b-zoom-inspector-end')}`);
+    $('.inspector')!.scrollTop = 0;
 
     click(byText('.toolbar button', '↶'));
     await sleep(50);
@@ -143,6 +156,10 @@ export async function runUiTest() {
     } else check(false, 'test project has a camera recording');
     await sleep(600);
     log.push(`shot: ${await odak().uiTestCapture('4-looks')}`);
+    layoutOK('style panel');
+    $('.inspector')!.scrollTop = 1e5; await sleep(150);
+    log.push(`shot: ${await odak().uiTestCapture('4b-style-end')}`);
+    $('.inspector')!.scrollTop = 0;
 
     click($('.transport .play'));
     await sleep(1500);
@@ -333,6 +350,7 @@ export async function runUiTest() {
     if (store().selection?.kind !== 'camera') store().select({ kind: 'camera', clipID: project().clips.find((c) => c.cameraSegments.length)!.id, segID: project().clips.find((c) => c.cameraSegments.length)!.cameraSegments[0].id });
     await until('camera panel', () => !!byText('.inspector h3', 'Kamera bölümü'));
     log.push(`shot: ${await odak().uiTestCapture('5d-camera-panel')}`);
+    layoutOK('camera panel');
     await backTo('camera segment');
 
     // Magnifier: select a range, "🔍 Büyüteç", change it on the right.
@@ -353,6 +371,7 @@ export async function runUiTest() {
     await (ed.player as unknown as { seek: (t: number) => Promise<void> }).seek(6.5);
     await sleep(300);
     log.push(`shot: ${await odak().uiTestCapture('5e-magnifier')}`);
+    layoutOK('magnifier panel');
     key('Delete');
     await sleep(50);
     check(!$('.lens-seg'), 'Delete removes the lens');
@@ -360,6 +379,25 @@ export async function runUiTest() {
     await sleep(50);
     check(!!$('.lens-seg'), 'undo brings the lens back');
     store().select(null);
+
+    // Keyboard: Z / K / B add a zoom, camera layout or magnifier at the playhead like the buttons,
+    // select it (its settings open on the right), and undo leaves the project exactly as before.
+    const seek = (t: number) => (ed.player as unknown as { seek: (t: number) => Promise<void> }).seek(t);
+    const total = projectDuration(project());
+    let free = -1;
+    for (let t = 0.2; t < total - 0.5 && free < 0; t += 0.1) if (!('error' in addZoomAt(project(), t))) free = t;
+    for (const [k, kind, what, at] of [['z', 'zoom', 'Zoom', free], ['k', 'camera', 'Kamera bölümü', 0.5], ['b', 'magnifier', 'Büyüteç', 0.5]] as const) {
+      await seek(at);
+      await sleep(80);
+      const before = JSON.stringify(project().clips);
+      key(k);
+      await sleep(80);
+      const added = store().selection?.kind === kind && JSON.stringify(project().clips) !== before && !!byText('.inspector h3', what);
+      store().undo();
+      await sleep(60);
+      check(at >= 0 && added && JSON.stringify(project().clips) === before, `${k.toUpperCase()} adds a ${kind} at ${at.toFixed(2)} s and opens its panel; undo restores the project`);
+      store().select(null);
+    }
 
     const cam = project().media.find((m) => m.cameraFile)?.cameraFile;
     const newId = await ed.importFile(`${pkg}/${cam}`);

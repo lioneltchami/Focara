@@ -534,7 +534,9 @@ function createWindow() {
   else void mainWindow.loadFile(path.join(__dirname, '..', 'dist', 'index.html'));
   if (!isTest) mainWindow.once('ready-to-show', () => mainWindow?.show());
   // Measured like real use: on screen (without taking focus).
-  if (isPerftest) mainWindow.once('ready-to-show', () => mainWindow?.showInactive());
+  // The perf window must be on screen (real vsync and GPU) but drives itself with DOM events;
+  // ignoring OS mouse input keeps a stray click (say, on "Kaydı Başlat") from derailing the run.
+  if (isPerftest) mainWindow.once('ready-to-show', () => { mainWindow?.setIgnoreMouseEvents(true); mainWindow?.showInactive(); });
   mainWindow.webContents.on('render-process-gone', (_e, d) => {
     if (isTest) { process.stdout.write(`renderer gone: ${d.reason}\n`); app.exit(3); }
   });

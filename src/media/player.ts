@@ -192,7 +192,11 @@ export class Player {
     this.playing = true; this.onPlaying(true);
     this.timeStart = this.currentTime;
     this.clockStart = this.audio.currentTime + 0.12;
-    void this.scheduleAudio(gen, p);
+    // Stopping, seeking or closing the project disposes the audio inputs mid-read; only a
+    // failure during the current playback is worth logging (the video keeps playing either way).
+    this.scheduleAudio(gen, p).catch((e) => {
+      if (gen === this.gen) odak().log('preview audio failed', { error: String((e as Error)?.message ?? e) });
+    });
     void this.videoLoop(gen, p);
   }
 

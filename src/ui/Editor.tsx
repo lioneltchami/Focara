@@ -238,6 +238,9 @@ export function Editor({ store, onClose, busy, onRecordInto }: {
       else if (e.key === 'v' || e.key === 'V') setTool('select');
       else if (e.key === 'r' || e.key === 'R') setTool('range');
       else if (e.key === 'c' || e.key === 'C') setTool('blade');
+      else if (e.key === 'z' || e.key === 'Z') { e.preventDefault(); addZoom(); }
+      else if ((e.key === 'k' || e.key === 'K') && hasCamera) { e.preventDefault(); addCamera(); }
+      else if ((e.key === 'b' || e.key === 'B') && hasCursor) { e.preventDefault(); addLens(); }
       else if (e.key === 'Escape') { setRange(null); store.select(null); setTool('select'); }
     };
     window.addEventListener('keydown', onKey);
@@ -291,12 +294,12 @@ export function Editor({ store, onClose, busy, onRecordInto }: {
                     <button onClick={() => setDialog('quiet')} title="Ekranın değişmediği, imlecin durduğu ve sesin olmadığı anları bul">⏩ Durgun anlar</button>
                   </div>
                   <div className="tool-group">
-                    <button onClick={addZoom} title="Oynatma çizgisinde yeni zoom">＋ Zoom</button>
+                    <button onClick={addZoom} title="Oynatma çizgisinde yeni zoom (Z)">＋ Zoom</button>
                     <button onClick={() => void regenerate()} title="Dokunulmamış otomatik zoom'ları tıklamalardan yeniden üret; elle düzenlenenler korunur">✦ Oto zoom</button>
                     <button onClick={addCamera} disabled={!hasCamera}
-                            title={hasCamera ? 'Seçili aralıkta (ya da oynatma çizgisinden 3 sn) kamerayı başka yere taşı, büyüt ya da gizle' : 'Bu projede kamera kaydı yok'}>📷 Kamera</button>
+                            title={hasCamera ? 'Seçili aralıkta (ya da oynatma çizgisinden 3 sn) kamerayı başka yere taşı, büyüt ya da gizle (K)' : 'Bu projede kamera kaydı yok'}>📷 Kamera</button>
                     <button onClick={addLens} disabled={!hasCursor}
-                            title={hasCursor ? 'Seçili aralıkta (ya da oynatma çizgisinden 3 sn) imlecin altını büyüteçle göster' : 'Büyüteç ekran kayıtlarında imleci takip eder'}>🔍 Büyüteç</button>
+                            title={hasCursor ? 'Seçili aralıkta (ya da oynatma çizgisinden 3 sn) imlecin altını büyüteçle göster (B)' : 'Büyüteç ekran kayıtlarında imleci takip eder'}>🔍 Büyüteç</button>
                   </div>
                 </>} />
       {dialog === 'export' && <ExportDialog store={store} lib={lib} onClose={() => setDialog(null)} range={range} time={now()} />}

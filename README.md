@@ -186,9 +186,12 @@ Prefer not to install? Download the `.zip`, unzip it and run `Odak.exe`.
 
 - Automatic zooms are created from your clicks: the view eases in a little before the click, holds while you work there and eases out after a pause. Clicks close to each other share one zoom.
 - **Move** a zoom by dragging it; **change its length** by dragging its edges. Click it to open its settings on the right:
-  - **Miktar** (*amount*): ×1.1 to ×4.
+  - **Miktar** (*amount*): ×1.1 to ×4, with one-click presets ×1.25 / ×1.5 / ×2 / ×2.5 / ×3.
   - **İmleci takip et** (*follow cursor*) or **Sabit nokta** (*fixed point*) — click or drag on the small picture to choose the point.
-- **＋ Zoom** adds a zoom at the playhead. **✦ Oto zoom** regenerates the automatic zooms; zooms you edited by hand are kept.
+  - **Geçiş** (*transition*): how gently every zoom eases in and out.
+  - **‹ Önceki / Sonraki ›** (*previous / next*): jump between zooms without hunting on the timeline.
+  - Every panel ends with a **Kısayollar** (*shortcuts*) card listing the keys for what you're editing.
+- **＋ Zoom** (or `Z`) adds a zoom at the playhead. **✦ Oto zoom** regenerates the automatic zooms; zooms you edited by hand are kept.
 - **Zoom hızı** (*zoom speed*) in the style panel: gentle, normal or quick camera motion.
 
 ### The timeline and editing tools
@@ -227,7 +230,7 @@ General settings (right panel, **Kamera** section): show/hide, **9 positions** (
 
 **Camera layouts for a part of the video:**
 1. Select the part with **↔ Aralık** (or put the playhead where it should start).
-2. Click **📷 Kamera** (in the bar under the range, or in the toolbar — then it covers the next 3 seconds).
+2. Click **📷 Kamera** or press `K` (in the bar under the range, or in the toolbar — then it covers the next 3 seconds).
 3. A pink block appears in the **KAMERA** lane and its settings open on the right:
    - **Balon** (*bubble*): one of 9 positions and its own size.
    - **Tam ekran** (*full frame*): the camera fills the whole video — great for intros and outros.
@@ -239,10 +242,10 @@ The camera eases into the new layout at the start of the block and back at its e
 ### Magnifier
 
 1. Select the part with **↔ Aralık** (or put the playhead where it should start).
-2. Click **🔍 Büyüteç** (in the bar under the range, or in the toolbar — then it covers the next 3 seconds).
+2. Click **🔍 Büyüteç** or press `B` (in the bar under the range, or in the toolbar — then it covers the next 3 seconds).
 3. A yellow block appears in the **BÜYÜTEÇ** lane and its settings open on the right:
-   - **Boyut** (*size*): the lens diameter, 12–70 % of the frame's short side.
-   - **Büyütme** (*magnification*): ×1.25 to ×5.
+   - **Boyut** (*size*): the lens diameter, 12–70 % of the frame's short side (presets *Küçük / Orta / Büyük*).
+   - **Büyütme** (*magnification*): ×1.25 to ×5 (presets ×1.5 / ×2 / ×3).
    - **Daire / Yuvarlak kare** (*circle / rounded square*).
 4. Drag the block to move it, drag its edges to change its length.
 
@@ -282,6 +285,9 @@ Click **Dışa Aktar** (*Export*) at the top right or press **⌘E / Ctrl+E**.
 | `←` / `→` | Previous / next frame (`Shift`: 10 frames) |
 | `V` / `R` / `C` | Select / Range / Scissors tool |
 | `S` | Split at the playhead (or at both ends of the selected range) |
+| `Z` | Add a zoom at the playhead |
+| `K` | Add a camera layout at the playhead (or for the selected range) |
+| `B` | Add a cursor magnifier at the playhead (or for the selected range) |
 | `Delete` / `Backspace` | Delete the selected clip, zoom, camera layout, magnifier or range |
 | `Esc` | Clear the selection, back to the Select tool and the general settings |
 | `⌘Z` / `Ctrl+Z` | Undo |
@@ -441,7 +447,8 @@ npm run selftest       # in the app: synthetic recording → zoom → save/open 
                        #   vertical/square/HEVC/M4A/WAV/GIF/PNG: size, length, audio position)
 npm run uitest -- "examples/Örnek Proje.odak"   # the real UI driven by DOM events: zooms, split/trim/drag/delete,
                                                #   playhead dragging, scissors, ranges, camera layouts, import,
-                                               #   quiet moments, export dialog, undo, autosave
+                                               #   quiet moments, export dialog, undo, autosave, Z/K/B keys,
+                                               #   no clipped labels in the side panels, real mouse input
 npm run perftest       # performance (see above)
 npm run docshots       # regenerates docs/images from a demo project: screenshots, frames, theme galleries,
                        #   the demo GIF and the editor-in-action GIF
