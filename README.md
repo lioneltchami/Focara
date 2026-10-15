@@ -408,8 +408,8 @@ Requirements:
 - **Windows:** [Rust](https://rustup.rs) and *Visual Studio Build Tools* ("Desktop development with C++")
 
 ```bash
-git clone https://github.com/lioneltchami/Focus.git
-cd Focus
+git clone https://github.com/lioneltchami/Focara.git
+cd Focara
 npm install
 npm run build:helper:mac      # macOS: Swift capture helper (universal: Apple Silicon + Intel)
 npm run build:helper:win      # Windows: Rust capture helper
