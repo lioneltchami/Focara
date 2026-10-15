@@ -448,6 +448,16 @@ window.odak.onHudFinishing&&window.odak.onHudFinishing(()=>{b.disabled=true;b.te
 
 ipcMain.handle('uitest:project', () => uiTestProject);
 ipcMain.handle('docshots:dir', () => docshotsDir);
+// Real mouse input through Chromium's input pipeline (pointer capture etc.), for the UI test only.
+ipcMain.handle('uitest:input', async (_e, events: { type: 'mouseDown' | 'mouseUp' | 'mouseMove'; x: number; y: number; held?: boolean }[]) => {
+  if (!isTest || !mainWindow) return;
+  for (const ev of events) {
+    mainWindow.webContents.sendInputEvent({ type: ev.type, x: Math.round(ev.x), y: Math.round(ev.y), button: 'left', clickCount: 1,
+      modifiers: ev.held || ev.type === 'mouseDown' ? ['leftbuttondown'] : [] });
+    await new Promise((r) => setTimeout(r, 16));
+  }
+});
+
 ipcMain.handle('uitest:capture', async (_e, name: string) => {
   const img = await mainWindow!.webContents.capturePage();
   selftestDir ??= await fsp.mkdtemp(path.join(os.tmpdir(), 'odak-uitest-'));

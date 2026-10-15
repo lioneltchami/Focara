@@ -203,6 +203,37 @@ export async function runUiTest() {
     click($$('.bar-zoom button')[2]);
     await sleep(200);
 
+    // Real mouse input: dragging moves the playhead; afterwards — whether the button was released
+    // inside the timeline, over the preview, or the release was missed (outside the window) —
+    // merely hovering the timeline must not move it.
+    {
+      const mouse = (type: 'mouseDown' | 'mouseUp' | 'mouseMove', x: number, y: number, held = false) => ({ type, x, y, held });
+      const rl = $('.ruler')!.getBoundingClientRect(), ry = rl.top + rl.height / 2;
+      const lane = $('.clip')!.getBoundingClientRect(), ly = lane.top + lane.height / 2;
+      const hover = async () => {
+        const before = ed.player.currentTime;
+        await odak().uiTestInput([mouse('mouseMove', xAt(1), ly), mouse('mouseMove', xAt(6), ly), mouse('mouseMove', xAt(8), ry), mouse('mouseMove', xAt(2), ly)]);
+        await sleep(150);
+        return Math.abs(ed.player.currentTime - before);
+      };
+      // A: drag on the ruler, release inside the timeline.
+      await odak().uiTestInput([mouse('mouseMove', xAt(3), ry), mouse('mouseDown', xAt(3), ry), mouse('mouseMove', xAt(4), ry, true), mouse('mouseMove', xAt(5), ry, true), mouse('mouseUp', xAt(5), ry)]);
+      await sleep(150);
+      const afterRuler = ed.player.currentTime, drift1 = await hover();
+      // B: drag the red head, release over the preview.
+      const knobR = $('.playhead-knob')!.getBoundingClientRect(), pv = $('.preview canvas')!.getBoundingClientRect();
+      await odak().uiTestInput([mouse('mouseMove', knobR.left + 8, knobR.top + 8), mouse('mouseDown', knobR.left + 8, knobR.top + 8),
+        mouse('mouseMove', xAt(2), knobR.top + 8, true), mouse('mouseMove', xAt(2), pv.top + pv.height / 2, true), mouse('mouseUp', xAt(2), pv.top + pv.height / 2)]);
+      await sleep(150);
+      const afterKnob = ed.player.currentTime, drift2 = await hover();
+      // C: the release never arrives (let go outside the window); the next move has no button held.
+      await odak().uiTestInput([mouse('mouseMove', xAt(6), ry), mouse('mouseDown', xAt(6), ry), mouse('mouseMove', xAt(7), ry, true)]);
+      await sleep(100);
+      const afterMissed = ed.player.currentTime, drift3 = await hover();
+      check(Math.abs(afterRuler - 5) < 0.1 && Math.abs(afterKnob - 2) < 0.1 && Math.abs(afterMissed - 7) < 0.1 && drift1 + drift2 + drift3 < 1e-6,
+        `real mouse: dragging moves the playhead (5 → 2 → 7 s); hovering afterwards doesn't (${drift1.toFixed(2)} / ${drift2.toFixed(2)} / ${drift3.toFixed(2)} s)`);
+    }
+
     // Playhead: grab the red head and drag it; the ruler scrubs too.
     const knob = $('.playhead-knob')!, kr = knob.getBoundingClientRect();
     pointer(knob, 'pointerdown', kr.left + 8, kr.top + 8); pointer(knob, 'pointermove', xAt(3), kr.top + 8);

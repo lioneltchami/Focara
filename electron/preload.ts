@@ -16,6 +16,7 @@ contextBridge.exposeInMainWorld('odak', {
   perfReportOnly: process.argv.includes('--perf-report'),
   uiTestProject: () => ipcRenderer.invoke('uitest:project'),
   uiTestCapture: (name: string) => ipcRenderer.invoke('uitest:capture', name),
+  uiTestInput: (events: unknown[]) => ipcRenderer.invoke('uitest:input', events),
   requestScreenPermission: () => ipcRenderer.invoke('capture:requestPermission'),
   askMediaAccess: (kind: string) => ipcRenderer.invoke('media:ask', kind),
   resetPermissions: () => ipcRenderer.invoke('capture:resetPermissions'),

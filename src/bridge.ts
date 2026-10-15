@@ -33,6 +33,7 @@ export interface OdakAPI {
   perfReportOnly: boolean;
   uiTestProject(): Promise<string | null>;
   uiTestCapture(name: string): Promise<string>;
+  uiTestInput(events: { type: 'mouseDown' | 'mouseUp' | 'mouseMove'; x: number; y: number; held?: boolean }[]): Promise<void>;
   requestScreenPermission(): Promise<boolean>;
   askMediaAccess(kind: 'camera' | 'microphone'): Promise<boolean>;
   resetPermissions(): Promise<boolean>;

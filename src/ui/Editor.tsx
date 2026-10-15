@@ -396,19 +396,36 @@ function Timeline({ store, lib, time, playing, seek, scrubTo, range, setRange, t
     });
   };
 
+  /**
+   * Follows one drag until the button is released. Listens on the whole window (the release may
+   * happen anywhere, and pointer capture can't be relied on: the up event may land on whatever
+   * moved under the pointer, such as the playhead). A real move with no button held means the
+   * release was missed (e.g. outside the window): the drag ends there, so hovering never drags.
+   */
   const drag = (e: React.PointerEvent, onMove: (ev: PointerEvent, dx: number) => void, onUp?: (ev: PointerEvent, moved: boolean) => void) => {
-    const el = e.currentTarget as HTMLElement;
-    try { el.setPointerCapture(e.pointerId); } catch { /* synthetic or lost pointer */ }
+    try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch { /* synthetic or lost pointer */ }
     const x0 = e.clientX;
-    let moved = false;
-    const move = (ev: PointerEvent) => { if (Math.abs(ev.clientX - x0) > 3) moved = true; onMove(ev, ev.clientX - x0); };
-    const up = (ev: PointerEvent) => {
-      el.removeEventListener('pointermove', move); el.removeEventListener('pointerup', up); el.removeEventListener('pointercancel', up);
+    let moved = false, done = false, last: PointerEvent = e.nativeEvent;
+    const finish = (ev: PointerEvent) => {
+      if (done) return;
+      done = true;
+      window.removeEventListener('pointermove', move, true);
+      window.removeEventListener('pointerup', finish, true);
+      window.removeEventListener('pointercancel', finish, true);
+      window.removeEventListener('blur', lost);
       onUp?.(ev, moved);
     };
-    el.addEventListener('pointermove', move);
-    el.addEventListener('pointerup', up);
-    el.addEventListener('pointercancel', up);
+    const move = (ev: PointerEvent) => {
+      if (ev.isTrusted && ev.buttons === 0) { finish(last); return; }
+      last = ev;
+      if (Math.abs(ev.clientX - x0) > 3) moved = true;
+      onMove(ev, ev.clientX - x0);
+    };
+    const lost = () => finish(last);
+    window.addEventListener('pointermove', move, true);
+    window.addEventListener('pointerup', finish, true);
+    window.addEventListener('pointercancel', finish, true);
+    window.addEventListener('blur', lost);
   };
   // While dragging near an edge of the visible area, scroll along.
   const follow = (clientX: number) => {
