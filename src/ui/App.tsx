@@ -149,7 +149,7 @@ export function App() {
       {alert && (
         <div className="modal-backdrop" onClick={() => setAlert(null)}>
           <div className="modal small" onClick={(e) => e.stopPropagation()}>
-            <h3>Focus</h3>
+            <h3>Focara</h3>
             <p className="pre">{alert.text}</p>
             <div className="row between">
               <button className="ghost" onClick={() => void odak().revealLog()}>{t('Tanılama Kaydı')}</button>
@@ -157,7 +157,7 @@ export function App() {
                 {alert.permission && odak().platform === 'darwin' && (
                   <button onClick={async () => {
                     await odak().resetPermissions();
-                    setAlert(t('Focus\'un izinleri sıfırlandı.\n\nŞimdi “Kaydı Başlat”a bas: macOS ekran kaydı (ve seçtiysen kamera/mikrofon) iznini yeniden soracak. Ekran kaydı iznini verdikten sonra macOS Focus\'u kapatıp yeniden açmanı isteyebilir.'));
+                    setAlert(t('Focara\'nın izinleri sıfırlandı.\n\nŞimdi “Kaydı Başlat”a bas: macOS ekran kaydı (ve seçtiysen kamera/mikrofon) iznini yeniden soracak. Ekran kaydı iznini verdikten sonra macOS Focara\'yı kapatıp yeniden açmanı isteyebilir.'));
                   }}>{t('İzinleri Sıfırla')}</button>
                 )}
                 <button className="primary" onClick={() => setAlert(null)}>{t('Tamam')}</button>
@@ -201,7 +201,7 @@ function Home({ onOpen, onShowOpen, busy, onStart, onSettings }: {
           </span>
         </div>
         {recents.length === 0
-          ? <p className="muted small">{t('Henüz proje yok. Kayıtlar Filmler/Videolar klasöründeki “Focus” klasörüne kaydedilir.')}</p>
+          ? <p className="muted small">{t('Henüz proje yok. Kayıtlar Filmler/Videolar klasöründeki “Focara” klasörüne kaydedilir.')}</p>
           : <ul className="recent">{recents.map((p) => (
               <li key={p}><button className="link" onClick={() => onOpen(p)}>
                 <span className="name" data-raw>{baseName(p)}</span><span className="path" data-raw>{p}</span>

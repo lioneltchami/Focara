@@ -432,7 +432,7 @@ export const themes: Theme[] = [
       }
       ctx.strokeRect(w * 0.78, h * 0.035, w * 0.19, m * 0.09);
       ctx.beginPath(); ctx.moveTo(w * 0.78, h * 0.035 + m * 0.045); ctx.lineTo(w * 0.97, h * 0.035 + m * 0.045); ctx.stroke();
-      ctx.fillText('ODAK · REV A', w * 0.79, h * 0.035 + m * 0.032);
+      ctx.fillText('FOCARA · REV A', w * 0.79, h * 0.035 + m * 0.032);
       ctx.fillText('SCALE 1:1', w * 0.79, h * 0.035 + m * 0.077);
       vignette(ctx, w, h, 0.35);
     },

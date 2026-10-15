@@ -10,16 +10,16 @@ export const en: Record<string, string> = {
   'Ayarlar': 'Settings',
   'Ayarlar…': 'Settings…',
   'Ayarlar: dil ve tanılama': 'Settings: language and diagnostics',
-  'Henüz proje yok. Kayıtlar Filmler/Videolar klasöründeki “Focus” klasörüne kaydedilir.': 'No projects yet. Recordings are saved to the “Focus” folder in your Movies/Videos folder.',
+  'Henüz proje yok. Kayıtlar Filmler/Videolar klasöründeki “Focara” klasörüne kaydedilir.': 'No projects yet. Recordings are saved to the “Focara” folder in your Movies/Videos folder.',
   'Klasörde göster': 'Show in folder',
   'Kaydı Başlat': 'Start Recording',
   'Kaydı Başlat ve Ekle': 'Record and Add',
   'Başlatılıyor…': 'Starting…',
   'Ekran kaydı izni gerekiyor.': 'Screen recording permission is needed.',
-  'Sistem Ayarları › Gizlilik ve Güvenlik › Ekran ve Sistem Sesi Kaydı\'nda Focus\'u aç. macOS izin verildikten sonra uygulamanın yeniden başlatılmasını isteyebilir.':
-    'Turn Focus on in System Settings › Privacy & Security › Screen & System Audio Recording. macOS may ask you to restart the app after you allow it.',
+  'Sistem Ayarları › Gizlilik ve Güvenlik › Ekran ve Sistem Sesi Kaydı\'nda Focara\'yı aç. macOS izin verildikten sonra uygulamanın yeniden başlatılmasını isteyebilir.':
+    'Turn Focara on in System Settings › Privacy & Security › Screen & System Audio Recording. macOS may ask you to restart the app after you allow it.',
   'İzin İste / Ayarları Aç': 'Grant Permission',
-  'Focus güncellendiyse eski izinleri temizler': 'Clears old permissions (useful after Focus was updated)',
+  'Focara güncellendiyse eski izinleri temizler': 'Clears old permissions (useful after Focara was updated)',
   'İzinleri Sıfırla': 'Reset Permissions',
   'Yeniden Denetle': 'Check Again',
   'Ekran': 'Display',
@@ -47,12 +47,12 @@ export const en: Record<string, string> = {
   'Kamera/mikrofon açılamadı: {detail}': 'Couldn\'t open the camera/microphone: {detail}',
   'Kamera/mikrofon kaydı tamamlanamadı: {detail}': 'Couldn\'t finish the camera/microphone recording: {detail}',
   'Proje açılamadı.': 'Couldn\'t open the project.',
-  'Focus\'un izinleri sıfırlandı.\n\nŞimdi “Kaydı Başlat”a bas: macOS ekran kaydı (ve seçtiysen kamera/mikrofon) iznini yeniden soracak. Ekran kaydı iznini verdikten sonra macOS Focus\'u kapatıp yeniden açmanı isteyebilir.':
-    'Focus\'s permissions were reset.\n\nNow click “Start Recording”: macOS will ask for screen recording (and, if you picked them, camera/microphone) permission again. After you allow screen recording, macOS may ask you to quit and reopen Focus.',
-  'macOS ekran kaydına izin vermedi.\n\nSistem Ayarları › Gizlilik ve Güvenlik › Ekran ve Sistem Sesi Kaydı\'nda Focus açık görünüyorsa bile, uygulama güncellendiyse macOS eski izni geçersiz sayar: Focus\'u listeden “–” ile kaldırın, sonra Focus\'ta kaydı yeniden başlatıp izin verin ve Focus\'u yeniden açın.':
-    'macOS didn\'t allow screen recording.\n\nEven if Focus looks enabled in System Settings › Privacy & Security › Screen & System Audio Recording, macOS treats the old permission as invalid after an update: remove Focus from the list with “–”, then start a recording in Focus again, allow it, and reopen Focus.',
+  'Focara\'nın izinleri sıfırlandı.\n\nŞimdi “Kaydı Başlat”a bas: macOS ekran kaydı (ve seçtiysen kamera/mikrofon) iznini yeniden soracak. Ekran kaydı iznini verdikten sonra macOS Focara\'yı kapatıp yeniden açmanı isteyebilir.':
+    'Focara\'s permissions were reset.\n\nNow click “Start Recording”: macOS will ask for screen recording (and, if you picked them, camera/microphone) permission again. After you allow screen recording, macOS may ask you to quit and reopen Focara.',
+  'macOS ekran kaydına izin vermedi.\n\nSistem Ayarları › Gizlilik ve Güvenlik › Ekran ve Sistem Sesi Kaydı\'nda Focara açık görünüyorsa bile, uygulama güncellendiyse macOS eski izni geçersiz sayar: Focara\'yı listeden “–” ile kaldırın, sonra Focara\'da kaydı yeniden başlatıp izin verin ve Focara\'yı yeniden açın.':
+    'macOS didn\'t allow screen recording.\n\nEven if Focara looks enabled in System Settings › Privacy & Security › Screen & System Audio Recording, macOS treats the old permission as invalid after an update: remove Focara from the list with “–”, then start a recording in Focara again, allow it, and reopen Focara.',
   'Geçersiz yol: {path}': 'Invalid path: {path}',
-  '“{name}” bir Focus projesi değil (project.json yok).': '“{name}” isn\'t a Focus project (no project.json).',
+  '“{name}” bir Focara projesi değil (project.json yok).': '“{name}” isn\'t a Focara project (no project.json).',
   'Projedeki medya dosyaları bulunamadı: {files}': 'Media files of the project are missing: {files}',
   'Proje okunamadı: {detail}': 'Couldn\'t read the project: {detail}',
   'Proje kaydedilemedi: {detail}': 'Couldn\'t save the project: {detail}',
@@ -93,18 +93,18 @@ export const en: Record<string, string> = {
 
   // ---- settings
   'Sistem dili': 'System language',
-  'Bilgisayarının dili: {name}. “Sistem dili” seçiliyken Focus bu dille açılır; Türkçe dışındaki diller için İngilizce kullanılır.':
-    'Your computer\'s language: {name}. With “System language”, Focus follows it; for languages other than Turkish it uses English.',
+  'Bilgisayarının dili: {name}. “Sistem dili” seçiliyken Focara bu dille açılır; Türkçe dışındaki diller için İngilizce kullanılır.':
+    'Your computer\'s language: {name}. With “System language”, Focara follows it; for languages other than Turkish it uses English.',
   'Tanılama': 'Diagnostics',
   'Bir sorun olursa bu kayıt dosyası neyin ters gittiğini gösterir. Videolarından hiçbir şey içermez.': 'If something goes wrong, this log shows what happened. It contains nothing from your videos.',
 
   // ---- menus
-  'Focus Hakkında': 'About Focus',
+  'Focara Hakkında': 'About Focara',
   'Servisler': 'Services',
-  'Focus\'u Gizle': 'Hide Focus',
+  'Focara\'yı Gizle': 'Hide Focara',
   'Diğerlerini Gizle': 'Hide Others',
   'Tümünü Göster': 'Show All',
-  'Focus\'tan Çık': 'Quit Focus',
+  'Focara\'dan Çık': 'Quit Focara',
   'Dosya': 'File',
   'Yeni Kayıt': 'New Recording',
   'Proje Aç…': 'Open Project…',
@@ -124,7 +124,7 @@ export const en: Record<string, string> = {
 
   // ---- file dialogs
   'Proje Aç': 'Open Project',
-  'Focus Projesi': 'Focus Project',
+  'Focara Projesi': 'Focara Project',
   'Video Ekle': 'Add Video',
   'Videolar': 'Videos',
   'Arka Plan Görseli Seç': 'Choose a Background Image',

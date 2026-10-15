@@ -87,12 +87,12 @@ export function RecordSetup({ busy, onStart, startLabel = `● ${t('Kaydı Başl
     {!available.ok && <div className="notice warn">{available.reason}</div>}
     {needsPermission && (
       <div className="notice warn">
-        <b>{t('Ekran kaydı izni gerekiyor.')}</b> {t('Sistem Ayarları › Gizlilik ve Güvenlik › Ekran ve Sistem Sesi Kaydı\'nda Focus\'u aç. macOS izin verildikten sonra uygulamanın yeniden başlatılmasını isteyebilir.')}
+        <b>{t('Ekran kaydı izni gerekiyor.')}</b> {t('Sistem Ayarları › Gizlilik ve Güvenlik › Ekran ve Sistem Sesi Kaydı\'nda Focara\'yı aç. macOS izin verildikten sonra uygulamanın yeniden başlatılmasını isteyebilir.')}
         <div className="row"><button className="primary" onClick={async () => {
             if (!(await odak().requestScreenPermission())) await odak().openPermissionSettings();
             void refresh();
           }}>{t('İzin İste / Ayarları Aç')}</button>
-          <button onClick={async () => { await odak().resetPermissions(); void refresh(); }} title={t('Focus güncellendiyse eski izinleri temizler')}>{t('İzinleri Sıfırla')}</button>
+          <button onClick={async () => { await odak().resetPermissions(); void refresh(); }} title={t('Focara güncellendiyse eski izinleri temizler')}>{t('İzinleri Sıfırla')}</button>
           <button onClick={() => void refresh()}>{t('Yeniden Denetle')}</button></div>
       </div>
     )}

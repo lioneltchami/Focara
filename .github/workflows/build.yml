@@ -8,10 +8,12 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write   # attach installers to a release when a v* tag is pushed
+  contents: read
 
 jobs:
   build:
+    permissions:
+      contents: read
     strategy:
       fail-fast: false
       matrix:
@@ -24,6 +26,16 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - name: Verify release tag matches package version
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          VERSION="$(node -p "require('./package.json').version")"
+          if [ "$TAG" != "$VERSION" ]; then
+            echo "Tag version ($TAG) must match package.json version ($VERSION)."
+            exit 1
+          fi
       - run: npm run typecheck
       - run: npm test
 
@@ -61,19 +73,56 @@ jobs:
           CSC_IDENTITY_AUTO_DISCOVERY: false
       - uses: actions/upload-artifact@v4
         with:
-          name: Focus-${{ runner.os }}
+          name: Focara-${{ runner.os }}
           path: |
             release/*.dmg
             release/*.zip
             release/*.exe
           if-no-files-found: error
 
-      - name: Publish release (v* tags only)
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download platform installers
+        uses: actions/download-artifact@v4
+        with:
+          pattern: Focara-*
+          path: release
+          merge-multiple: true
+
+      - name: Publish GitHub release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            release/*.dmg
-            release/*.zip
-            release/*.exe
+            release/*
           generate_release_notes: true
+
+  homebrew:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Update Homebrew tap cask
+        env:
+          HOMEBREW_TAP_DEPLOY_KEY: ${{ secrets.HOMEBREW_TAP_DEPLOY_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "${HOMEBREW_TAP_DEPLOY_KEY:-}" ]; then
+            echo "::notice::HOMEBREW_TAP_DEPLOY_KEY is not configured; skipping Homebrew tap update."
+            exit 0
+          fi
+          VERSION="${GITHUB_REF_NAME#v}"
+          TMP="$(mktemp -d)"
+          curl -fsSL -o "$TMP/Focara-arm64.dmg" \
+            "https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}/Focara-${VERSION}-mac-arm64.dmg"
+          curl -fsSL -o "$TMP/Focara-x64.dmg" \
+            "https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}/Focara-${VERSION}-mac-x64.dmg"
+          ARM_SHA="$(sha256sum "$TMP/Focara-arm64.dmg" | awk '{print $1}')"
+          INTEL_SHA="$(sha256sum "$TMP/Focara-x64.dmg" | awk '{print $1}')"
+          bash scripts/update-homebrew-cask.sh "$VERSION" "$ARM_SHA" "$INTEL_SHA"
