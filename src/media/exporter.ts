@@ -11,7 +11,7 @@ import {
 } from '../core/model.ts';
 import { odak } from '../bridge.ts';
 import type { ClipRenderData } from '../render/renderer.ts';
-import type { MediaLibrary } from './media.ts';
+import { type MediaLibrary, frameTime } from './media.ts';
 import { renderSample } from './player.ts';
 
 const SAMPLE_RATE = 48000;
@@ -169,9 +169,9 @@ export async function* renderFrames(p: Project, lib: MediaLibrary, data: ClipRen
         const media = await lib.open(assetOf(p, clip.mediaID)!.videoFile);
         const times: number[] = [];
         for (let j = k; j < count; j++) { const l = at(j); if (l.index !== readerClip) break; times.push(l.sourceTime); }
-        reader = media.videoSink ? media.videoSink.samplesAtTimestamps(times) : null;
+        reader = media.videoSink ? media.videoSink.samplesAtTimestamps(times.map((t) => frameTime(media, t))) : null;
         const cam = await lib.camera(p, clip);
-        camReader = cam ? cam.videoSink!.samplesAtTimestamps(times) : null;
+        camReader = cam ? cam.videoSink!.samplesAtTimestamps(times.map((t) => frameTime(cam, t))) : null;
       }
       const r = reader ? await reader.next() : null;
       const sample = r && !r.done ? r.value : null;
@@ -255,9 +255,9 @@ async function writeFrame(p: Project, lib: MediaLibrary, settings: ExportSetting
   const clip = p.clips[loc.index];
   const data = await lib.allRenderData(p);
   const media = await lib.open(assetOf(p, clip.mediaID)!.videoFile);
-  const sample = media.videoSink ? await media.videoSink.getSample(loc.sourceTime) : null;
+  const sample = media.videoSink ? await media.videoSink.getSample(frameTime(media, loc.sourceTime)) : null;
   const cam = await lib.camera(p, clip);
-  const camSample = cam ? await cam.videoSink!.getSample(loc.sourceTime) : null;
+  const camSample = cam ? await cam.videoSink!.getSample(frameTime(cam, loc.sourceTime)) : null;
   renderSample(ctx, size, sample, data[loc.index], loc.sourceTime, camSample);
   sample?.close(); camSample?.close();
   const blob = await canvas.convertToBlob({ type: 'image/png' });

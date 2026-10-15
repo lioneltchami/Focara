@@ -208,10 +208,30 @@ export function insertClip(p: Project, clip: Clip, afterIndex = p.clips.length -
 
 // ---------------------------------------------------------------- quiet moments
 
+/**
+ * When the screen actually changed, from the video's packets (time, size, key frame or not).
+ * macOS records frames only when something changes, so every frame counts. Some encoders (the
+ * Windows one) write a constant frame rate instead and repeat the last image while the screen is
+ * still: those repeats are tiny packets, so a constant-rate stream counts only frames that are
+ * clearly bigger than the repeats. Key frames never count (they come on a timer).
+ */
+export function screenChanges(packets: { t: number; size: number; key: boolean }[]): Float64Array {
+  const ps = [...packets].sort((a, b) => a.t - b.t);
+  if (ps.length < 3) return Float64Array.from(ps.map((p) => p.t));
+  const gaps = ps.slice(1).map((p, i) => p.t - ps[i].t).sort((a, b) => a - b);
+  const median = gaps[Math.floor(gaps.length / 2)];
+  const regular = gaps.filter((g) => Math.abs(g - median) <= median * 0.15).length / gaps.length;
+  if (regular < 0.9) return Float64Array.from(ps.map((p) => p.t)); // variable rate: frames are changes
+  const sizes = ps.filter((p) => !p.key).map((p) => p.size).sort((a, b) => a - b);
+  const repeat = sizes[Math.floor(sizes.length * 0.1)] ?? 0;
+  const threshold = Math.max(1200, repeat * 4);
+  return Float64Array.from(ps.filter((p) => !p.key && p.size > threshold).map((p) => p.t));
+}
+
 export interface Activity {
   /** Cursor track of the recording (moves and clicks count as activity). */
   cursor: CursorTrack | null;
-  /** Times of video frames: screen captures only deliver frames when the screen changes. */
+  /** Times when the screen changed (see screenChanges). */
   frameTimes: Float64Array | null;
   /** Audio loudness envelope (peak per `audioStep` seconds), mixed over all sources. */
   audio: Float32Array | null;

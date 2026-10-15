@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { type Project, clipDuration, clipStarts, followCursor, locate, newClip, newProject, projectDuration } from '../src/core/model.ts';
 import {
-  applyQuietRanges, deleteClip, duplicateClip, findQuietRanges, insertClip, isolateRange, moveClip, removeRange,
+  applyQuietRanges, deleteClip, screenChanges, duplicateClip, findQuietRanges, insertClip, isolateRange, moveClip, removeRange,
   setClipSpeed, speedRange, splitAt, trimClip,
 } from '../src/core/edit.ts';
 
@@ -114,4 +114,20 @@ test('quiet moments: no frames, no cursor, no sound', () => {
   const cut = applyQuietRanges(p, 'M', ranges, 'cut');
   assert.ok(near(projectDuration(cut), 20 - len, 1e-6));
   assert.ok(cut.clips.every((c) => clipDuration(c) > 0));
+});
+
+test('screen changes: variable-rate frames all count; constant-rate repeats do not', () => {
+  // macOS-like: frames only when something changes (irregular gaps) — every one counts.
+  const vfr = [0, 0.016, 0.033, 1.2, 1.216, 3.5].map((t, i) => ({ t, size: 300 + i, key: i === 0 }));
+  assert.deepEqual([...screenChanges(vfr)], [0, 0.016, 0.033, 1.2, 1.216, 3.5]);
+  // Windows-like: 30 fps; a still screen repeats tiny frames, real changes are big; key frames ignored.
+  const cfr = Array.from({ length: 300 }, (_, i) => {
+    const t = (i + 1) / 30, busy = (t > 2 && t < 4) || (t > 7.5 && t < 8);
+    return { t, size: i % 60 === 0 ? 90000 : busy ? 25000 : 400, key: i % 60 === 0 };
+  });
+  const changes = [...screenChanges(cfr)];
+  assert.ok(changes.length > 50 && changes.every((t) => (t > 2 && t < 4) || (t > 7.5 && t < 8)), `${changes.length} changes`);
+  // …so a quiet moment is found in the still part (4–7.5 s) of a constant-rate recording.
+  const quiet = findQuietRanges({ cursor: null, frameTimes: screenChanges(cfr), audio: null, audioStep: 0.1 }, 10);
+  assert.ok(quiet.some((r) => r.start < 4.8 && r.end > 6.7), JSON.stringify(quiet)); // minus the safety margins
 });

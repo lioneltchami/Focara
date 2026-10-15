@@ -59,19 +59,19 @@ const vdur = await vt.computeDuration();
 check(fin.duration > 2.5 && fin.duration < 6, `recording length ${fin.duration.toFixed(2)}s`);
 check(vt && (await vt.getCodecParameterString())?.startsWith('avc') || fin.width > 4096, `video codec ${await vt.getCodecParameterString()}`);
 check(vt.displayWidth === fin.width && vt.displayHeight === fin.height, `video ${vt.displayWidth}×${vt.displayHeight}`);
-// Every frame lies inside the recording. (On a still screen the last frame is shown until the
-// end; macOS ends the video exactly there, the Windows encoder may give that frame a longer duration.)
+// The video covers the recording from its start. macOS writes frames only when the screen changes
+// and ends the video exactly at the stop; the Windows encoder writes a constant frame rate (it
+// repeats the last image, also a little past the stop — the editor uses the recording's duration).
 const packets = new EncodedPacketSink(vt);
-const lastPacket = await packets.getPacket(Infinity);
-{
-  const ts = [];
-  for (let pk = await packets.getFirstPacket({ metadataOnly: true }); pk; pk = await packets.getNextPacket(pk, { metadataOnly: true })) ts.push(pk.timestamp);
-  ts.sort((a, b) => a - b);
-  console.log(`INFO: ${ts.length} frames in the file (helper sent ${fin.frames ?? '?'}, last at ${fin.lastFrame ?? '?'}s); first ${ts.slice(0, 4).map((x) => x.toFixed(3)).join(' ')} … last ${ts.slice(-4).map((x) => x.toFixed(3)).join(' ')}`);
-}
-check(!!lastPacket && lastPacket.timestamp <= fin.duration + 0.05, `last frame at ${lastPacket?.timestamp.toFixed(2)}s (≤ recording ${fin.duration.toFixed(2)}s)`);
-if (process.platform === 'darwin') check(Math.abs(vdur - fin.duration) < 0.1, `video ends with the recording (${vdur.toFixed(2)}s)`);
-else console.log(`NOTE: video track ${vdur.toFixed(2)}s`);
+const ts = [];
+for (let pk = await packets.getFirstPacket({ metadataOnly: true }); pk; pk = await packets.getNextPacket(pk, { metadataOnly: true })) ts.push(pk.timestamp);
+ts.sort((a, b) => a - b);
+console.log(`INFO: ${ts.length} frames in the file (helper sent ${fin.frames ?? '?'}); first ${ts.slice(0, 3).map((x) => x.toFixed(3)).join(' ')} … last ${ts.slice(-3).map((x) => x.toFixed(3)).join(' ')}`);
+check(ts.length > 0 && ts[0] <= 0.05, `video starts with the recording (first frame ${ts[0]?.toFixed(3)}s)`);
+check(ts.length > 0 && ts[ts.length - 1] >= fin.duration - 0.25, `video covers the recording (last frame ${ts[ts.length - 1]?.toFixed(2)}s of ${fin.duration.toFixed(2)}s)`);
+if (process.platform === 'darwin') {
+  check(ts[ts.length - 1] <= fin.duration + 0.05 && Math.abs(vdur - fin.duration) < 0.1, `video ends with the recording (${vdur.toFixed(2)}s)`);
+} else console.log(`NOTE: constant-rate video runs to ${vdur.toFixed(2)}s (recording ${fin.duration.toFixed(2)}s)`);
 const cursor = JSON.parse(fs.readFileSync(path.join(out, fin.cursor), 'utf8'));
 check(Array.isArray(cursor.samples) && cursor.samples.length > 0 && Array.isArray(cursor.clicks), `cursor.json has ${cursor.samples.length} samples`);
 if (fin.systemAudio) {

@@ -1,6 +1,7 @@
 import { ALL_FORMATS, AudioBufferSink, CustomSource, EncodedPacketSink, Input, VideoSampleSink, type InputAudioTrack, type InputVideoTrack } from 'mediabunny';
 import { type Clip, type CursorTrack, type MediaAsset, type Project, type StyleSettings, assetOf, clipStarts } from '../core/model.ts';
 import { cameraTrack } from '../core/cameraLayout.ts';
+import { screenChanges } from '../core/edit.ts';
 import { type ClipRenderData, makeRenderData } from '../render/renderer.ts';
 import { odak } from '../bridge.ts';
 
@@ -14,7 +15,12 @@ export interface MediaFile {
   audioSink: AudioBufferSink | null;
   /** Packet index of the video (finds key frames without decoding). */
   videoPackets: EncodedPacketSink | null;
+  /** Time of the first video frame. Some encoders start a little after 0 (Windows: one frame). */
+  firstTime: number;
 }
+
+/** A time to ask a video for: never before its first frame, which stands in for the moment before it. */
+export const frameTime = (m: MediaFile, t: number) => Math.max(t, m.firstTime);
 
 export class MediaLibrary {
   private files = new Map<string, Promise<MediaFile>>();
@@ -47,6 +53,7 @@ export class MediaLibrary {
           videoSink: video && (await video.canDecode()) ? new VideoSampleSink(video) : null,
           audioSink: audio && (await audio.canDecode()) ? new AudioBufferSink(audio) : null,
           videoPackets: video ? new EncodedPacketSink(video) : null,
+          firstTime: video ? Math.max(0, await video.getFirstTimestamp().catch(() => 0)) : 0,
         };
       })();
       this.files.set(rel, f);
@@ -161,9 +168,11 @@ export class MediaLibrary {
         const m = await this.open(asset.videoFile);
         if (!m.video) return null;
         const sink = new EncodedPacketSink(m.video);
-        const times: number[] = [];
-        for (let p = await sink.getFirstPacket({ metadataOnly: true }); p; p = await sink.getNextPacket(p, { metadataOnly: true })) times.push(p.timestamp);
-        return Float64Array.from(times.sort((a, b) => a - b));
+        const packets: { t: number; size: number; key: boolean }[] = [];
+        for (let p = await sink.getFirstPacket({ metadataOnly: true }); p; p = await sink.getNextPacket(p, { metadataOnly: true })) {
+          packets.push({ t: p.timestamp, size: p.byteLength, key: p.type === 'key' });
+        }
+        return screenChanges(packets);
       })().catch(() => null);
       this.frameTimesCache.set(asset.id, f);
     }

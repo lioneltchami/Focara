@@ -1,7 +1,7 @@
 import type { VideoSample, VideoSampleSink } from 'mediabunny';
 import { type ExportSettings, type Project, type Size, assetOf, canvasSize, clipDuration, clipStarts, locate, projectDuration } from '../core/model.ts';
 import { type ClipRenderData, drawFrame } from '../render/renderer.ts';
-import type { MediaLibrary } from './media.ts';
+import { type MediaLibrary, frameTime } from './media.ts';
 import { odak } from '../bridge.ts';
 
 /** Geometry is resolution independent; the preview renders at up to 1080p. */
@@ -160,8 +160,8 @@ export class Player {
     }
     const cam = await this.lib.camera(p, clip);
     const [sample, camSample] = await Promise.all([
-      media.videoSink ? media.videoSink.getSample(at) : null,
-      cam ? cam.videoSink!.getSample(loc.sourceTime) : null,
+      media.videoSink ? media.videoSink.getSample(frameTime(media, at)) : null,
+      cam ? cam.videoSink!.getSample(frameTime(cam, loc.sourceTime)) : null,
     ]);
     if (this.playing) { sample?.close(); camSample?.close(); return; }
     renderSample(this.ctx, this.size, sample, this.data[loc.index], loc.sourceTime, camSample);
