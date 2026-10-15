@@ -73,7 +73,7 @@ jobs:
           CSC_IDENTITY_AUTO_DISCOVERY: false
       - uses: actions/upload-artifact@v4
         with:
-          name: Focus-${{ runner.os }}
+          name: Focara-${{ runner.os }}
           path: |
             release/*.dmg
             release/*.zip
@@ -90,7 +90,7 @@ jobs:
       - name: Download platform installers
         uses: actions/download-artifact@v4
         with:
-          pattern: Focus-*
+          pattern: Focara-*
           path: release
           merge-multiple: true
 
@@ -119,10 +119,10 @@ jobs:
           fi
           VERSION="${GITHUB_REF_NAME#v}"
           TMP="$(mktemp -d)"
-          curl -fsSL -o "$TMP/Focus-arm64.dmg" \
-            "https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}/Focus-${VERSION}-mac-arm64.dmg"
-          curl -fsSL -o "$TMP/Focus-x64.dmg" \
-            "https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}/Focus-${VERSION}-mac-x64.dmg"
-          ARM_SHA="$(sha256sum "$TMP/Focus-arm64.dmg" | awk '{print $1}')"
-          INTEL_SHA="$(sha256sum "$TMP/Focus-x64.dmg" | awk '{print $1}')"
+          curl -fsSL -o "$TMP/Focara-arm64.dmg" \
+            "https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}/Focara-${VERSION}-mac-arm64.dmg"
+          curl -fsSL -o "$TMP/Focara-x64.dmg" \
+            "https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}/Focara-${VERSION}-mac-x64.dmg"
+          ARM_SHA="$(sha256sum "$TMP/Focara-arm64.dmg" | awk '{print $1}')"
+          INTEL_SHA="$(sha256sum "$TMP/Focara-x64.dmg" | awk '{print $1}')"
           bash scripts/update-homebrew-cask.sh "$VERSION" "$ARM_SHA" "$INTEL_SHA"

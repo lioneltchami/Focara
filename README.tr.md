@@ -1,18 +1,18 @@
-<p align="center"><img src="docs/images/tr/banner.png" alt="ODAK / FOCUS: tıkladığın yere zoom yapan ekran kayıtları; kamera düzenleri, büyüteç ve gerçek bir editör" width="100%"></p>
+<p align="center"><img src="docs/images/tr/banner.png" alt="Focara logosu" width="100%"></p>
 
-# ODAK / FOCUS
+# Focara
 
-🇬🇧 [English README](README.md) · Uygulamanın adı Focus; ilk adı *Odak*'tı.
+🇬🇧 [English README](README.md) · Focara'nın önceki adı Focus, daha önceki adı Odak'tı.
 
-![Focus demo](docs/images/demo.gif)
+![Focara demo](docs/images/demo.gif)
 
 **Editör çalışırken:** Her tıklama zaten bir zoom. Birini derinleştir ya da sabit bir noktaya çevir, kameraya kendi düzenlerini ver:
 
-![Focus editörü: zoom derinleştirilip sabit bir noktaya çevriliyor, kamera tam ekran olup sol üste kayıyor](docs/images/editing.gif)
+![Focara editörü: zoom derinleştirilip sabit bir noktaya çevriliyor, kamera tam ekran olup sol üste kayıyor](docs/images/editing.gif)
 
 İmleci takip eden bir büyüteç ekle, temaları dene:
 
-![Focus editörü: grafiğin üstüne büyüteç ekleniyor, ardından dört tema](docs/images/looks.gif)
+![Focara editörü: grafiğin üstüne büyüteç ekleniyor, ardından dört tema](docs/images/looks.gif)
 
 Makasla kes, yavaş bir kısmı ×4 hızlandır, dışa aktar:
 
@@ -44,10 +44,10 @@ Ekran kaydı, otomatik zoom ve zoom'ları elle düzenleme. **macOS ve Windows'ta
   ![Profesyonel temalar](docs/images/themes-business.png)
 - **İmleç:** Beyaz ok, siyah ok, renkli ok ya da nokta. Renk, boyut, vurgu halkası, hareketsizken gizleme, hareket yumuşatma ve tıklama efekti (halka ya da dolgu) ayarlanabilir.
 - Projeler `.focus` klasörlerinde saklanır: ham medya, imleç verisi ve düzenlemeler. Uygulamayı kapatıp açınca kaldığın yerden devam edersin.
-- **Odak'tan geçiş:** Uygulamanın eski adı Odak'tı. Focus'u kurduktan sonra *Uygulamalar*'dan Odak'ı silebilirsin (Windows'ta kaldır). Focus ilk açılışta son projelerini, dil ve mikrofon/kamera seçimlerini getirir; **Filmler/Odak** içindeki `.odak` projeleri eskisi gibi açılır. macOS ekran kaydı, kamera ve mikrofon iznini Focus için bir kez daha sorar.
-- **Dil:** Arayüz Türkçe ve İngilizce. Focus bilgisayarının diliyle açılır; **⚙ Ayarlar**'dan istediğin an değiştirebilirsin (aşağıda [Dil](#dil)).
+- **Focus veya Odak'tan geçiş:** Focara, önceki uygulama profilindeki son projeleri, dili ve mikrofon/kamera seçimlerini getirir. Var olan `.focus` ve `.odak` projeleri yerlerinde kalır ve açılmaya devam eder; yeni kayıtlar **Filmler/Focara** (macOS) ya da **Videolar/Focara** (Windows) içine kaydedilir.
+- **Dil:** Arayüz Türkçe ve İngilizce. Focara bilgisayarının diliyle açılır; **⚙ Ayarlar**'dan istediğin an değiştirebilirsin (aşağıda [Dil](#dil)).
 
-![Focus editörü, Türkçe arayüz](docs/images/tr/editor.png)
+![Focara editörü, Türkçe arayüz](docs/images/tr/editor.png)
 
 ## İndir
 
@@ -55,9 +55,9 @@ Ekran kaydı, otomatik zoom ve zoom'ları elle düzenleme. **macOS ve Windows'ta
 
 | Sistem | Dosya | Not |
 |---|---|---|
-| macOS 14+ (Apple Silicon: M1–M4) | `Focus-x.y.z-mac-arm64.dmg` | Uygulama imzalı/notarize değil. İlk açılışta Sistem Ayarları › Gizlilik ve Güvenlik › **Yine de Aç**. |
-| macOS 14+ (Intel) | `Focus-x.y.z-mac-x64.dmg` | Aynı. Rosetta altında selftest'i geçiyor; gerçek bir Intel Mac'te henüz denenmedi. |
-| Windows 10 (2004+) / 11 | `Focus-Setup-x.y.z.exe` | İmzalı değil. SmartScreen uyarısında **Ek bilgi › Yine de çalıştır**. Kurulumsuz kullanım için `Focus-x.y.z-win-x64.zip`. |
+| macOS 14+ (Apple Silicon: M1–M4) | `Focara-x.y.z-mac-arm64.dmg` | Uygulama imzalı/notarize değil. İlk açılışta Sistem Ayarları › Gizlilik ve Güvenlik › **Yine de Aç**. |
+| macOS 14+ (Intel) | `Focara-x.y.z-mac-x64.dmg` | Aynı. Rosetta altında selftest'i geçiyor; gerçek bir Intel Mac'te henüz denenmedi. |
+| Windows 10 (2004+) / 11 | `Focara-Setup-x.y.z.exe` | İmzalı değil. SmartScreen uyarısında **Ek bilgi › Yine de çalıştır**. Kurulumsuz kullanım için `Focara-x.y.z-win-x64.zip`. |
 
 ### macOS'ta Homebrew ile kurulum
 
@@ -65,19 +65,19 @@ Ekran kaydı, otomatik zoom ve zoom'ları elle düzenleme. **macOS ve Windows'ta
 
 ```bash
 brew tap lioneltchami/tap
-brew install --cask focus
+brew install --cask focara
 ```
 
-Homebrew cask'i, dağıtım anahtarı tanımlıysa her sürümden sonra otomatik güncellenir. Focus henüz imzalı/notarize değil; ilk açılışta **Sistem Ayarları › Gizlilik ve Güvenlik › Yine de Aç** gerekebilir.
+Homebrew cask'i, dağıtım anahtarı tanımlıysa her sürümden sonra otomatik güncellenir. Focara henüz imzalı/notarize değil; ilk açılışta **Sistem Ayarları › Gizlilik ve Güvenlik › Yine de Aç** gerekebilir.
 
 macOS'ta ilk kayıtta **Ekran ve Sistem Sesi Kaydı** izni istenir. Mikrofon kullanılacaksa mikrofon izni de istenir. İzinden sonra uygulamayı yeniden başlatmak gerekebilir.
 
 ## Dil
 
-Focus **Türkçe** ve **İngilizce** konuşur.
+Focara **Türkçe** ve **İngilizce** konuşur.
 
-- **Otomatik:** Bilgisayarının ilk dili Türkçe ise Focus Türkçe açılır, başka bir dil ise İngilizce.
-- **İstediğin an değiştir:** **⚙ Ayarlar**'a tıkla (ana ekranın sağ üstünde ya da editörün araç çubuğundaki ⚙ düğmesi; macOS'ta *Focus › Ayarlar…*, Windows'ta *Dosya › Ayarlar…*, ya da `⌘,` / `Ctrl+,`) ve **Sistem dili**, **Türkçe** ya da **English** seç. Bütün arayüz hemen değişir; açık proje açık kalır, hiçbir şey kaybolmaz.
+- **Otomatik:** Bilgisayarının ilk dili Türkçe ise Focara Türkçe açılır, başka bir dil ise İngilizce.
+- **İstediğin an değiştir:** **⚙ Ayarlar**'a tıkla (ana ekranın sağ üstünde ya da editörün araç çubuğundaki ⚙ düğmesi; macOS'ta *Focara › Ayarlar…*, Windows'ta *Dosya › Ayarlar…*, ya da `⌘,` / `Ctrl+,`) ve **Sistem dili**, **Türkçe** ya da **English** seç. Bütün arayüz hemen değişir; açık proje açık kalır, hiçbir şey kaybolmaz.
 - Menü çubuğunda iki dilde yazılmış bir **Dil · Language** menüsü de var; hangi dil açık olursa olsun kolayca bulunur.
 - Seçimin hatırlanır. Projeler dile bağlı değildir: Türkçe arayüzde yapılan proje İngilizcede de aynen açılır.
 
@@ -103,7 +103,7 @@ npm run dist:mac              # macOS: .dmg / .zip  → release/
 npm run dist:win              # Windows: kurulum .exe / .zip → release/
 ```
 
-Geliştirme modunda (`npm run dev`) macOS izinleri "Electron" uygulamasına verilir; paketlenmiş uygulamada "Focus"a.
+Geliştirme modunda (`npm run dev`) macOS izinleri "Electron" uygulamasına verilir; paketlenmiş uygulamada "Focara"ya.
 
 ## Kullanım
 
@@ -183,7 +183,7 @@ Kısayollar: boşluk (oynat/duraklat), ←/→ (kare kare, Shift ile 10 kare), V
   - Sesler ilk ekran karesine hizalanmış 16 bit WAV olarak yazılır. Boşluklara sessizlik eklenir, çakışan kısımlar atılır.
 - **Önizleme = dışa aktarma:** İkisi de aynı `drawFrame` fonksiyonunu ve aynı kare seçme kuralını kullanır. Kural şu: kaynakta o andan önce ya da o anda başlayan son kare. Dışa aktarmada AAC kodlayıcının eklediği "priming" gecikmesi ölçülüp telafi edilir.
 
-Proje paketi (`~/Movies/Focus` ya da `~/Videos/Focus`):
+Proje paketi (`~/Movies/Focara` ya da `~/Videos/Focara`):
 
 ```
 Kayıt 2026-10-15 10.12.30.focus/
@@ -249,5 +249,5 @@ Bunu sağlayan beş şey:
 - 4096×2304'ten büyük ekranlar: macOS'ta kayıt bu boyuta sığdırılır. Windows'ta HEVC kullanılır ve bu kayıtlar ancak HEVC çözebilen bilgisayarlarda düzenlenebilir.
 - Linux'ta düzenleme ve dışa aktarma çalışır, kayıt henüz desteklenmiyor.
 - Hızı 1× olmayan kliplerde ses kapatılır (sesi perdesini bozmadan hızlandırma henüz yok).
-- Durgun anlar yalnızca Focus'un kendi ekran kayıtlarında aranır; içe aktarılan videolarda imleç verisi olmadığı için analiz edilmez.
+- Durgun anlar yalnızca Focara'nın kendi ekran kayıtlarında aranır; içe aktarılan videolarda imleç verisi olmadığı için analiz edilmez.
 - Windows'ta kullanılan yakalama kütüphanesi anahtar kare aralığını ayarlamaya izin vermiyor. Oynatıcı sonraki klibi gerektiğinde daha erken açarak bunu telafi eder. Windows'taki performans henüz ölçülmedi; CI iş akışı performans testini orada rapor olarak çalıştırır.

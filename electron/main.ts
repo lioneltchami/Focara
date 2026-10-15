@@ -26,7 +26,7 @@ const PROJECT_EXT = '.focus';
 let mainWindow: BrowserWindow | null = null;
 let hudWindow: BrowserWindow | null = null;
 
-app.setName('Focus');
+app.setName('Focara');
 if (isTest) {
   // Tests keep their own app data (recent projects, settings), away from the user's.
   app.setPath('userData', path.join(os.tmpdir(), 'odak-test-data'));
@@ -37,7 +37,7 @@ if (isTest) {
 
 // ---------------------------------------------------------------- diagnostics log
 
-/** ~/Library/Logs/Focus/focus.log (macOS) or %APPDATA%/Focus/logs/focus.log (Windows). */
+/** ~/Library/Logs/Focara/focus.log (macOS) or %APPDATA%/Focara/logs/focus.log (Windows). */
 const logFile = () => path.join(app.getPath('logs'), 'focus.log');
 function log(...parts: unknown[]) {
   const line = `${new Date().toISOString()} ${parts.map((p) => (typeof p === 'string' ? p : JSON.stringify(p))).join(' ')}\n`;
@@ -55,28 +55,30 @@ function permissions() {
 ipcMain.on('log', (_e, ...parts: unknown[]) => log('[ui]', ...parts));
 ipcMain.handle('log:reveal', () => { log('log revealed'); shell.showItemInFolder(logFile()); });
 
-// The app used to be called Odak. On the first start as Focus, bring over the recent projects, the
-// settings and the remembered microphone/camera (localStorage) from Odak's folder. Nothing is
-// overwritten, and the projects themselves stay where they are.
+// Focara was previously called Focus; the original app name was Odak. On first start as Focara, bring over profile data
+// from the newest existing app folder. Nothing is overwritten, and project files stay where they are.
 if (!isTest) {
-  const from = path.join(app.getPath('appData'), 'Odak'), to = app.getPath('userData');
-  if (from !== to && fs.existsSync(from)) {
-    for (const name of ['recents.json', 'settings.json', 'Local Storage']) {
-      const src = path.join(from, name), dst = path.join(to, name);
-      try {
-        if (fs.existsSync(src) && !fs.existsSync(dst)) {
-          fs.mkdirSync(to, { recursive: true });
-          fs.cpSync(src, dst, { recursive: true });
-          log('brought over from Odak', name);
-        }
-      } catch (e) { log('could not bring over from Odak', name, String(e)); }
+  const to = app.getPath('userData');
+  for (const previousName of ['Focus', 'Odak']) {
+    const from = path.join(app.getPath('appData'), previousName);
+    if (from !== to && fs.existsSync(from)) {
+      for (const name of ['recents.json', 'settings.json', 'Local Storage']) {
+        const src = path.join(from, name), dst = path.join(to, name);
+        try {
+          if (fs.existsSync(src) && !fs.existsSync(dst)) {
+            fs.mkdirSync(to, { recursive: true });
+            fs.cpSync(src, dst, { recursive: true });
+            log('brought over from previous app folder', { previousName, name });
+          }
+        } catch (e) { log('could not bring over from previous app folder', { previousName, name, error: String(e) }); }
+      }
     }
   }
 }
 
 // ---------------------------------------------------------------- paths & files
 
-const defaultFolder = () => path.join(app.getPath('videos'), 'Focus'); // ~/Movies on macOS, ~/Videos on Windows
+const defaultFolder = () => path.join(app.getPath('videos'), 'Focara'); // ~/Movies on macOS, ~/Videos on Windows
 let selftestDir: string | null = null;
 
 /** Resolves a package-relative path and refuses anything that escapes the package. */
@@ -146,7 +148,7 @@ ipcMain.handle('project:create', (_e, name: string) => createPackage(name));
 
 ipcMain.handle('project:load', async (_e, pkg: string) => {
   const file = path.join(pkg, 'project.json');
-  if (!fs.existsSync(file)) return { error: t('“{name}” bir Focus projesi değil (project.json yok).', { name: path.basename(pkg) }) };
+  if (!fs.existsSync(file)) return { error: t('“{name}” bir Focara projesi değil (project.json yok).', { name: path.basename(pkg) }) };
   try {
     const project = JSON.parse(await fsp.readFile(file, 'utf8'));
     const missing: string[] = [];
@@ -214,7 +216,7 @@ ipcMain.handle('dialog:openProject', async () => {
     defaultPath: defaultFolder(),
     // Project packages are folders; macOS also accepts projects from Odak (the old name) and Kadraj (same format).
     properties: isMac ? ['openFile', 'openDirectory', 'treatPackageAsDirectory'] : ['openDirectory'],
-    filters: isMac ? [{ name: t('Focus Projesi'), extensions: ['focus', 'odak', 'kadraj'] }] : undefined,
+    filters: isMac ? [{ name: t('Focara Projesi'), extensions: ['focus', 'odak', 'kadraj'] }] : undefined,
   });
   return r.canceled ? null : r.filePaths[0] ?? null;
 });
@@ -298,7 +300,7 @@ ipcMain.handle('capture:requestPermission', async () => {
   if (!isMac) return true;
   const h = helperPath();
   if (!fs.existsSync(h)) return false;
-  // Asking from the helper attributes the request to Focus (the responsible app).
+  // Asking from the helper attributes the request to Focara (the responsible app).
   const out = await new Promise<string>((resolve) => {
     const p = spawn(h, ['permission', '--request']);
     let s = ''; p.stdout.on('data', (d: Buffer) => { s += d.toString(); }); p.on('exit', () => resolve(s)); p.on('error', () => resolve(''));
@@ -415,7 +417,7 @@ ipcMain.handle('capture:start', async (_e, o: { displayId: number; systemAudio: 
     proc.kill();
     await fsp.rm(appending ? out : pkg, { recursive: true, force: true });
     const msg = first.code === 'permission'
-      ? t('macOS ekran kaydına izin vermedi.\n\nSistem Ayarları › Gizlilik ve Güvenlik › Ekran ve Sistem Sesi Kaydı\'nda Focus açık görünüyorsa bile, uygulama güncellendiyse macOS eski izni geçersiz sayar: Focus\'u listeden “–” ile kaldırın, sonra Focus\'ta kaydı yeniden başlatıp izin verin ve Focus\'u yeniden açın.')
+      ? t('macOS ekran kaydına izin vermedi.\n\nSistem Ayarları › Gizlilik ve Güvenlik › Ekran ve Sistem Sesi Kaydı\'nda Focara açık görünüyorsa bile, uygulama güncellendiyse macOS eski izni geçersiz sayar: Focara\'yı listeden “–” ile kaldırın, sonra Focara\'da kaydı yeniden başlatıp izin verin ve Focara\'yı yeniden açın.')
       : first.message ? helperMessage(String(first.message)) : (r.stderr.trim() || t('Kayıt başlatılamadı.'));
     return { ok: false, error: msg, code: first.code === 'permission' ? 'permission' : 'error' };
   }
@@ -570,19 +572,19 @@ function buildMenu() {
   };
   const template: Electron.MenuItemConstructorOptions[] = [
     ...(isMac ? [{
-      label: 'Focus',
+      label: 'Focara',
       submenu: [
-        { role: 'about' as const, label: t('Focus Hakkında') },
+        { role: 'about' as const, label: t('Focara Hakkında') },
         { type: 'separator' as const },
         settings, language,
         { type: 'separator' as const },
         { role: 'services' as const, label: t('Servisler') },
         { type: 'separator' as const },
-        { role: 'hide' as const, label: t('Focus\'u Gizle') },
+        { role: 'hide' as const, label: t('Focara\'yı Gizle') },
         { role: 'hideOthers' as const, label: t('Diğerlerini Gizle') },
         { role: 'unhide' as const, label: t('Tümünü Göster') },
         { type: 'separator' as const },
-        { role: 'quit' as const, label: t('Focus\'tan Çık') },
+        { role: 'quit' as const, label: t('Focara\'dan Çık') },
       ],
     }] : []),
     {
@@ -620,7 +622,7 @@ function buildMenu() {
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: docshotsDir ? 1440 : 1320, height: docshotsDir ? 900 : 860, minWidth: 1100, minHeight: 720,
-    show: false, title: 'Focus', backgroundColor: '#1e1e22',
+    show: false, title: 'Focara', backgroundColor: '#1e1e22',
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'), contextIsolation: true, sandbox: true,
       additionalArguments: isSelftest ? ['--selftest'] : isPerftest ? ['--perftest', ...process.argv.filter((a) => a === '--perf-report')]

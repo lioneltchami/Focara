@@ -27,7 +27,7 @@ export function SettingsDialog({ state, onPick, onClose }: { state: LanguageStat
               <button key={pref} className={state.pref === pref ? 'on' : ''} onClick={() => onPick(pref)} data-raw={pref !== 'auto' || undefined}>{name}</button>
             ))}
           </div>
-          <p className="muted small">{t('Bilgisayarının dili: {name}. “Sistem dili” seçiliyken Focus bu dille açılır; Türkçe dışındaki diller için İngilizce kullanılır.', { name: systemName })}</p>
+          <p className="muted small">{t('Bilgisayarının dili: {name}. “Sistem dili” seçiliyken Focara bu dille açılır; Türkçe dışındaki diller için İngilizce kullanılır.', { name: systemName })}</p>
         </section>
         <section className="setting">
           <h3>{t('Tanılama')}</h3>

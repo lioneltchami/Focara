@@ -338,13 +338,12 @@ async function banner(editorPng: Uint8Array): Promise<Uint8Array> {
   ctx.fillStyle = 'rgba(124,92,255,0.18)'; ctx.strokeStyle = 'rgba(167,139,250,0.5)'; ctx.lineWidth = 1.5;
   ctx.beginPath(); ctx.roundRect(x, 150, pw, 44, 22); ctx.fill(); ctx.stroke();
   ctx.fillStyle = '#d8d0ff'; ctx.fillText(pill, x + 20, 180);
-  ctx.font = font(fit('ODAK / FOCUS', 104, 800), 800);
-  const wOdak = ctx.measureText('ODAK').width, wSlash = ctx.measureText(' / ').width, wFocus = ctx.measureText('FOCUS').width;
-  ctx.fillStyle = '#fff'; ctx.fillText('ODAK', x, 312);
-  ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.fillText(' / ', x + wOdak, 312);
-  const g = ctx.createLinearGradient(x + wOdak + wSlash, 0, x + wOdak + wSlash + wFocus, 0);
+  const brand = 'Focara';
+  ctx.font = font(fit(brand, 104, 800), 800);
+  const wBrand = ctx.measureText(brand).width;
+  const g = ctx.createLinearGradient(x, 0, x + wBrand, 0);
   g.addColorStop(0, '#8b6cff'); g.addColorStop(0.55, '#c084fc'); g.addColorStop(1, '#f472b6');
-  ctx.fillStyle = g; ctx.fillText('FOCUS', x + wOdak + wSlash, 312);
+  ctx.fillStyle = g; ctx.fillText(brand, x, 312);
   const lines = tr ? ['Tıkladığın yere zoom yapan ekran kayıtları.', 'Kamera düzenleri, büyüteç ve gerçek bir editör.']
     : ['Screen recordings that zoom where you click.', 'Webcam layouts, a magnifier and a real editor.'];
   ctx.font = font(Math.min(...lines.map((l) => fit(l, 34, 500))), 500); ctx.fillStyle = '#d4d5ea';
@@ -359,7 +358,7 @@ export async function runDocshots() {
   try {
     const out = await odak().docshotsDir();
     await odak().selftestTempDir();
-    const pkg = await odak().createPackage('Focus Demo');
+    const pkg = await odak().createPackage('Focara Demo');
     const id = uuid();
     const dir = `${pkg}/media/${id}`;
     const save = async (name: string, data: Uint8Array) => { await odak().writeFile(out, name, data); log.push(`wrote ${name}`); };
@@ -393,7 +392,7 @@ export async function runDocshots() {
       id, kind: 'screenRecording', displayName: 'Screen recording', videoFile: `media/${id}/screen.mp4`, cameraFile: `media/${id}/camera.mp4`,
       cursorFile: `media/${id}/cursor.json`, duration: SECONDS, pixelWidth: W, pixelHeight: H, pixelsPerPoint: 2,
     };
-    let p: Project = newProject('Focus Demo');
+    let p: Project = newProject('Focara Demo');
     p.media = [asset];
     const clip = newClip(id, 0, SECONDS);
     clip.zooms = generateAutoZooms(track, SECONDS);
@@ -618,7 +617,7 @@ export async function runDocshots() {
     while ($('.modal.settings')) await sleep(30);
 
     // Editor GIFs: the real editor with a drawn mouse pointer, filmed by a camera that moves in on
-    // each step, the way Focus zooms in on clicks.
+    // each step, the way Focara zooms in on clicks.
     if (!uiOnly) {
       const fps = 12, OW = 1000, OH = 625, WW = innerWidth, WH = innerHeight;
       const ctx = new OffscreenCanvas(OW, OH).getContext('2d', { willReadFrequently: true })!;

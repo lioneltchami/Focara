@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Create or update lioneltchami/homebrew-tap Casks/focus.rb after a release.
+# Create or update lioneltchami/homebrew-tap Casks/focara.rb after a release.
 # Usage: update-homebrew-cask.sh <version> <arm64_sha256> <intel_sha256>
 # Env: HOMEBREW_TAP_DEPLOY_KEY (SSH private key with write access to the tap).
 set -euo pipefail
@@ -31,16 +31,16 @@ git clone --depth 1 "git@github.com:${TAP_REPO}.git" "$WORKDIR/tap"
 
 cd "$WORKDIR/tap"
 mkdir -p Casks
-cat > Casks/focus.rb <<EOF
-cask "focus" do
+cat > Casks/focara.rb <<EOF
+cask "focara" do
   arch arm: "arm64", intel: "x64"
 
   version "$VERSION"
   sha256 arm:   "$ARM_SHA",
          intel: "$INTEL_SHA"
 
-  url "https://github.com/lioneltchami/Focus/releases/download/v#{version}/Focus-#{version}-mac-#{arch}.dmg"
-  name "Focus"
+  url "https://github.com/lioneltchami/Focus/releases/download/v#{version}/Focara-#{version}-mac-#{arch}.dmg"
+  name "Focara"
   desc "Screen recorder with automatic, editable zoom"
   homepage "https://github.com/lioneltchami/Focus"
 
@@ -51,22 +51,25 @@ cask "focus" do
 
   depends_on macos: :sonoma
 
-  app "Focus.app"
+  app "Focara.app"
 
   caveats <<~EOS
-    Focus is not signed or notarized yet. On first launch, use System Settings > Privacy & Security > Open Anyway.
+    Focara is not signed or notarized yet. On first launch, use System Settings > Privacy & Security > Open Anyway.
   EOS
 end
 EOF
 
-if git ls-files --error-unmatch Casks/focus.rb >/dev/null 2>&1 && git diff --quiet -- Casks/focus.rb; then
-  echo "Focus cask already at $VERSION — nothing to commit"
+if git ls-files --error-unmatch Casks/focara.rb >/dev/null 2>&1 && git diff --quiet -- Casks/focara.rb && ! git ls-files --error-unmatch Casks/focus.rb >/dev/null 2>&1; then
+  echo "Focara cask already at $VERSION — nothing to commit"
   exit 0
 fi
 
-git config user.name "Focus Release Bot"
+# Retire the old cask name if it exists in the tap so it cannot offer a second install.
+rm -f Casks/focus.rb
+
+git config user.name "Focara Release Bot"
 git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-git add Casks/focus.rb
-git commit -m "focus ${VERSION}"
+git add -A Casks
+git commit -m "focara ${VERSION}"
 git push origin HEAD
-echo "Pushed Homebrew tap update for Focus ${VERSION}"
+echo "Pushed Homebrew tap update for Focara ${VERSION}"

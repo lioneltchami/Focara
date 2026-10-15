@@ -1,6 +1,6 @@
 {
   "name": "odak",
-  "productName": "Focus",
+  "productName": "Focara",
   "version": "0.1.0",
   "description": "Screen recorder with automatic, editable zoom, timed webcam layouts and a real editor. macOS and Windows.",
   "main": "dist-electron/main.cjs",
@@ -40,7 +40,7 @@
   "author": "Yıldız Dikme",
   "build": {
     "appId": "com.yildizdikme.focus",
-    "productName": "Focus",
+    "productName": "Focara",
     "copyright": "Copyright © Yıldız Dikme",
     "directories": {
       "output": "release",
@@ -81,11 +81,11 @@
         }
       ],
       "extendInfo": {
-        "NSMicrophoneUsageDescription": "Focus, kayıtlarına mikrofon sesini ayrı bir iz olarak eklemek için mikrofona erişir.",
-        "NSScreenCaptureUsageDescription": "Focus, seçtiğin ekranı kaydetmek için ekran kaydı iznine ihtiyaç duyar.",
-        "NSCameraUsageDescription": "Focus, ekran kaydıyla birlikte kamera görüntünü kaydetmek için kameraya erişir."
+        "NSMicrophoneUsageDescription": "Focara, kayıtlarına mikrofon sesini ayrı bir iz olarak eklemek için mikrofona erişir.",
+        "NSScreenCaptureUsageDescription": "Focara, seçtiğin ekranı kaydetmek için ekran kaydı iznine ihtiyaç duyar.",
+        "NSCameraUsageDescription": "Focara, ekran kaydıyla birlikte kamera görüntünü kaydetmek için kameraya erişir."
       },
-      "artifactName": "Focus-${version}-mac-${arch}.${ext}"
+      "artifactName": "Focara-${version}-mac-${arch}.${ext}"
     },
     "win": {
       "target": [
@@ -99,12 +99,12 @@
           "to": "bin/odak-capture.exe"
         }
       ],
-      "artifactName": "Focus-${version}-win-${arch}.${ext}"
+      "artifactName": "Focara-${version}-win-${arch}.${ext}"
     },
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
-      "artifactName": "Focus-Setup-${version}.${ext}"
+      "artifactName": "Focara-Setup-${version}.${ext}"
     },
     "afterSign": "scripts/after-sign.cjs"
   }

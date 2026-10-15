@@ -1,31 +1,31 @@
-<p align="center"><img src="docs/images/banner.png" alt="ODAK / FOCUS: screen recordings that zoom where you click, with webcam layouts, a magnifier and a real editor" width="100%"></p>
+<p align="center"><img src="docs/images/banner.png" alt="Focara logo" width="100%"></p>
 
-# ODAK / FOCUS
+# Focara
 
-**Record your screen. Focus zooms in where you click, follows your cursor, puts your webcam where your story needs it — and gives you a real editor to finish the video.**
-Free, runs on **macOS and Windows**, works completely offline. Its first name was *Odak*, Turkish for *focus*.
+**Record your screen. Focara zooms in where you click, follows your cursor, puts your webcam where your story needs it — and gives you a real editor to finish the video.**
+Free, runs on **macOS and Windows**, works completely offline. Focara was previously called Focus; the project began as Odak, Turkish for *focus*.
 
 🇹🇷 [Türkçe README](README.tr.md)
 
-![Focus demo: a webcam that starts full frame, automatic zoom on clicks, a cut, the same recording on other themes while the camera moves aside](docs/images/demo.gif)
+![Focara demo: a webcam that starts full frame, automatic zoom on clicks, a cut, the same recording on other themes while the camera moves aside](docs/images/demo.gif)
 
-<sub>Rendered by Focus itself from a demo project (the app, the presenter and the cursor path are generated for the demo). The theme changes show the same recording with different backgrounds — one click each.</sub>
+<sub>Rendered by Focara itself from a demo project (the app, the presenter and the cursor path are generated for the demo). The theme changes show the same recording with different backgrounds — one click each.</sub>
 
 ### The editor in action
 
 Every click is already a zoom. Make one deeper or point it at a fixed spot, and give the webcam its own layouts:
 
-![The Focus editor: a zoom made deeper and pointed at a fixed spot, the webcam full frame and then moved to the top left](docs/images/editing.gif)
+![The Focara editor: a zoom made deeper and pointed at a fixed spot, the webcam full frame and then moved to the top left](docs/images/editing.gif)
 
 Add a magnifier that follows your cursor, try themes:
 
-![The Focus editor: a magnifier added over the chart, then four themes one after another](docs/images/looks.gif)
+![The Focara editor: a magnifier added over the chart, then four themes one after another](docs/images/looks.gif)
 
 Cut with the scissors, play a slow part ×4, export:
 
-![The Focus timeline: a scissors cut, a range sped up ×4, the export dialog](docs/images/cutting.gif)
+![The Focara timeline: a scissors cut, a range sped up ×4, the export dialog](docs/images/cutting.gif)
 
-<sub>Recorded from the real editor; the camera moves in on each step the same way Focus zooms in on your clicks.</sub>
+<sub>Recorded from the real editor; the camera moves in on each step the same way Focara zooms in on your clicks.</sub>
 
 ---
 
@@ -34,7 +34,7 @@ Cut with the scissors, play a slow part ×4, export:
 - [The editor in action](#the-editor-in-action)
 - [Highlights](#highlights)
 - [In motion](#in-motion)
-- [How is Focus different?](#how-is-focus-different)
+- [How is Focara different?](#how-is-focara-different)
 - [Screenshots](#screenshots)
 - [Download and install](#download-and-install)
 - [Quick start: your first video in 2 minutes](#quick-start-your-first-video-in-2-minutes)
@@ -52,9 +52,9 @@ Cut with the scissors, play a slow part ×4, export:
 
 ## Highlights
 
-- 🎯 **Automatic zoom on clicks.** Focus records your cursor and clicks separately from the video. When you click, the view eases in towards that spot and follows your cursor with spring-smooth camera motion. Zooms on nearby clicks are merged; the camera settles where you spend the most time.
+- 🎯 **Automatic zoom on clicks.** Focara records your cursor and clicks separately from the video. When you click, the view eases in towards that spot and follows your cursor with spring-smooth camera motion. Zooms on nearby clicks are merged; the camera settles where you spend the most time.
 - ✏️ **Every zoom is editable.** Drag it, resize it, change the amount, or switch from *follow the cursor* to *a fixed point* that you pick on the frame. Regenerate the automatic ones at any time — your hand-edited zooms are kept.
-- 🎥 **Webcam with timed layouts.** Record your camera together with the screen. Show it as a circle, rounded or square bubble — and for any part of the video choose a different layout: **move it to one of 9 positions, make it full frame, or hide it**. Focus animates between layouts smoothly (0.5 s eased transitions).
+- 🎥 **Webcam with timed layouts.** Record your camera together with the screen. Show it as a circle, rounded or square bubble — and for any part of the video choose a different layout: **move it to one of 9 positions, make it full frame, or hide it**. Focara animates between layouts smoothly (0.5 s eased transitions).
 - 🔍 **Magnifier.** For any part of the video, a lens follows your cursor and shows what's under it larger — size (12–70 %), magnification (×1.25–×5) and shape (circle or rounded square) are adjustable; it pops open and closes smoothly.
 - ✂️ **A real editor.** Split, trim, reorder, duplicate, change speed (×0.5–×8), delete a time range across clips, cut with a scissors tool, import other videos, add more recordings to the same project. Everything is undoable.
 - ⏩ **Quiet moments.** One click finds the parts where nothing happens (screen unchanged, cursor still, no sound) and speeds them up or cuts them out — with a small margin so no movement gets clipped.
@@ -75,30 +75,30 @@ Cut with the scissors, play a slow part ×4, export:
 
 ![The same recording exported as 16:9, 9:16 and 1:1](docs/images/formats.gif)
 
-## How is Focus different?
+## How is Focara different?
 
-Focus was inspired by apps like [Screen Studio](https://screen.studio) that made auto-zooming screen recordings popular. It is an independent project, written from scratch, and not affiliated with Screen Studio.
+Focara was inspired by apps like [Screen Studio](https://screen.studio) that made auto-zooming screen recordings popular. It is an independent project, written from scratch, and not affiliated with Screen Studio.
 
-| | **Focus** | **Screen Studio** |
+| | **Focara** | **Screen Studio** |
 |---|---|---|
 | Platforms | **macOS and Windows** (same app, same features) | macOS only |
 | Price | **Free** | Paid |
 | Source code | Available in this repository | Closed |
 
-What Focus focuses on:
+What Focara focuses on:
 
 1. **A webcam that follows your story.** Select any time range (say 3:00–5:00) and give the camera its own layout there: another corner, the centre of an edge, full frame for an intro or a talking-head moment, or hidden while you show something under it. The camera glides to the new spot and back. Cuts inside a layout don't make it jump, and the layout stays attached to its footage when you cut or move clips.
-2. **Editing in the same app.** Focus's timeline has select / range / scissors tools, range speed-up, *Quiet moments*, video import and multi-recording projects — so you can go from raw recording to finished video without another editor.
+2. **Editing in the same app.** Focara's timeline has select / range / scissors tools, range speed-up, *Quiet moments*, video import and multi-recording projects — so you can go from raw recording to finished video without another editor.
 3. **Every device you use.** The same project folder opens on a Mac and on a Windows PC.
 4. **Formats for every channel:** vertical 9:16 for Shorts/Reels/TikTok, square for feeds, GIF for READMEs and chats, a PNG frame for your YouTube thumbnail, M4A/WAV for podcasts.
 
-> Feature sets of other apps change over time. This list describes what Focus does — check other apps' current versions yourself.
+> Feature sets of other apps change over time. This list describes what Focara does — check other apps' current versions yourself.
 
 ## Screenshots
 
 **The editor** — preview, timeline with clips, zooms (purple: automatic, orange: edited) and camera layouts (pink), and the style panel:
 
-![Focus editor](docs/images/editor.png)
+![Focara editor](docs/images/editor.png)
 
 **Camera layouts over time** — here the camera moves to the top-left while the chart is shown, then comes back:
 
@@ -146,61 +146,61 @@ Go to the **[Releases page](../../releases/latest)** and download the file for y
 
 | Your computer | File | Notes |
 |---|---|---|
-| Mac with Apple Silicon (M1, M2, M3, M4…) | `Focus-x.y.z-mac-arm64.dmg` | macOS 14 Sonoma or newer |
-| Mac with an Intel processor | `Focus-x.y.z-mac-x64.dmg` | macOS 14 or newer · passes the self-test under Rosetta, not yet tried on a real Intel Mac |
-| Windows PC | `Focus-Setup-x.y.z.exe` | Windows 10 (version 2004 or newer) or Windows 11, 64-bit |
-| Windows, without installing | `Focus-x.y.z-win-x64.zip` | Unzip anywhere and run `Focus.exe` |
+| Mac with Apple Silicon (M1, M2, M3, M4…) | `Focara-x.y.z-mac-arm64.dmg` | macOS 14 Sonoma or newer |
+| Mac with an Intel processor | `Focara-x.y.z-mac-x64.dmg` | macOS 14 or newer · passes the self-test under Rosetta, not yet tried on a real Intel Mac |
+| Windows PC | `Focara-Setup-x.y.z.exe` | Windows 10 (version 2004 or newer) or Windows 11, 64-bit |
+| Windows, without installing | `Focara-x.y.z-win-x64.zip` | Unzip anywhere and run `Focara.exe` |
 
 ### Install with Homebrew (macOS)
 
-After the first tagged release, install or update Focus with:
+After the first tagged release, install or update Focara with:
 
 ```bash
 brew tap lioneltchami/tap
-brew install --cask focus
+brew install --cask focara
 ```
 
-The cask is updated automatically after each release when the Homebrew tap deploy key is configured. Focus is not signed or notarized yet, so macOS may require **System Settings › Privacy & Security › Open Anyway** on first launch.
+The cask is updated automatically after each release when the Homebrew tap deploy key is configured. Focara is not signed or notarized yet, so macOS may require **System Settings › Privacy & Security › Open Anyway** on first launch.
 
 > **Not sure which Mac you have?** Apple menu  › *About This Mac*. "Chip: Apple M…" → Apple Silicon. "Processor: Intel…" → Intel.
 
-Focus is not signed with a paid Apple Developer ID or a Windows code-signing certificate yet, so your system will warn you the first time. This is expected; here is how to open it.
+Focara is not signed with a paid Apple Developer ID or a Windows code-signing certificate yet, so your system will warn you the first time. This is expected; here is how to open it.
 
 ### macOS
 
-1. Open the downloaded `.dmg` and drag **Focus** onto **Applications**.
-2. Open Focus from *Applications*. macOS says it can't verify the app — click **Done** (not *Move to Trash*).
-3. Open **System Settings › Privacy & Security**, scroll down to the message about Focus and click **Open Anyway**, then confirm with your password or Touch ID.
-   - On macOS 14 you can instead right-click Focus in *Applications* › **Open** › **Open**.
+1. Open the downloaded `.dmg` and drag **Focara** onto **Applications**.
+2. Open Focara from *Applications*. macOS says it can't verify the app — click **Done** (not *Move to Trash*).
+3. Open **System Settings › Privacy & Security**, scroll down to the message about Focara and click **Open Anyway**, then confirm with your password or Touch ID.
+   - On macOS 14 you can instead right-click Focara in *Applications* › **Open** › **Open**.
    - Terminal alternative (removes the "downloaded from the internet" flag):
      ```bash
-     xattr -dr com.apple.quarantine /Applications/Focus.app
+     xattr -dr com.apple.quarantine /Applications/Focara.app
      ```
 4. On your first recording macOS asks for permissions:
-   - **Screen & System Audio Recording** — required. After allowing it, macOS may ask you to quit and reopen Focus.
+   - **Screen & System Audio Recording** — required. After allowing it, macOS may ask you to quit and reopen Focara.
    - **Camera** and **Microphone** — only if you choose a camera or microphone.
 
-   You can change these any time in *System Settings › Privacy & Security*. If recording keeps failing after an update, use the **Reset Permissions** button that Focus shows with the error, then record again and allow.
+   You can change these any time in *System Settings › Privacy & Security*. If recording keeps failing after an update, use the **Reset Permissions** button that Focara shows with the error, then record again and allow.
 
 ### Windows
 
-1. Run `Focus-Setup-x.y.z.exe`.
+1. Run `Focara-Setup-x.y.z.exe`.
 2. If you see **"Windows protected your PC"** (SmartScreen), click **More info › Run anyway**.
-3. Choose where to install and finish. Focus appears in the Start menu.
+3. Choose where to install and finish. Focara appears in the Start menu.
 4. On first use Windows may ask for camera and microphone access (*Settings › Privacy & security › Camera / Microphone*). Screen recording needs no extra permission on Windows.
 
-Prefer not to install? Download the `.zip`, unzip it and run `Focus.exe`.
+Prefer not to install? Download the `.zip`, unzip it and run `Focara.exe`.
 
 ### Updating and uninstalling
 
 - **Update:** download the new version and install it over the old one. Your projects are separate files and are never touched.
-- **Coming from Odak** (the app's earlier name): install Focus, then delete *Odak* from *Applications* (Windows: uninstall Odak). On its first start Focus brings over your recent projects, language and microphone/camera choices; projects saved as `.odak` in **Movies/Odak** keep opening as before. macOS asks for the screen recording, camera and microphone permissions once more, for Focus.
-- **Uninstall:** macOS — drag *Focus* from *Applications* to the Trash. Windows — *Settings › Apps › Focus › Uninstall*. Your recordings stay in the `Focus` folder (see [Projects, files and privacy](#projects-files-and-privacy)) until you delete them.
+- **Coming from Focus or Odak:** install Focara. It brings over recent projects, language and microphone/camera choices from the previous app profile. Existing `.focus` and `.odak` projects stay where they are and continue to open; new recordings go in **Movies/Focara** (macOS) or **Videos/Focara** (Windows).
+- **Uninstall:** macOS — drag *Focara* from *Applications* to the Trash. Windows — *Settings › Apps › Focara › Uninstall*. Your recordings stay in their project folders (see [Projects, files and privacy](#projects-files-and-privacy)) until you delete them.
 
 ## Quick start: your first video in 2 minutes
 
-1. **Open Focus.** On the home screen pick the display to record. Optionally tick *system audio* and choose a **microphone** and a **camera** (a live camera preview appears).
-2. Click **● Start Recording**. Do your demo — click on the things you talk about; that's where Focus will zoom.
+1. **Open Focara.** On the home screen pick the display to record. Optionally tick *system audio* and choose a **microphone** and a **camera** (a live camera preview appears).
+2. Click **● Start Recording**. Do your demo — click on the things you talk about; that's where Focara will zoom.
 3. **Stop** with the small floating panel or **⌘⇧2** (macOS) / **Ctrl+Shift+2** (Windows).
 4. The recording opens in the editor with automatic zooms already made. Press **Space** to watch it.
 5. Pick a **Background** on the right: a colour, a theme or your own image.
@@ -209,7 +209,7 @@ Prefer not to install? Download the `.zip`, unzip it and run `Focus.exe`.
 
 ## User guide
 
-> Focus's interface is in English or Turkish (see [Language](#language)); this guide uses the English labels.
+> Focara's interface is in English or Turkish (see [Language](#language)); this guide uses the English labels.
 
 ### Recording
 
@@ -241,7 +241,7 @@ The bar above the timeline has three tools (the right side of the bar always exp
 | **✂ Blade** (scissors) | `C` | Click on a clip to cut it exactly there. A dashed line shows the cut; it snaps to the playhead. |
 
 Moving around:
-- Drag the **red playhead** by its head (or anywhere on the ruler). While you drag, Focus shows the nearest key frame instantly; the exact frame appears as soon as you stop.
+- Drag the **red playhead** by its head (or anywhere on the ruler). While you drag, Focara shows the nearest key frame instantly; the exact frame appears as soon as you stop.
 - **Space** play/pause · **←/→** one frame (**Shift** = 10 frames) · zoom the timeline with **− / ＋ / ⤢** or **Ctrl/⌘ + mouse wheel**.
 
 Editing:
@@ -335,10 +335,10 @@ Click **Export** at the top right or press **⌘E / Ctrl+E**.
 
 ## Language
 
-Focus speaks **English** and **Turkish**.
+Focara speaks **English** and **Turkish**.
 
-- **Automatic:** Focus uses your computer's language — Turkish when your system's first language is Turkish, English for every other language.
-- **Change it any time:** click **⚙ Settings** (top right of the home screen, or the ⚙ button in the editor's toolbar; also *Focus › Settings…* on macOS, *File › Settings…* on Windows, or `⌘,` / `Ctrl+,`) and pick **System language**, **Türkçe** or **English**. The whole interface switches immediately; an open project stays open and nothing is lost.
+- **Automatic:** Focara uses your computer's language — Turkish when your system's first language is Turkish, English for every other language.
+- **Change it any time:** click **⚙ Settings** (top right of the home screen, or the ⚙ button in the editor's toolbar; also *Focara › Settings…* on macOS, *File › Settings…* on Windows, or `⌘,` / `Ctrl+,`) and pick **System language**, **Türkçe** or **English**. The whole interface switches immediately; an open project stays open and nothing is lost.
 - The menu bar has a **Dil · Language** submenu too, labelled in both languages so it's easy to find whichever language is on.
 - Your choice is remembered. Projects don't depend on the language: a project made in Turkish opens in English and vice versa.
 
@@ -346,8 +346,8 @@ Focus speaks **English** and **Turkish**.
 
 ## Projects, files and privacy
 
-- **Everything stays on your computer.** Focus has no account, no cloud, no analytics and makes no network requests.
-- Recordings are saved as project folders in **Movies/Focus** (macOS) or **Videos\Focus** (Windows). Edits are saved automatically; close the app and continue later.
+- **Everything stays on your computer.** Focara has no account, no cloud, no analytics and makes no network requests.
+- Recordings are saved as project folders in **Movies/Focara** (macOS) or **Videos\Focara** (Windows). Edits are saved automatically; close the app and continue later.
 - A project is a plain folder you can back up, copy to another computer (Mac ↔ Windows) or inspect:
 
 ```
@@ -362,11 +362,11 @@ Recording 2026-10-15 10.12.30.focus/
 ```
 
 - Raw recordings are never modified — every edit is just data in `project.json`.
-- A diagnostics log (no screen content) helps with bug reports: *Help › Show Diagnostics Log* (also in **⚙ Settings**), or `~/Library/Logs/Focus/focus.log` on macOS and `%APPDATA%\Focus\logs\focus.log` on Windows.
+- A diagnostics log (no screen content) helps with bug reports: *Help › Show Diagnostics Log* (also in **⚙ Settings**), or `~/Library/Logs/Focara/focus.log` on macOS and `%APPDATA%\Focara\logs\focus.log` on Windows.
 
 ## Performance
 
-Focus ships with a performance test (`npm run perftest`) that builds a deliberately heavy project — 40 s of 2560×1600 60 fps screen video with busy content, a 1280×720 camera, two audio tracks, 16 clips with cuts and speed changes, zooms and camera layouts — and drives the real editor in a visible window.
+Focara ships with a performance test (`npm run perftest`) that builds a deliberately heavy project — 40 s of 2560×1600 60 fps screen video with busy content, a 1280×720 camera, two audio tracks, 16 clips with cuts and speed changes, zooms and camera layouts — and drives the real editor in a visible window.
 
 Results on an Apple M4 Pro with a 120 Hz display (packaged app):
 
@@ -386,13 +386,13 @@ Windows performance has not been measured on real hardware yet; the CI workflow 
 
 ## Troubleshooting
 
-**Recording fails although Focus has permission (macOS).** After an update, macOS sometimes keeps a stale permission. Click **Reset Permissions** in the error message, start recording again and allow access. You may need to quit and reopen Focus.
+**Recording fails although Focara has permission (macOS).** After an update, macOS sometimes keeps a stale permission. Click **Reset Permissions** in the error message, start recording again and allow access. You may need to quit and reopen Focara.
 
-**"Focus can't be opened" / "damaged" (macOS).** See [macOS install](#macos): *System Settings › Privacy & Security › Open Anyway*, or run the `xattr` command shown there.
+**"Focara can't be opened" / "damaged" (macOS).** See [macOS install](#macos): *System Settings › Privacy & Security › Open Anyway*, or run the `xattr` command shown there.
 
 **"Windows protected your PC".** Click **More info › Run anyway**. This appears because the installer isn't code-signed yet.
 
-**My camera or microphone isn't listed.** Close other apps using it, then reopen Focus. On macOS check *System Settings › Privacy & Security › Camera / Microphone*; on Windows *Settings › Privacy & security*.
+**My camera or microphone isn't listed.** Close other apps using it, then reopen Focara. On macOS check *System Settings › Privacy & Security › Camera / Microphone*; on Windows *Settings › Privacy & security*.
 
 **A recording made on a very large Windows display won't play.** Displays larger than 4096×2304 are recorded with HEVC on Windows; editing them requires a computer that can decode HEVC (on Windows: the *HEVC Video Extensions* from the Microsoft Store).
 
@@ -418,7 +418,7 @@ npm run dist:mac              # macOS: .dmg / .zip for arm64 and x64 → release
 npm run dist:win              # Windows: Setup .exe / .zip → release/
 ```
 
-In development mode (`npm run dev`) macOS asks for permissions for "Electron"; the packaged app asks for "Focus".
+In development mode (`npm run dev`) macOS asks for permissions for "Electron"; the packaged app asks for "Focara".
 
 **Publishing a release:** push a version tag that matches `package.json` — CI builds and tests on macOS and Windows, attaches the installers to a GitHub Release, and updates the Homebrew cask when its deploy key is configured:
 
@@ -490,5 +490,5 @@ node scripts/helper-smoke.mjs                      # records 3 s of this screen 
 - Displays larger than 4096×2304: on macOS the recording is scaled to fit; on Windows HEVC is used, which needs HEVC decoding to edit.
 - Linux: editing and export work when built from source; recording is not supported yet.
 - Clips that play faster or slower than 1× are silent (no pitch-preserving time-stretch yet).
-- *Quiet moments* works on Focus's own screen recordings (it uses the cursor data); imported videos aren't analysed.
-- On Windows the capture library doesn't let Focus choose the key-frame interval; the player compensates by preparing the next clip earlier.
+- *Quiet moments* works on Focara's own screen recordings (it uses the cursor data); imported videos aren't analysed.
+- On Windows the capture library doesn't let Focara choose the key-frame interval; the player compensates by preparing the next clip earlier.

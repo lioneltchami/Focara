@@ -76,7 +76,7 @@ test('no Turkish text is left outside t() / N() in the app', () => {
 
 test('JSX text and title attributes go through t()', () => {
   // Plain words in markup would stay in one language. Symbols, numbers, units and key names are fine.
-  const allowed = /^(?:[\s·×%/:,.…•↖↔✂┆⌫＋●⏩✦📷🔍⚙‹›↶↷⏮⏭▶❚⛶⊘🎞🖥➚⌖—–()?\d-]|Esc|fps|px|PNG|GIF|Focus|Dil · Language|S|[A-Z])*$/u;
+  const allowed = /^(?:[\s·×%/:,.…•↖↔✂┆⌫＋●⏩✦📷🔍⚙‹›↶↷⏮⏭▶❚⛶⊘🎞🖥➚⌖—–()?\d-]|Esc|fps|px|PNG|GIF|Focara|Dil · Language|S|[A-Z])*$/u;
   const found: string[] = [];
   for (const f of appSources.filter((x) => x.endsWith('.tsx'))) {
     const rest = code(f);
