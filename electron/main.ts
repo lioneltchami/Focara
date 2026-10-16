@@ -310,7 +310,7 @@ ipcMain.handle('capture:requestPermission', async () => {
 
 ipcMain.handle('capture:resetPermissions', async () => {
   if (!isMac) return true;
-  const id = 'com.yildizdikme.focus';
+  const id = 'com.lioneltchami.focara';
   const results: string[] = [];
   for (const service of ['ScreenCapture', 'Camera', 'Microphone']) {
     results.push(await new Promise<string>((resolve) => execFile('tccutil', ['reset', service, id], (err, out, errOut) =>
