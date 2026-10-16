@@ -44,6 +44,6 @@ The focus frame uses thick strokes and rounded outer corners. Keep the center do
 ## Do's and Don'ts
 
 - Use `docs/images/focara-logo.png` for the approved horizontal logo.
-- Use `build/icon.png` for the macOS and Windows app icon.
+- Use `build/icon.png` for the Windows app icon and larger macOS icon sizes. Use `build/icon-mac-small.svg` as the simplified source for the 16/32/64-pixel macOS title-bar artwork embedded in `build/icon-mac.icns`.
 - Preserve the existing `.focus` project extension and use `com.lioneltchami.focara` as the app identifier.
 - Do not reintroduce the ODAK / FOCUS wordmark; Odak and Focus are historical app names only.
