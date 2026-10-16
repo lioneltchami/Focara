@@ -37,11 +37,11 @@
     "vite": "8.3.4"
   },
   "type": "module",
-  "author": "Lionel Tchami",
+  "author": "Focara",
   "build": {
-    "appId": "com.lioneltchami.focara",
+    "appId": "com.focara.app",
     "productName": "Focara",
-    "copyright": "Copyright © Lionel Tchami",
+    "copyright": "Copyright © Focara",
     "directories": {
       "output": "release",
       "buildResources": "build"
